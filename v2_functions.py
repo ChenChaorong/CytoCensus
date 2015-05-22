@@ -9,8 +9,13 @@ import time
 from sklearn.ensemble import ExtraTreesRegressor
 import cPickle as pickle
 from scipy.ndimage import filters
-
-"""QuantiFly Software v2.0
+from oiffile import OifFile
+import itertools as itt
+import struct
+import copy
+from matplotlib.lines import Line2D
+from matplotlib.path import Path
+"""QuantiFly3d Software v0.0
 
     Copyright (C) 2015  Dominic Waithe
 
@@ -28,6 +33,282 @@ from scipy.ndimage import filters
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 """
+
+def peak_local_max(image, min_distance=10, threshold_abs=0, threshold_rel=0.1,
+                   exclude_border=False, indices=True, num_peaks=np.inf,
+                   footprint=None, labels=None):
+    """
+    Find peaks in an image, and return them as coordinates or a boolean array.
+
+    Peaks are the local maxima in a region of `2 * min_distance + 1`
+    (i.e. peaks are separated by at least `min_distance`).
+
+    NOTE: If peaks are flat (i.e. multiple adjacent pixels have identical
+    intensities), the coordinates of all such pixels are returned.
+
+    Parameters
+    ----------
+    image : ndarray of floats
+        Input image.
+    min_distance : int
+        Minimum number of pixels separating peaks in a region of `2 *
+        min_distance + 1` (i.e. peaks are separated by at least
+        `min_distance`). If `exclude_border` is True, this value also excludes
+        a border `min_distance` from the image boundary.
+        To find the maximum number of peaks, use `min_distance=1`.
+    threshold_abs : float
+        Minimum intensity of peaks.
+    threshold_rel : float
+        Minimum intensity of peaks calculated as `max(image) * threshold_rel`.
+    exclude_border : bool
+        If True, `min_distance` excludes peaks from the border of the image as
+        well as from each other.
+    indices : bool
+        If True, the output will be an array representing peak coordinates.
+        If False, the output will be a boolean array shaped as `image.shape`
+        with peaks present at True elements.
+    num_peaks : int
+        Maximum number of peaks. When the number of peaks exceeds `num_peaks`,
+        return `num_peaks` peaks based on highest peak intensity.
+    footprint : ndarray of bools, optional
+        If provided, `footprint == 1` represents the local region within which
+        to search for peaks at every point in `image`.  Overrides
+        `min_distance`, except for border exclusion if `exclude_border=True`.
+    labels : ndarray of ints, optional
+        If provided, each unique region `labels == value` represents a unique
+        region to search for peaks. Zero is reserved for background.
+
+    Returns
+    -------
+    output : ndarray or ndarray of bools
+
+        * If `indices = True`  : (row, column, ...) coordinates of peaks.
+        * If `indices = False` : Boolean array shaped like `image`, with peaks
+          represented by True values.
+
+    Notes
+    -----
+    The peak local maximum function returns the coordinates of local peaks
+    (maxima) in a image. A maximum filter is used for finding local maxima.
+    This operation dilates the original image. After comparison between
+    dilated and original image, peak_local_max function returns the
+    coordinates of peaks where dilated image = original.
+
+    Examples
+    --------
+    >>> img1 = np.zeros((7, 7))
+    >>> img1[3, 4] = 1
+    >>> img1[3, 2] = 1.5
+    >>> img1
+    array([[ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ],
+           [ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ],
+           [ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ],
+           [ 0. ,  0. ,  1.5,  0. ,  1. ,  0. ,  0. ],
+           [ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ],
+           [ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ],
+           [ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ]])
+
+    >>> peak_local_max(img1, min_distance=1)
+    array([[3, 2],
+           [3, 4]])
+
+    >>> peak_local_max(img1, min_distance=2)
+    array([[3, 2]])
+
+    >>> img2 = np.zeros((20, 20, 20))
+    >>> img2[10, 10, 10] = 1
+    >>> peak_local_max(img2, exclude_border=False)
+    array([[10, 10, 10]])
+
+    """
+    out = np.zeros_like(image, dtype=np.bool)
+    # In the case of labels, recursively build and return an output
+    # operating on each label separately
+    """
+    if labels is not None:
+        label_values = np.unique(labels)
+        # Reorder label values to have consecutive integers (no gaps)
+        if np.any(np.diff(label_values) != 1):
+            mask = labels >= 1
+            labels[mask] = 1 + rank_order(labels[mask])[0].astype(labels.dtype)
+        labels = labels.astype(np.int32)
+
+        # New values for new ordering
+        label_values = np.unique(labels)
+        for label in label_values[label_values != 0]:
+            maskim = (labels == label)
+            out += peak_local_max(image * maskim, min_distance=min_distance,
+                                  threshold_abs=threshold_abs,
+                                  threshold_rel=threshold_rel,
+                                  exclude_border=exclude_border,
+                                  indices=False, num_peaks=np.inf,
+                                  footprint=footprint, labels=None,overlap=overlap)
+
+        if indices is True:
+            return np.transpose(out.nonzero())
+        else:
+            return out.astype(np.bool)
+            """
+
+
+
+    if np.all(image == image.flat[0]):
+        if indices is True:
+            return []
+        else:
+            return out
+
+    image = image.copy()
+    # Non maximum filter
+    if footprint is not None:
+        image_max = filters.maximum_filter(image, footprint=footprint,mode='constant')
+    else:
+        size = np.array(min_distance)*2.3548
+        image_max = filters.maximum_filter(image, size=size, mode='constant')
+    mask = (image == image_max)
+    image *= mask
+
+    if exclude_border:
+        # zero out the image borders
+        for i in range(image.ndim):
+            image = image.swapaxes(0, i)
+            
+            min_d = np.floor(min_distance[i])
+            
+            image[:min_d] = 0
+            image[-min_d:] = 0
+            image = image.swapaxes(0, i)
+
+    # find top peak candidates above a threshold
+    peak_threshold = max(np.max(image.ravel()) * threshold_rel, threshold_abs)
+
+    # get coordinates of peaks
+    coordinates = np.argwhere(image > peak_threshold)
+
+    if coordinates.shape[0] > num_peaks:
+        intensities = image.flat[np.ravel_multi_index(coordinates.transpose(),image.shape)]
+        idx_maxsort = np.argsort(intensities)[::-1]
+        coordinates = coordinates[idx_maxsort][:num_peaks]
+
+    if indices is True:
+        return coordinates
+    else:
+        nd_indices = tuple(coordinates.T)
+        out[nd_indices] = True
+
+       
+        return out
+        #return out
+"""rankorder.py - convert an image of any type to an image of ints whose
+pixels have an identical rank order compared to the original image
+
+Originally part of CellProfiler, code licensed under both GPL and BSD licenses.
+Website: http://www.cellprofiler.org
+Copyright (c) 2003-2009 Massachusetts Institute of Technology
+Copyright (c) 2009-2011 Broad Institute
+All rights reserved.
+Original author: Lee Kamentstky
+"""
+import numpy as np
+
+
+def rank_order(image):
+    """Return an image of the same shape where each pixel is the
+    index of the pixel value in the ascending order of the unique
+    values of `image`, aka the rank-order value.
+
+    Parameters
+    ----------
+    image: ndarray
+
+    Returns
+    -------
+    labels: ndarray of type np.uint32, of shape image.shape
+        New array where each pixel has the rank-order value of the
+        corresponding pixel in `image`. Pixel values are between 0 and
+        n - 1, where n is the number of distinct unique values in
+        `image`.
+
+    original_values: 1-D ndarray
+        Unique original values of `image`
+
+    Examples
+    --------
+    >>> a = np.array([[1, 4, 5], [4, 4, 1], [5, 1, 1]])
+    >>> a
+    array([[1, 4, 5],
+           [4, 4, 1],
+           [5, 1, 1]])
+    >>> rank_order(a)
+    (array([[0, 1, 2],
+           [1, 1, 0],
+           [2, 0, 0]], dtype=uint32), array([1, 4, 5]))
+    >>> b = np.array([-1., 2.5, 3.1, 2.5])
+    >>> rank_order(b)
+    (array([0, 1, 2, 1], dtype=uint32), array([-1. ,  2.5,  3.1]))
+    """
+    flat_image = image.ravel()
+    sort_order = flat_image.argsort().astype(np.uint32)
+    flat_image = flat_image[sort_order]
+    sort_rank = np.zeros_like(sort_order)
+    is_different = flat_image[:-1] != flat_image[1:]
+    np.cumsum(is_different, out=sort_rank[1:])
+    original_values = np.zeros((sort_rank[-1] + 1,), image.dtype)
+    original_values[0] = flat_image[0]
+    original_values[1:] = flat_image[1:][is_different]
+    int_image = np.zeros_like(sort_order)
+    int_image[sort_order] = sort_rank
+    return (int_image.reshape(image.shape), original_values)
+def _blob_overlap(blob1, blob2,min_distance):
+    """Finds the overlapping area fraction between two blobs.
+    Returns a float representing fraction of overlapped area.
+    """
+    
+    d1 = abs(blob1[0] - blob2[0]) > min_distance[0]
+    d2 = abs(blob1[1] - blob2[1]) > min_distance[1]
+    d3 = abs(blob1[2] - blob2[2]) > min_distance[2]
+
+    if d1 == False or d2 == False or d3 == False:
+        #overlap detected
+        
+        return True
+    
+    return False
+
+def _prune_blobs(blobs_array, min_distance):
+    """Eliminated blobs with area overlap.
+
+    Parameters
+    ----------
+    blobs_array : ndarray
+        A 2d array with each row representing 3 values, ``(y,x,sigma)``
+        where ``(y,x)`` are coordinates of the blob and ``sigma`` is the
+        standard deviation of the Gaussian kernel which detected the blob.
+    overlap : float
+        A value between 0 and 1. If the fraction of area overlapping for 2
+        blobs is greater than `overlap` the smaller blob is eliminated.
+
+    Returns
+    -------
+    A : ndarray
+        `array` with overlapping blobs removed.
+    """
+
+    # iterating again might eliminate more blobs, but one iteration suffices
+    # for most cases
+    for blob1, blob2 in itt.combinations(blobs_array, 2):
+
+        if _blob_overlap(blob1, blob2,min_distance) == True:
+            blob2[2] = -1
+
+            #if blob1[2] > blob2[2]:
+            #    blob2[2] = -1
+            #else:
+            #    blob1[2] = -1
+
+    # return blobs_array[blobs_array[:, 2] > 0]
+    return np.array([b for b in blobs_array if b[2] > 0])
+
 def calculateCI(data1,data2, test_value):
     """Returns bootstrap estimate of 100.0*(1-alpha) CI for statistic."""
     
@@ -279,13 +560,25 @@ def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=N
             
             imStr = str(par_obj.file_array[b])
             frames = inner_loop_arr[b]
+            if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
+                temp = Tiff_Controller(imStr)
+            if par_obj.file_ext == 'oib':
+                par_obj.oib_file = OifFile(imStr).asarray()[:,:,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
+
+
             for i in frames:
                 count = count+1
                 if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
-                    temp = Tiff_Controller(imStr)
+                    
                     imRGB = temp.get_frame(i)
                 elif par_obj.file_ext == 'png':
                     imRGB = pylab.imread(str(imStr))*255
+                elif par_obj.file_ext == 'oib':
+                    par_obj.height = par_obj.oib_file.shape[2]
+                    par_obj.width = par_obj.oib_file.shape[3]
+                    imRGB = np.zeros((int(par_obj.height),int(par_obj.width),par_obj.ch_active.__len__()))
+                    for c in range(0,par_obj.ch_active.__len__()):
+                        imRGB[:,:,c] = par_obj.oib_file[c,i,:,:]
                 if par_obj.fresh_features == False:
                     try:
                         #Try loading features.
@@ -303,6 +596,7 @@ def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=N
                     int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(i+1))
                     feat =feature_create(par_obj,imRGB,imStr,i)
                 par_obj.num_of_feat = feat.shape[2]
+                print 'thecountersays',count
                 par_obj.feat_arr[count] = feat  
     
     return
@@ -361,6 +655,7 @@ def evaluate_forest(par_obj,int_obj,withGT,model_num,inline=False,inner_loop=Non
                 linPred = v2.regenerateImg(par_obj.p_size, tree_pred, pos)
                     
             else:
+                print 'the count is:',count
                 mimg_lin = np.reshape(par_obj.feat_arr[count], (par_obj.height * par_obj.width, par_obj.feat_arr[count].shape[2]))
                 t2 = time.time()
                 linPred = par_obj.RF[model_num].predict(mimg_lin)
@@ -609,6 +904,12 @@ def eval_goto_img_fn(im_num, par_obj, int_obj):
         imStr = str(par_obj.file_array[b])
         temp = Tiff_Controller(imStr)
         imRGB = temp.get_frame(i)
+    if ( par_obj.file_ext == 'oib'):
+        print 'current index', i
+        imRGB = np.zeros((int(par_obj.height),int(par_obj.width),par_obj.ch_active.__len__()))
+        for c in range(0,par_obj.ch_active.__len__()):
+            imRGB[:,:,c] = 0.99- (par_obj.oib_file[c,i,:,:].astype(np.float64)/np.max(par_obj.oib_file[c,i,:,:].astype(np.float64)))
+        
     count = 0
     CH = [0]*par_obj.numCH
     for c in range(0,par_obj.numCH):
@@ -643,10 +944,13 @@ def eval_goto_img_fn(im_num, par_obj, int_obj):
         int_obj.plt1.lines.pop(0)
     par_obj.newImg = newImg
     int_obj.plt1.cla()
-    int_obj.plt1.imshow(255-newImg)
+    int_obj.plt1.imshow(254-newImg)
+    int_obj.plt1.set_xlim([0,newImg.shape[0]])
+    int_obj.plt1.set_ylim([newImg.shape[1],0])
     int_obj.draw_saved_dots_and_roi()
     int_obj.plt1.set_xticklabels([])
     int_obj.plt1.set_yticklabels([])
+    int_obj.cursor.draw_ROI()
     int_obj.canvas1.draw()
     #del im
     
@@ -657,16 +961,46 @@ def eval_goto_img_fn(im_num, par_obj, int_obj):
 def eval_pred_show_fn(im_num,par_obj,int_obj):
     """Shows Prediction Image when forest is loaded"""
     if par_obj.eval_load_im_win_eval == True:
+        print 'okyeah',str(im_num)
         int_obj.image_num_txt.setText('The Current Image is No. ' + str(par_obj.curr_img+1))
-        
-        string_2_show = 'The Predicted Count: ' + str(round(par_obj.sum_pred[im_num],1)) 
-        if par_obj.upperCI[im_num] < 1000:
-            string_2_show += ' with bias correction: '+str(round(par_obj.CC[im_num],1))+' +\- CI '+str(np.round(par_obj.upperCI[im_num],2))+''
-        int_obj.output_count_txt.setText(string_2_show)
+
+        if int_obj.count_maxima_plot_on.isChecked() == True:
+            par_obj.show_pts = True
+        else:
+            par_obj.show_pts = False
+
         int_obj.plt2.cla()
-        int_obj.plt2.imshow(par_obj.pred_arr[im_num].astype(np.float32))
+
+
+        if par_obj.show_pts == True:
+            
+            pt_x = []
+            pt_y = []
+            for pt2d in par_obj.pts:
+                if pt2d[2] == par_obj.curr_img:
+
+
+                    
+
+                        pt_x.append(pt2d[1])
+                        pt_y.append(pt2d[0])
+
+
+            int_obj.plt1.plot(pt_x,pt_y, 'go')
+            int_obj.plt2.plot(pt_x,pt_y, 'go')
+            string_2_show = 'The Predicted Count: ' + str(par_obj.pts.__len__())
+        #if par_obj.upperCI[im_num] < 1000:
+        #    string_2_show += ' with bias correction: '+str(round(par_obj.CC[im_num],1))+' +\- CI '+str(np.round(par_obj.upperCI[im_num],2))+''
+            int_obj.output_count_txt.setText(string_2_show)
+            int_obj.plt2.imshow(par_obj.maxi_arr[im_num].astype(np.float32))
+        else:
+            int_obj.plt2.imshow(par_obj.pred_arr[im_num].astype(np.float32))
+        
+
+
         int_obj.plt2.set_xticklabels([])
         int_obj.plt2.set_yticklabels([])
+        int_obj.canvas1.draw()
         int_obj.canvas2.draw()
         
  
@@ -703,7 +1037,18 @@ def import_data_fn(par_obj,file_array):
                 
                 par_obj.test_im_end = par_obj.tiff_file.maxFrames
                 imRGB = par_obj.tiff_file.get_frame(0)
+            elif par_obj.file_ext == 'oib':
+                par_obj.oib_file = OifFile(imStr).asarray()
+                par_obj.numCH = par_obj.oib_file.shape[0]
                 
+
+                par_obj.bitDepth = 16
+                imRGB = par_obj.oib_file[0,0,:,:]
+                par_obj.test_im_end = par_obj.oib_file.shape[1]
+                if par_obj.oib_file.shape[1] > 8:
+                    par_obj.uploadLimit = 8
+                else:
+                    par_obj.uploadLimit = par_obj.oib_file.shape[1]
                 
             elif par_obj.file_ext =='png':
                  
@@ -740,7 +1085,7 @@ def import_data_fn(par_obj,file_array):
     par_obj.height = imRGB.shape[0]
     par_obj.width = imRGB.shape[1]
     par_obj.im_num_range = range(par_obj.test_im_start, par_obj.test_im_end)
-    par_obj.num_of_train_im = par_obj.test_im_end
+    par_obj.num_of_train_im = par_obj.test_im_end - par_obj.test_im_start
     
     
     if imRGB.shape.__len__() > 2:
@@ -751,6 +1096,8 @@ def import_data_fn(par_obj,file_array):
         else:
             #If the size of the third dimenion is just 1, this is invalid for imshow show we have to adapt.
             par_obj.ex_img = imRGB[:,:,0]
+    elif imRGB.shape.__len__() ==2:
+        par_obj.ex_img = imRGB[:,:]
     
 
     
@@ -781,7 +1128,376 @@ def save_output_data_fn(par_obj,int_obj):
                 
 
     int_obj.report_progress('Data exported to '+ par_obj.csvPath)
+class ROI:
+    
+    def __init__(self, int_obj,par_obj):
+        self.ppt_x = []
+        self.ppt_y = []
+        self.line = [None]
+        self.int_obj = int_obj
+        self.complete = False
+        self.flag = False
+        self.par_obj = par_obj
+        
+        
+    def motion_notify_callback(self, event):
+        #Mouse moving.
+        if event.inaxes: 
+            self.int_obj.plt1 = event.inaxes
+            x, y = event.xdata, event.ydata
+            if self.flag == True and event.button == 1: 
+                i = self.flag_idx
+                print self.ppt_x.__len__()
+                print 'line',self.line.__len__()
+                self.ppt_x[i] = x
+                self.ppt_y[i] = y
+                
+                if i  == self.ppt_x.__len__()-1:
+                    
+                    self.line[0].set_data([self.ppt_x[i], self.ppt_x[0]],[self.ppt_y[i], self.ppt_y[0]])
+                    self.line[i].set_data([self.ppt_x[i], self.ppt_x[i-1]],[self.ppt_y[i], self.ppt_y[i-1]])   
+                else:
+                    self.line[i+1].set_data([self.ppt_x[i], self.ppt_x[i+1]],[self.ppt_y[i], self.ppt_y[i+1]])
+                    self.line[i].set_data([self.ppt_x[i], self.ppt_x[i-1]],[self.ppt_y[i], self.ppt_y[i-1]])   
+                self.int_obj.canvas1.draw()
+                self.par_obj.roi_stk_x[self.par_obj.curr_img] = copy.deepcopy(self.ppt_x)
+                self.par_obj.roi_stk_y[self.par_obj.curr_img] = copy.deepcopy(self.ppt_y)
+                #self.flag = False
+            
+        
+    def button_press_callback(self, event):
+        #Mouse clicking
+        if event.inaxes: 
+            x, y = event.xdata, event.ydata
+            self.int_obj.plt1 = event.inaxes
+            if event.button == 1:  # If you press the left button
+                #Scan all to check if 
+                if self.flag == False:
+                    for i in range(0,self.ppt_x.__len__()):
+                        if abs(x - self.ppt_x[i])<10 and abs(y - self.ppt_y[i])<10:
+                            self.flag = True
+                            self.flag_idx = i
+                            print 'here ',i
+                            break;
+                            
+                
+                    
+                    if self.flag == False and self.complete == False:
+                        
+                        if self.line[-1] == None: # if there is no line, create a line
+                            self.line[0] = Line2D([x,  x],[y, y], marker = 'o')
+                            self.ppt_x.append(x)
+                            self.ppt_y.append(y) 
+                            self.int_obj.plt1.add_line(self.line[0])
+                            self.int_obj.canvas1.draw()
+                        # add a segment
+                        else: # if there is a line, create a segment
+                            
+                            self.line.append(Line2D([self.ppt_x[-1], x], [self.ppt_y[-1], y],marker = 'o'))
+                            self.ppt_x.append(x)
+                            self.ppt_y.append(y)
+                            self.int_obj.plt1.add_line(self.line[-1])
+                            self.int_obj.canvas1.draw()
+                        self.par_obj.roi_stk_x[self.par_obj.curr_img] = copy.deepcopy(self.ppt_x)
+                        self.par_obj.roi_stk_y[self.par_obj.curr_img] = copy.deepcopy(self.ppt_y)
+    def button_release_callback(self, event):
+        self.flag = False
+    def complete_roi(self):
+        print 'ROI completed.'
+        self.complete = True
+        self.draw_ROI()
+        self.reparse_ROI(self.par_obj.curr_img)
+        #self.find_the_inside()
+    def draw_ROI(self):
+        #redraws the regions in the current slice.
+        drawn = False
+        for bt in self.par_obj.roi_stk_x:
+            if bt == self.par_obj.curr_img:
+                cppt_x = self.par_obj.roi_stk_x[self.par_obj.curr_img]  
+                cppt_y = self.par_obj.roi_stk_y[self.par_obj.curr_img]
+                self.line = [None]
+                for i in range(0,cppt_x.__len__()):
+                    if i ==0:
+                        self.line[0] = Line2D([cppt_x[0], cppt_x[0]], [cppt_y[0], cppt_y[0]], marker = 'o',color='red')
+                        self.int_obj.plt1.add_line(self.line[-1])
 
+                    elif i  < cppt_x.__len__():
+                        self.line.append(Line2D([cppt_x[i-1], cppt_x[i]], [cppt_y[i-1], cppt_y[i]], marker = 'o',color='red'))
+                        self.int_obj.plt1.add_line(self.line[-1])
+                drawn = True
+        if drawn == False:
+            for bt in self.par_obj.roi_stkint_x:
+                if bt == self.par_obj.curr_img:
+                    cppt_x = self.par_obj.roi_stkint_x[self.par_obj.curr_img]  
+                    cppt_y = self.par_obj.roi_stkint_y[self.par_obj.curr_img]
+                    self.line = [None]
+                    for i in range(0,cppt_x.__len__()):
+                        if i == 0:
+                            self.line[0] = Line2D([cppt_x[0], cppt_x[0]], [cppt_y[0], cppt_y[0]], color='red')
+                            self.int_obj.plt1.add_line(self.line[-1])
+
+                        elif i  < cppt_x.__len__():
+                            self.line.append(Line2D([cppt_x[i-1], cppt_x[i]], [cppt_y[i-1], cppt_y[i]], color='red'))
+                            self.int_obj.plt1.add_line(self.line[-1])
+        
+
+
+
+        self.int_obj.canvas1.draw()
+    def reparse_ROI(self,im_num):
+        #So that we can compare the ROI we resample them to have many more points.
+        #This sounds straightforward but first we have to measure the distance between existing points.
+        #And then we resample at specific intervals across the whole outline
+        to_approve = []
+        #Iterate the list of all the interpolations
+        for bt in self.par_obj.roi_stkint_x:
+            #If there is a matching hand-drawn one we 
+            to_approve.append(bt)
+                
+        
+        for cv in to_approve:
+            del self.par_obj.roi_stkint_x[cv]
+            del self.par_obj.roi_stkint_y[cv]
+
+        for cd in self.par_obj.roi_stk_x:
+                
+            #First we make a local copy. We make a deep copy because python uses pointers and we don't want to change the original.
+            cppt_x = copy.deepcopy(self.par_obj.roi_stk_x[cd])
+            cppt_y = copy.deepcopy(self.par_obj.roi_stk_y[cd])
+
+            dist = []
+            #This is where we measure the distance between each of the defined points. 
+            for i in range(0,cppt_y.__len__()-1):
+                dist.append(np.sqrt((cppt_x[i]-cppt_x[i+1])**2+(cppt_y[i]-cppt_y[i+1])**2))
+            dist.append(np.sqrt((cppt_x[i+1]-cppt_x[0])**2+(cppt_y[i+1]-cppt_y[0])**2))
+            cmdist = [0]
+            for i in range(0,dist.__len__()):
+                cmdist.append(cmdist[-1]+dist[i])
+
+            #We normalise the total distance to one in each case.
+            cmdist = np.array(cmdist)
+            cmdist = cmdist/cmdist[-1]
+
+            #now we set the number of points. Should be a high number.
+            npts = self.par_obj.npts
+            pos = np.linspace(0,1,npts)
+            
+            cppt_x.append(cppt_x[0])
+            cppt_y.append(cppt_y[0])
+           
+            nppt_x = []#[0]*npts
+            nppt_y = []#[0]*npts
+
+            #Now we interpolate between the points so that the structure is equally distributed with points.
+            for i in range(0,npts):
+                for b in range(0,cmdist.shape[0]-1):
+                    ind0 = 0
+                    ind1 = 1
+                    if pos[i]>=cmdist[b] and pos[i]<=cmdist[b+1]:
+                        ind0 = b
+                        ind1 = b+1
+                        break;
+                
+                pt0x = cppt_x[ind0]
+                pt0y = cppt_y[ind0]
+                pt1x = cppt_x[ind1]
+                pt1y = cppt_y[ind1]
+
+
+                l0 = pos[i] - cmdist[ind0]
+                l1 = cmdist[ind1]-pos[i]
+                
+                #if(l0+l1) > 0.001:
+                nppt_x.append(((pt0x*l1) + (pt1x*l0))/(l0+l1))
+                nppt_y.append(((pt0y*l1) + (pt1y*l0))/(l0+l1))
+            self.par_obj.roi_stkint_x[cd]  = nppt_x
+            self.par_obj.roi_stkint_y[cd]  = nppt_y
+
+        
+        #self.int_obj.plt1.plot(nppt_x,nppt_y,'-')
+        #self.int_obj.canvas1.draw()
+
+    def interpolate_ROI(self):
+        
+        
+
+        #We want to interpolate between frames. So we make sure the frames are in order.
+        tosort = []
+        for bt in self.par_obj.roi_stkint_x:
+            tosort.append(bt)
+        sortd = np.sort(np.array(tosort))
+
+        #For each of the slices which have been drawn in
+        for b in range(0,sortd.shape[0]-1):
+            ab = sortd[b]
+            ac = sortd[b+1]
+            #We assess if there are any slices which are empty within the range.
+            if (ac-ab) > 1:
+                #We then copy the points. (we use deepcopy because python uses pointers by defualt and we don't want to edit the original)
+                lrx = copy.deepcopy(self.par_obj.roi_stkint_x[ab])
+                lry = copy.deepcopy(self.par_obj.roi_stkint_y[ab])
+                upx = copy.deepcopy(self.par_obj.roi_stkint_x[ac])
+                upy = copy.deepcopy(self.par_obj.roi_stkint_y[ac])
+                
+                #Now we try and line up points which are closest.
+                minfn1 = []
+                for bx in range(0,lrx.__len__()):
+                    lrx.append(lrx[0])
+                    lry.append(lry[0])
+                    lrx = lrx[1:]
+                    lry = lry[1:]
+
+                    ai = np.array(lrx)-np.array(upx)
+                    bi = np.array(lry)-np.array(upy)
+                    minfn1.append(np.sum(((ai**2)+(bi**2))**0.5))
+
+
+                #The list can be reversed depending on howe the ROI was drawn (clockwise or anti-clockwise)
+                lrx = copy.deepcopy(self.par_obj.roi_stkint_x[ab])[::-1]
+                lry = copy.deepcopy(self.par_obj.roi_stkint_y[ab])[::-1]
+
+                minfn2 = []
+                for bx in range(0,lrx.__len__()):
+                    lrx.append(lrx[0])
+                    lry.append(lry[0])
+                    lrx = lrx[1:]
+                    lry = lry[1:]
+
+                    ai = np.array(lrx)-np.array(upx)
+                    bi = np.array(lry)-np.array(upy)
+                    minfn2.append(np.sum(((ai**2)+(bi**2))**0.5))
+                
+
+                #Now we take the minimum of the two.
+                opt = np.argmin([np.min(np.array(minfn1)),np.min(np.array(minfn2))])
+                
+
+                #From this we find the global minima and set the lists accordingly
+                if opt == 0:
+                    min_dis = np.argmin(np.array(minfn1))
+                    lrx = copy.deepcopy(self.par_obj.roi_stkint_x[ab])
+                    lry = copy.deepcopy(self.par_obj.roi_stkint_y[ab])
+                else:  
+                    min_dis = np.argmin(np.array(minfn2))
+                    lrx = copy.deepcopy(self.par_obj.roi_stkint_x[ab])[::-1]
+                    lry = copy.deepcopy(self.par_obj.roi_stkint_y[ab])[::-1]
+
+                lrx.extend(lrx[0:min_dis])
+                lrx = lrx[min_dis:]
+                lry.extend(lry[0:min_dis])
+                lry = lry[min_dis:]
+
+                #Finally we interpolate the ROI to provide a smooth transformation between the different frames.
+                for b in range(ab+1, ac):
+                    nppt_x = []
+                    nppt_y = []
+                    for i in range(0,lrx.__len__()):
+                        
+                        pt0x = lrx[i]
+                        pt0y = lry[i]
+                        pt1x = upx[i]
+                        pt1y = upy[i]
+
+
+                        l0 = ab - b
+                        l1 = (b+1)-ac
+                        
+                        #if(l0+l1) > 0.001:
+                        nppt_x.append(((pt0x*l1) + (pt1x*l0))/(l0+l1))
+                        nppt_y.append(((pt0y*l1) + (pt1y*l0))/(l0+l1))  
+
+                    #Then we save the results
+                    self.par_obj.roi_stkint_x[b] = nppt_x
+                    self.par_obj.roi_stkint_y[b] = nppt_y
+                    
+            self.int_obj.canvas1.draw()
+    def find_the_inside(self):
+            ppt_x =    self.par_obj.roi_stkint_x[self.par_obj.curr_img]
+            ppt_y  =   self.par_obj.roi_stkint_y[self.par_obj.curr_img]
+            imRGB = np.array(self.par_obj.dv_file.get_frame(par_obj.curr_img))
+            
+            pot = [] 
+            for i in range(0,ppt_x.__len__()):
+                pot.append([ppt_x[i],ppt_y[i]])
+
+            p = Path(pot)
+            for y in range(0,imRGB.shape[0]):
+                for x in range(0,imRGB.shape[1]):
+                    if p.contains_point([x,y]) == True:
+                        imRGB[y,x] = 255
+                        
+                    
+            self.int_obj.plt1.imshow(imRGB)
+            self.int_obj.canvas1.draw()
+
+#from __future__ import division # Sets division to be float division
+class DV_Controller:
+    def __init__(self,im_str):
+        f = open(im_str)
+        self.dvdata = f.read()
+        f.close()
+         
+        dvExtendedHeaderSize = struct.unpack_from("<I", self.dvdata, 92)[0]
+         
+        # endian-ness test
+        if not struct.unpack_from("<H", self.dvdata, 96)[0] == 0xc0a0:
+            print "unsupported endian-ness"
+            return
+         
+        dvImageWidth=struct.unpack_from("<I", self.dvdata, 0)[0]
+        dvImageHeight=struct.unpack_from("<I", self.dvdata, 4)[0]
+        dvNumOfImages=struct.unpack_from("<I", self.dvdata, 8)[0]
+        dvPixelType=struct.unpack_from("<I", self.dvdata, 12)[0]
+
+        
+        dvImageDataOffset=1024+dvExtendedHeaderSize
+        rawSizeT = struct.unpack_from("<H", self.dvdata, 180)[0]
+        if rawSizeT == 0:
+            timepoints = 1
+        else:
+            timepoints = rawSizeT
+        sequence =  struct.unpack_from("<H", self.dvdata, 182)[0]
+        extSize  = struct.unpack_from("<I", self.dvdata, 92)[0]
+        rawSizeC= struct.unpack_from("<H", self.dvdata, 196)[0]
+        if rawSizeC == 0:
+            num_channels = 1
+        else:
+            num_channels = rawSizeC
+         
+        dvExtendedHeaderNumInts=struct.unpack_from("<H", self.dvdata, 128)[0]
+        dvExtendedHeaderNumFloats=struct.unpack_from("<H", self.dvdata, 130)[0]
+        sectionSize = 4*(dvExtendedHeaderNumFloats+dvExtendedHeaderNumInts)
+        sections = dvExtendedHeaderSize/sectionSize
+        if (sections < dvNumOfImages):
+            print "number of sections is less than the number of images"
+            return
+        self.maxFrames = dvNumOfImages
+        self.numCH = rawSizeC
+        self.num_of_tp = timepoints
+        self.bitDepth = dvPixelType
+
+        print 'self.maxFrames', self.maxFrames
+        print 'self.numCH', self.numCH
+        print 'self.num_of_tp', self.num_of_tp
+        #elapsed_times = [[struct.unpack_from("<f", dvdata, i*sectionSize+k*4)[0] for k in range(sectionSize/4)][25] for i in range(sections)]
+
+         
+        #elapsed_times = [strftimefloat(s) for s in elapsed_times]
+         
+        self.offset = dvImageDataOffset
+        self.size = dvImageWidth*dvImageHeight*4
+        self.width = dvImageWidth
+        self.height = dvImageHeight
+    def get_frame(self,j):
+        st = (j*self.size)+self.offset
+        en = st+self.size
+            
+        im = np.frombuffer(self.dvdata[st:en], dtype=np.dtype(np.float32))
+        
+        return im.reshape(self.height,self.width)
+
+
+          
         
 
     

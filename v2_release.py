@@ -9,19 +9,23 @@ import re
 import cPickle as pickle
 import sys
 
+
 from scipy.special import _ufuncs_cxx
 import sklearn.utils.lgamma
 from gnu import return_license
 import matplotlib.lines as lines
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+
 from matplotlib.figure import Figure
+from scipy.ndimage import filters
 import v2_functions as v2
 
 
 
 
 
-"""QuantiFly Software v2.0
+"""QuantiFly3d Software v0.0
 
     Copyright (C) 2015  Dominic Waithe
 
@@ -87,7 +91,7 @@ class fileDialog(QtGui.QMainWindow):
 
         self.parent.selIntButton.setEnabled(False)
         #filepath = QtGui.QFileDialog.getOpenFileName(self, 'Open file', '/home')
-        for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file',self.parent.filepath,'Images(*.tif *.tiff *.png);;'):
+        for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file',self.parent.filepath,'Images(*.tif *.tiff *.png *.oib);;'):
             par_obj.file_array.append(path)
 
             
@@ -153,6 +157,14 @@ class Load_win_fn(QtGui.QWidget):
         self.feature_scale_input.textChanged[str].connect(self.feature_scale_change)
         self.feature_scale_input.hide()
 
+        self.resize_factor_text = QtGui.QLabel('Resize Factor:')
+
+        self.resize_factor_input = QtGui.QLineEdit(str(par_obj.resize_factor))
+        self.resize_factor_input.resize(10,10)
+        self.resize_factor_input.textChanged[str].connect(self.resize_factor_change)
+
+        vbox.addWidget(self.resize_factor_text)
+        vbox.addWidget(self.resize_factor_input)
         
         
         CH_pX = 0
@@ -308,7 +320,10 @@ class Load_win_fn(QtGui.QWidget):
         layout.addWidget(self.view)
         self.about_win.setLayout(layout)
         self.about_win.show()
-        self.about_win.raise_()   
+        self.about_win.raise_()
+    def resize_factor_change(self,text):
+        """Updates on change of feature scale"""
+        par_obj.resize_factor = float(text)
 
     def feature_scale_change(self,text):
         """Updates on change of feature scale"""
@@ -320,7 +335,14 @@ class Load_win_fn(QtGui.QWidget):
         if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
             if par_obj.tiff_file.maxFrames >1:
                 self.linEdit_Frm.setText('1-'+str(par_obj.uploadLimit))
-                self.Text_FrmOpt2.setText('There are '+str(par_obj.tiff_file.maxFrames)+' frames in total.')
+                self.Text_FrmOpt2.setText('There are '+str(par_obj.tiff_file.maxFrames+1)+' frames in total.')
+                self.Text_FrmOpt1.show()
+                self.Text_FrmOpt2.show()
+                self.linEdit_Frm.show()
+        if par_obj.file_ext == 'oib':
+            if par_obj.oib_file.shape[1] >1:
+                self.linEdit_Frm.setText('1-'+str(par_obj.uploadLimit))
+                self.Text_FrmOpt2.setText('There are '+str(par_obj.oib_file.shape[1])+' frames in total.')
                 self.Text_FrmOpt1.show()
                 self.Text_FrmOpt2.show()
                 self.linEdit_Frm.show()
@@ -422,6 +444,24 @@ class Load_win_fn(QtGui.QWidget):
                     par_obj.left_2_calc.append(i)
                     par_obj.frames_2_load[i] = [0]
                 v2.im_pred_inline_fn(par_obj, self)
+        elif par_obj.file_ext =='oib':
+            if par_obj.oib_file.shape[1]>1:
+                for i in range(0,par_obj.file_array.__len__()):
+                    par_obj.left_2_calc.append(i)
+                    try:
+                        np.array(list(self.hyphen_range(fmStr)))-1
+                        par_obj.frames_2_load[i] = np.array(list(self.hyphen_range(fmStr)))-1
+                    except:
+                        self.image_status_text.showMessage('Status: The supplied range of image frames is in the wrong format. Please correct and click confirm images.')
+                        return
+                self.image_status_text.showMessage('Status: Loading Images.')
+                v2.im_pred_inline_fn(par_obj, self)
+               
+            else:
+                for i in range(0,par_obj.file_array.__len__()):
+                    par_obj.left_2_calc.append(i)
+                    par_obj.frames_2_load[i] = [0]
+                v2.im_pred_inline_fn(par_obj, self)
         count = 0
         for b in par_obj.left_2_calc:
             frames =par_obj.frames_2_load[b]
@@ -451,13 +491,16 @@ class Win_fn(QtGui.QWidget):
         self.figure1 = Figure(figsize=(8, 8), dpi=100)
         self.canvas1 = FigureCanvas(self.figure1)
         self.figure1.patch.set_facecolor('grey')
-        
+        self.cursor = v2.ROI(self,par_obj)
         
         self.plt1 = self.figure1.add_subplot(1, 1, 1)
         im_RGB = np.zeros((512, 512))
         #Makes sure it spans the whole figure.
         self.figure1.subplots_adjust(left=0.001, right=0.999, top=0.999, bottom=0.001)
         
+        toolbar = NavigationToolbar(self.canvas1,self)
+        
+
         self.plt1.imshow(im_RGB)
 
         #Removes the tick labels
@@ -469,6 +512,7 @@ class Win_fn(QtGui.QWidget):
         self.canvas2 = FigureCanvas(self.figure2)
         self.figure2.patch.set_facecolor('grey')
         self.plt2 = self.figure2.add_subplot(1, 1, 1)
+
         
         #Makes sure it spans the whole figure.
         self.figure2.subplots_adjust(left=0.001, right=0.999, top=0.999, bottom=0.001)
@@ -513,7 +557,7 @@ class Win_fn(QtGui.QWidget):
         self.next_im_btn.setEnabled(True)
         
         #Sets the current text.
-        self.image_num_txt.setText('The Current Image is: ' + str(par_obj.curr_img +1))
+        self.image_num_txt.setText(' Image is: ' + str(par_obj.curr_img +1))
         self.count_txt = QtGui.QLabel()
         
         #Sets up the button which saves the ROI.
@@ -602,6 +646,48 @@ class Win_fn(QtGui.QWidget):
         self.clear_dots_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.kernel_show_btn, 2, 2)
 
+        self.count_maxima_btn = QtGui.QPushButton('Count Maxima')
+        self.count_maxima_btn.setEnabled(False)
+        self.top_right_grid.addWidget(self.count_maxima_btn, 4, 0)
+
+        
+
+        self.count_replot_btn = QtGui.QPushButton('Replot')
+
+        self.count_maxima_plot_on = QtGui.QCheckBox()
+        self.count_maxima_plot_on.setChecked = False
+        
+
+        self.count_txt_1 = QtGui.QLineEdit(str(par_obj.min_distance[0]))
+        self.count_txt_1.setFixedWidth(20)
+        self.count_txt_2 = QtGui.QLineEdit(str(par_obj.min_distance[1]))
+        self.count_txt_2.setFixedWidth(20)
+        self.count_txt_3 = QtGui.QLineEdit(str(par_obj.min_distance[2]))
+        self.count_txt_3.setFixedWidth(20)
+
+        abs_thr_lbl = QtGui.QLabel('Abs Thr:')
+        self.abs_thr_txt = QtGui.QLineEdit(str(par_obj.abs_thr))
+        self.abs_thr_txt.setFixedWidth(25)
+        rel_thr_lbl = QtGui.QLabel('Rel Thr:')
+        self.rel_thr_txt = QtGui.QLineEdit(str(par_obj.rel_thr))
+        self.rel_thr_txt.setFixedWidth(25)
+        
+
+        self.min_distance_panel = QtGui.QHBoxLayout()
+        self.min_distance_panel.addStretch()
+        self.min_distance_panel.addWidget(self.count_txt_1)
+        self.min_distance_panel.addWidget(self.count_txt_2 )
+        self.min_distance_panel.addWidget(self.count_txt_3 )
+        self.min_distance_panel.addWidget(abs_thr_lbl)
+        self.min_distance_panel.addWidget(self.abs_thr_txt)
+        self.min_distance_panel.addWidget(rel_thr_lbl)
+        self.min_distance_panel.addWidget(self.rel_thr_txt)
+        
+        self.top_right_grid.addLayout(self.min_distance_panel,4,1)
+        self.top_right_grid.addWidget(self.count_maxima_plot_on,4,2)
+
+        self.top_right_grid.addWidget(self.count_replot_btn,4,3)
+
         self.top_right_grid.setRowStretch(4,2)
 
         #Sets up the image panel splitter.
@@ -626,6 +712,7 @@ class Win_fn(QtGui.QWidget):
 
         #Status bar which is located beneath images.
         self.image_status_text = QtGui.QStatusBar()
+        box.addWidget(toolbar)
         box.addWidget(self.image_status_text)
         self.image_status_text.showMessage('Status: Please Select a Region and Click \'Save ROI\'. ')
         
@@ -637,6 +724,8 @@ class Win_fn(QtGui.QWidget):
         self.sel_ROI_btn.clicked.connect(self.sel_ROI_btn_fn)
         self.remove_dots_btn.clicked.connect(self.remove_dots_btn_fn)
         self.train_model_btn.clicked.connect(self.train_model_btn_fn)
+        self.count_maxima_btn.clicked.connect(self.count_maxima_btn_fn)
+        self.count_replot_btn.clicked.connect(self.replot_fn)
         #self.feat_scale_change_btn.clicked.connect(self.feat_scale_change_btn_fn)
         self.kernel_show_btn.clicked.connect(self.kernel_btn_fn)
         self.clear_dots_btn.clicked.connect(self.clear_dots_fn)
@@ -651,6 +740,38 @@ class Win_fn(QtGui.QWidget):
         par_obj.saved_ROI =[]
         par_obj.subdivide_ROI=[]
         self.m_Cursor = self.makeCursor()
+    def replot_fn(self):
+            v2.eval_pred_show_fn(par_obj.curr_img,par_obj,self)
+    def count_maxima_btn_fn(self):
+        predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.num_of_train_im))
+        for i in range(par_obj.test_im_start,par_obj.test_im_end):
+            predMtx[:,:,i]= par_obj.pred_arr[i]
+        
+
+        gau_stk = filters.gaussian_filter(predMtx,[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
+        y,x,z = np.gradient(gau_stk,1)
+        xy,xx,xz = np.gradient(x)
+        yy,yx,yz = np.gradient(y)
+        zy,zx,zz = np.gradient(z)
+        det = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
+        detl = -1*np.min(det)+det
+        detn = detl/np.max(detl)*255
+        par_obj.maxi_arr = {}
+        for i in range(par_obj.test_im_start,par_obj.test_im_end):
+            par_obj.maxi_arr[i] = detn[:,:,i]
+        #instk = (255*(detn/np.max(detn))).astype(np.int32)
+        par_obj.min_distance = [int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())]
+        par_obj.abs_thr = float(self.abs_thr_txt.text())
+        par_obj.rel_thr = float(self.rel_thr_txt.text())
+
+
+
+        par_obj.pts = v2.peak_local_max(detn, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
+        #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
+
+        par_obj.show_pts = True
+
+        self.goto_img_fn(par_obj.curr_img)
     def report_progress(self,message):
         self.image_status_text.showMessage('Status: '+message)
         app.processEvents()
@@ -807,9 +928,8 @@ class Win_fn(QtGui.QWidget):
             
 
             self.dots_and_square(par_obj.dots,par_obj.rects,'y')
-            print 'here1'
             self.canvas1.draw()
-            print 'here2'
+            
         if(par_obj.select_ROI== True):
             x = event.xdata
             y = event.ydata
@@ -1025,11 +1145,12 @@ class Win_fn(QtGui.QWidget):
         self.image_status_text.showMessage('Evaluating Images with the Trained Model. ')
         app.processEvents()    
         v2.evaluate_forest(par_obj,self, False,0)
-        v2.make_correction(par_obj, 0)
+        #v2.make_correction(par_obj, 0)
         self.image_status_text.showMessage('Model Trained. Continue adding samples, or click \'Save Training Model\'. ')
         par_obj.eval_load_im_win_eval = True
         self.goto_img_fn(par_obj.curr_img)
         self.save_model_btn.setEnabled(True)  
+        self.count_maxima_btn.setEnabled(True)
     def sigmaOnChange(self,text):
         par_obj.sigma_data = float(text)
         self.update_density_fn()
@@ -1109,7 +1230,7 @@ class Win_fn(QtGui.QWidget):
         "feature_scale":par_obj.feature_scale, "ch_active":par_obj.ch_active, "limit_ratio_size":par_obj.limit_ratio_size, \
         "max_depth":par_obj.max_depth, "min_samples":par_obj.min_samples_split, "min_samples_leaf":par_obj.min_samples_leaf,\
         "max_features":par_obj.max_features, "num_of_tree":par_obj.num_of_tree, "file_ext":par_obj.file_ext, "imFile":save_im,\
-        "gt_vec":par_obj.gt_vec, "error_vec":par_obj.error_vec};
+        "resize_factor":par_obj.resize_factor, "min_distance":par_obj.min_distance, "abs_thr":par_obj.abs_thr,"rel_thr":par_obj.rel_thr};
         
         pickle.dump(save_file, open(filename, "wb"))
         self.save_model_btn.setEnabled(False)
@@ -1176,11 +1297,13 @@ class parameterClass:
         self.fresh_features = True
         self.crop_x2 = 0
         self.crop_x1 =0
+        self.resize_factor = 2
         self.curr_img = 0
         self.numCH =0;
         self.RF ={}
         self.dense_array={}
         self.frames_2_load ={}
+        #self.curr_img = None
         #Auto mode.
         self.auto = True
         self.draw_ROI = True
@@ -1191,6 +1314,15 @@ class parameterClass:
         self.kernel_toggle = False
         self.eval_load_im_win_eval = False
         self.ex_img = []
+        self.show_pts= False
+        self.min_distance = [2,2,2]
+        self.abs_thr = 0
+        self.rel_thr = 0.5
+        self.left_2_calc =[]
+        self.roi_stk_x = []
+        self.roi_stkint_x = []
+        self.c = 0
+        self.M =1
 
 
 #generate layout
@@ -1205,7 +1337,7 @@ app.processEvents()
 #Creates tab widget.
 win_tab = QtGui.QTabWidget()
 #Creates win, an instance of QWidget
-par_obj  = parameterClass()  
+par_obj  = parameterClass() 
 win = Win_fn(par_obj)
 loadWin= Load_win_fn(par_obj,win)
 
@@ -1218,6 +1350,26 @@ win_tab.resize(1000,600)
 time.sleep(2.0)
 splash.finish(win_tab)
 win_tab.show()
+
+#Automates the loading for testing.
+
+"""
+par_obj.file_array = ['/Users/dwaithe/Documents/collaborators/YangLu/int_examples/20140905_DAPI_Phalloidin568_40x_WT01-1.tif']
+v2.import_data_fn(par_obj,par_obj.file_array)
+par_obj.test_im_start = 0
+par_obj.test_im_end = par_obj.tiff_file.maxFrames
+par_obj.left_2_calc = [0]
+par_obj.frames_2_load = [range(par_obj.test_im_start,par_obj.test_im_end)]
+win.loadTrainFn()
+
+
+pred_tiff = v2.Tiff_Controller('/Users/dwaithe/Documents/collaborators/YangLu/int_examples/output-2.tif')
+par_obj.pred_arr={}
+for ix in par_obj.frames_2_load[0]:
+    par_obj.pred_arr[ix] = pred_tiff.get_frame(ix)[:,:,0]
+par_obj.eval_load_im_win_eval = True
+win.goto_img_fn(0)
+win.count_maxima_btn.setEnabled(True)"""
 
 # Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':

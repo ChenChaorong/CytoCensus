@@ -16,11 +16,13 @@ import datetime
 import errno
 import os
 import numpy as np
-
+import copy
 import datetime
 from scipy.special import _ufuncs_cxx
 import sklearn.utils.lgamma
 from gnu import return_license
+from matplotlib.path import Path
+from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 
 #Apparently matplotlib slows the loading drammatically due to a font cache issue. This resolves it.
 try:
@@ -124,6 +126,7 @@ class Eval_load_im_win(QtGui.QWidget):
         self.image_status_text = QtGui.QStatusBar()
         self.image_status_text.showMessage('Status: Highlight training images in folder. ')
         vbox0.addWidget(self.image_status_text)
+
     def on_about(self):
         self.about_win = QtGui.QWidget()
         self.about_win.setWindowTitle('About QuantiFly Software v2.0')
@@ -240,6 +243,8 @@ class Eval_load_model_win(QtGui.QWidget):
         #Removes the tick labels
         self.plt1.set_xticklabels([])
         self.plt1.set_yticklabels([])
+
+        
 
         vbox1.addWidget(self.canvas1)
         
@@ -374,8 +379,15 @@ class Eval_load_model_win(QtGui.QWidget):
             par_obj.max_features = save_file["max_features"]
             par_obj.num_of_tree = save_file["num_of_tree"]
             par_obj.file_ext = save_file["file_ext"]
-            par_obj.gt_vec = save_file["gt_vec"]
-            par_obj.error_vec = save_file["error_vec"]
+            par_obj.resize_factor = save_file["resize_factor"]
+            par_obj.min_distance = save_file["min_distance"]
+            par_obj.abs_thr = save_file["abs_thr"]
+            par_obj.rel_thr = save_file["rel_thr"]
+
+            print 'par_objmin_distance',par_obj.min_distance
+            
+            #par_obj.gt_vec = save_file["gt_vec"]
+            #par_obj.error_vec = save_file["error_vec"]
             save_im = 255-save_file["imFile"]
             self.image_status_text.showMessage('Status: Model loaded. ')
             success = True
@@ -426,12 +438,23 @@ class Eval_load_model_win(QtGui.QWidget):
                     #except:
                     #    self.image_status_text.showMessage('Status: The supplied range of image frames is in the wrong format. Please correct and click confirm images.')
                     #    return
-                
-               
             else:
                 for i in range(0,par_obj.file_array.__len__()):
                     par_obj.left_2_calc.append(i)
                     par_obj.frames_2_load[i] = [0]
+        elif par_obj.file_ext =='oib':
+            if par_obj.oib_file.shape[1]>1:
+                for i in range(0,par_obj.file_array.__len__()):
+                    par_obj.left_2_calc.append(i)
+                    par_obj.frames_2_load[i] = range(0,par_obj.oib_file.shape[1])
+                    #try:
+                    #    np.array(list(self.hyphen_range(fmStr)))-1
+                    #    par_obj.frames_2_load[i] = np.array(list(self.hyphen_range(fmStr)))-1
+                    #except:
+                    #    self.image_status_text.showMessage('Status: The supplied range of image frames is in the wrong format. Please correct and click confirm images.')
+                    #    return
+                #self.image_status_text.showMessage('Status: Loading Images.')
+                #v2.im_pred_inline_fn(par_obj, self)
                 
         count = 0
         for b in par_obj.left_2_calc:
@@ -457,7 +480,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.figure1 = Figure(figsize=(8, 8), dpi=100)
         self.canvas1 = FigureCanvas(self.figure1)
         self.figure1.patch.set_facecolor('grey')
-        
+        toolbar = NavigationToolbar(self.canvas1,self)
         
         self.plt1 = self.figure1.add_subplot(1, 1, 1)
         im_RGB = np.zeros((512, 512))
@@ -469,6 +492,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         #Removes the tick labels
         self.plt1.set_xticklabels([])
         self.plt1.set_yticklabels([])
+        self.cursor = v2.ROI(self,par_obj)
         
         #Initialises the second figure.
         self.figure2 = Figure(figsize=(8, 8), dpi=100)
@@ -550,9 +574,68 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.top_right_grid.addWidget(self.output_count_txt,2,0,1,4)
         #self.top_right_grid.addWidget(self.save_output_link, 2, 0)
         
+        self.count_maxima_btn = QtGui.QPushButton('Count Maxima')
+        self.count_maxima_btn.setEnabled(False)
+        self.top_right_grid.addWidget(self.count_maxima_btn, 4, 0)
+        self.count_maxima_btn.clicked.connect(self.count_maxima_btn_fn)
+
         
+
+        self.count_replot_btn = QtGui.QPushButton('Replot')
+        self.count_replot_btn_all = QtGui.QPushButton('Replot All')
+
+        self.count_maxima_plot_on = QtGui.QCheckBox()
+        self.count_maxima_plot_on.setChecked = False
         
+
+        self.count_txt_1 = QtGui.QLineEdit(str(par_obj.min_distance[0]))
+        self.count_txt_1.setFixedWidth(20)
+        self.count_txt_2 = QtGui.QLineEdit(str(par_obj.min_distance[1]))
+        self.count_txt_2.setFixedWidth(20)
+        self.count_txt_3 = QtGui.QLineEdit(str(par_obj.min_distance[2]))
+        self.count_txt_3.setFixedWidth(20)
+
+        abs_thr_lbl = QtGui.QLabel('Abs Thr:')
+        self.abs_thr_txt = QtGui.QLineEdit(str(par_obj.abs_thr))
+        self.abs_thr_txt.setFixedWidth(25)
+        rel_thr_lbl = QtGui.QLabel('Rel Thr:')
+        self.rel_thr_txt = QtGui.QLineEdit(str(par_obj.rel_thr))
+        self.rel_thr_txt.setFixedWidth(25)
         
+
+        self.min_distance_panel = QtGui.QHBoxLayout()
+        self.min_distance_panel.addStretch()
+        self.min_distance_panel.addWidget(self.count_txt_1)
+        self.min_distance_panel.addWidget(self.count_txt_2 )
+        self.min_distance_panel.addWidget(self.count_txt_3 )
+        self.min_distance_panel.addWidget(abs_thr_lbl)
+        self.min_distance_panel.addWidget(self.abs_thr_txt)
+        self.min_distance_panel.addWidget(rel_thr_lbl)
+        self.min_distance_panel.addWidget(self.rel_thr_txt)
+        
+        self.top_right_grid.addLayout(self.min_distance_panel,4,1)
+        self.top_right_grid.addWidget(self.count_maxima_plot_on,4,2)
+        self.top_right_grid.addWidget(self.count_replot_btn_all,0,1)
+        self.top_right_grid.addWidget(self.count_replot_btn,1,1)
+
+        self.top_right_grid.setRowStretch(4,2)
+        
+        #self.top_panel = QtGui.QHBoxLayout()
+        self.compl_btn = QtGui.QPushButton('complete')
+        self.compl_btn.clicked.connect(self.cursor.complete_roi)
+        
+        self.interpolate_btn = QtGui.QPushButton('interpolate')
+
+        self.interpolate_btn.clicked.connect(self.cursor.interpolate_ROI)
+        
+        maxima_panel = QtGui.QVBoxLayout()
+
+        maxima_panel.addWidget(self.compl_btn)
+        maxima_panel.addWidget(self.interpolate_btn)
+        maxima_panel.addStretch()
+
+
+        top_panel.addLayout(maxima_panel)
 
 
         #Sets up the image panel splitter.
@@ -572,6 +655,7 @@ class Eval_disp_im_win(QtGui.QWidget):
 
         #Status bar which is located beneath images.
         self.image_status_text = QtGui.QStatusBar()
+        box.addWidget(toolbar)
         box.addWidget(self.image_status_text)
         self.image_status_text.showMessage('Status: Please Select a Region and Click \'Save ROI\'. ')
         
@@ -583,11 +667,71 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.imageNumText = QtGui.QLabel(self)
         
         self.evalStatusText = QtGui.QLabel(self)
+        self.canvas1.mpl_connect('motion_notify_event', self.cursor.motion_notify_callback)
+        self.canvas1.mpl_connect('button_press_event', self.cursor.button_press_callback)
+        self.canvas1.mpl_connect('button_release_event', self.cursor.button_release_callback)
+
+    def count_maxima_btn_fn(self):
+        par_obj.min_distance[0]= int(self.count_txt_1.text())
+        par_obj.min_distance[1]= int(self.count_txt_2.text())
+        par_obj.min_distance[2]= int(self.count_txt_3.text())
+        par_obj.abs_thr =float(self.abs_thr_txt.text())
+        par_obj.rel_thr =float(self.rel_thr_txt.text())
+        self.count_maxima()
+        v2.eval_pred_show_fn(par_obj.curr_img, par_obj,self)
+    def count_maxima(self):
+
+        predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.num_of_train_im))
+        for i in range(par_obj.test_im_start,par_obj.test_im_end):
+            predMtx[:,:,i]= par_obj.pred_arr[i]
+       
+        gau_stk = filters.gaussian_filter(predMtx,par_obj.min_distance)
+        y,x,z = np.gradient(gau_stk,1)
+        xy,xx,xz = np.gradient(x)
+        yy,yx,yz = np.gradient(y)
+        zy,zx,zz = np.gradient(z)
+        det = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
+        detl = -1*np.min(det)+det
+        detn = detl/np.max(detl)*255
+        par_obj.maxi_arr = {}
+        for i in range(par_obj.test_im_start,par_obj.test_im_end):
+            par_obj.maxi_arr[i] = detn[:,:,i]
+        
+
+        
+
+        par_obj.pts = v2.peak_local_max(detn, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
+        #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
+
+        par_obj.show_pts = True
+
+        #Filter those which are not inside the region.
+        if par_obj.roi_stkint_x.__len__() >0:
+            pts2keep = []
+            
+            for i in par_obj.roi_stkint_x:
+                 for pt2d in par_obj.pts:
+
+
+                    if pt2d[2] == i:
+                        #Find the region of interest.
+                        ppt_x = par_obj.roi_stkint_x[i]
+                        ppt_y = par_obj.roi_stkint_y[i]
+                        #Reformat to make the path object.
+                        pot = []
+                        for b in range(0,ppt_x.__len__()):
+                            pot.append([ppt_x[b],ppt_y[b]])
+                        p = Path(pot)
+                        if p.contains_point([pt2d[1],pt2d[0]]) == True:
+                                pts2keep.append(pt2d)
+            par_obj.pts = pts2keep
+
         
     def evaluate_images(self):
         par_obj.feat_arr = {}
         par_obj.pred_arr = {}
         par_obj.sum_pred = {}
+        print 'resize',par_obj.resize_factor
         count = -1
         for b in par_obj.left_2_calc:
             frames =par_obj.frames_2_load[b]
@@ -596,8 +740,24 @@ class Eval_disp_im_win(QtGui.QWidget):
                 v2.im_pred_inline_fn(par_obj, self,inline=True,outer_loop=b,inner_loop=i,count=count)
                 v2.evaluate_forest(par_obj,self, False, 0,inline=True,outer_loop=b,inner_loop=i,count=count)
                 count = count+1
-        v2.apply_correction(par_obj)
 
+        self.count_txt_1.setText(str(par_obj.min_distance[0]))
+        self.count_txt_2.setText(str(par_obj.min_distance[1]))
+        self.count_txt_3.setText(str(par_obj.min_distance[2]))
+        self.abs_thr_txt.setText(str(par_obj.abs_thr))
+        self.rel_thr_txt.setText(str(par_obj.rel_thr))
+        
+        self.count_maxima()
+
+        
+                                
+                                    
+                                        
+
+
+
+        self.count_maxima_plot_on.setCheckState(True)
+        self.count_maxima_btn.setEnabled(True)
         self.save_output_data_btn.setEnabled(True)
         self.image_status_text.showMessage('Status: evaluation finished.')
         par_obj.eval_load_im_win_eval = True
@@ -633,13 +793,31 @@ class Eval_disp_im_win(QtGui.QWidget):
         im_num = par_obj.curr_img - 1
         if im_num >-1:
             par_obj.curr_img = im_num
-            v2.eval_goto_img_fn(im_num,par_obj,self)
+            self.goto_img_fn(im_num,par_obj)
             
     def next_im_btn_fn(self):
         im_num = par_obj.curr_img + 1
         if im_num <par_obj.test_im_end:
             par_obj.curr_img = im_num
-            v2.eval_goto_img_fn(im_num,par_obj,self)
+            self.goto_img_fn(im_num,par_obj)
+            
+    def goto_img_fn(self,im_num,par_obj):
+        self.cursor.ppt_x = []
+        self.cursor.ppt_y = []
+        self.cursor.line = [None]
+        self.cursor.draw_ROI()
+        self.canvas1.draw()
+        
+        self.cursor.complete = False
+        self.cursor.flag = False
+        for bt in par_obj.roi_stk_x:
+            if bt == par_obj.curr_img:
+                self.cursor.complete = True
+                self.cursor.ppt_x = copy.deepcopy(par_obj.roi_stk_x[bt])
+                self.cursor.ppt_y = copy.deepcopy(par_obj.roi_stk_y[bt])
+                
+                break;
+        v2.eval_goto_img_fn(im_num,par_obj,self)
 
                   
 class checkBoxCH(QtGui.QCheckBox):
@@ -716,7 +894,7 @@ class File_Dialog(QtGui.QMainWindow):
         par_obj.file_array =[]
         self.int_obj.selIntButton.setEnabled(False)
         #filepath = QtGui.QFileDialog.getOpenFileName(self, 'Open file', '/home')
-        for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file', self.par_obj.filepath,'Images(*.tif *.tiff *.png);;'):
+        for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file', self.par_obj.filepath,'Images(*.tif *.tiff *.png *.oib);;'):
             
             par_obj.file_array.append(path)
         
@@ -735,27 +913,42 @@ class File_Dialog(QtGui.QMainWindow):
                 par_obj.left_2_calc.append(i)
                 par_obj.frames_2_load[i] = [0]
             self.int_obj.image_status_text.showMessage('Status: Loading Images. Loading Image Num: '+str(par_obj.file_array.__len__()))
-                
-            
         elif par_obj.file_ext =='tiff' or par_obj.file_ext =='tif':
             if par_obj.tiff_file.maxFrames>1:
                 for i in range(0,par_obj.file_array.__len__()):
                     par_obj.left_2_calc.append(i)
                     for b in range(0, par_obj.tiff_file.maxFrames):
                         par_obj.frames_2_load[i] = [0]
-                    #try:
-                    #    np.array(list(self.hyphen_range(fmStr)))-1
-                    #    par_obj.frames_2_load[i] = np.array(list(self.hyphen_range(fmStr)))-1
-                    #except:
-                        #self.int_obj.image_status_text.showMessage('Status: The supplied range of image frames is in the wrong format. Please correct and click confirm images.')
-                    #    return
                 self.int_obj.image_status_text.showMessage('Status: Loading Images.')
-               
+            else:
+                for i in range(0,par_obj.file_array.__len__()):
+                    par_obj.left_2_calc.append(i)
+                    par_obj.frames_2_load[i] = [0]
+        elif par_obj.file_ext =='dv':
+            if par_obj.dv_file.maxFrames>1:
+                for i in range(0,par_obj.file_array.__len__()):
+                    par_obj.left_2_calc.append(i)
+                    for b in range(0, par_obj.dv_file.maxFrames):
+                        par_obj.frames_2_load[i] = [0]
+                self.int_obj.image_status_text.showMessage('Status: Loading Images.')
+            else:
+                for i in range(0,par_obj.file_array.__len__()):
+                    par_obj.left_2_calc.append(i)
+                    par_obj.frames_2_load[i] = [0]
+        elif par_obj.file_ext =='oib':
+            if par_obj.oib_file.shape[1]>1:
+                for i in range(0,par_obj.file_array.__len__()):
+                    par_obj.left_2_calc.append(i)
+                    for b in range(0, par_obj.oib_file.shape[1]):
+                        par_obj.frames_2_load[i] = [0]
+        
+                self.int_obj.image_status_text.showMessage('Status: Loading Images.')
                
             else:
                 for i in range(0,par_obj.file_array.__len__()):
                     par_obj.left_2_calc.append(i)
                     par_obj.frames_2_load[i] = [0]
+                
                 
         count = 0
         for b in par_obj.left_2_calc:
@@ -859,9 +1052,19 @@ class Parameter_class:
         self.left2calc = 0
         self.p_size = 1
         self.file_array =[]
+        self.maxi_arr = {}
         self.height = 0
         self.width = 0
         self.fresh_features = True
+        self.show_pts= False
+        self.min_distance = [2,2,2]
+        self.abs_thr = 0
+        self.rel_thr = 0.5
+        self.roi_stk_x = {}
+        self.roi_stk_y = {}
+        self.roi_stkint_x ={}
+        self.roi_stkint_y ={}
+        self.npts = 100
         self.forPath = os.path.expanduser('~')+'/.densitycount/models/'
         try:
             os.makedirs(self.forPath)
