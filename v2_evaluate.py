@@ -532,6 +532,7 @@ class Eval_load_model_win(QtGui.QWidget):
 		win_tab.setCurrentWidget(evalImWin)
 		evalImWin.prev_im_btn.setEnabled(True)
 		evalImWin.next_im_btn.setEnabled(True)
+
 		#Now that we have correct resize factor from the model import.
 		v2.import_data_fn(par_obj,par_obj.file_array)
 		
@@ -669,7 +670,7 @@ class Eval_disp_im_win(QtGui.QWidget):
 		self.eval_im_btn = QtGui.QPushButton('Evaluate Images')
 		self.eval_im_btn.clicked.connect(self.evaluate_images)
 
-		self.count_all_btn = QtGui.QPushButton('Count Maxima in all Images')
+		self.count_all_btn = QtGui.QPushButton('Count Maxima at all time')
 		self.count_all_btn.clicked.connect(self.count_all_fn)
 
 		self.save_output_data_btn = QtGui.QPushButton('Save Output Data')
@@ -679,24 +680,31 @@ class Eval_disp_im_win(QtGui.QWidget):
 		self.save_output_link.setText('''<p><a href="'''+str(par_obj.csvPath)+'''">Goto output folder</a></p>
 		<p><span style="font-size: 17px;"><br /></span></p>''')
 
+		self.kernel_show_btn = QtGui.QPushButton('Showing Prediction')
+		#self.kernel_show_btn.setMinimumWidth(170)
+		
+
+		self.top_right_grid.addWidget(self.kernel_show_btn, 1, 1)
+
 		#Populates the grid on the right with the different widgets.
 		self.top_right_grid.addWidget(self.eval_im_btn, 0, 0)
 		self.top_right_grid.addWidget(self.save_output_data_btn, 1, 0)
-		self.top_right_grid.addWidget(self.output_count_txt,2,0,1,4)
+		self.top_right_grid.addWidget(self.count_all_btn, 2,0)
+		self.top_right_grid.addWidget(self.output_count_txt,2,1,1,4)
 		#self.top_right_grid.addWidget(self.save_output_link, 2, 0)
 		
 		self.count_maxima_btn = QtGui.QPushButton('Count Maxima')
 		self.count_maxima_btn.setEnabled(False)
 		self.top_right_grid.addWidget(self.count_maxima_btn, 4, 0)
 		self.count_maxima_btn.clicked.connect(self.count_maxima_btn_fn)
+		self.kernel_show_btn.clicked.connect(self.kernel_btn_fn)
 
 		
 
 		self.count_replot_btn = QtGui.QPushButton('Replot')
 		self.count_replot_btn_all = QtGui.QPushButton('Replot All')
 
-		self.count_maxima_plot_on = QtGui.QCheckBox()
-		self.count_maxima_plot_on.setChecked = False
+		
 		
 
 		self.count_txt_1 = QtGui.QLineEdit(str(par_obj.min_distance[0]))
@@ -716,8 +724,11 @@ class Eval_disp_im_win(QtGui.QWidget):
 
 		self.min_distance_panel = QtGui.QHBoxLayout()
 		self.min_distance_panel.addStretch()
+		self.min_distance_panel.addWidget(QtGui.QLabel("x:"))
 		self.min_distance_panel.addWidget(self.count_txt_1)
+		self.min_distance_panel.addWidget(QtGui.QLabel("y:"))
 		self.min_distance_panel.addWidget(self.count_txt_2 )
+		self.min_distance_panel.addWidget(QtGui.QLabel("z:"))
 		self.min_distance_panel.addWidget(self.count_txt_3 )
 		self.min_distance_panel.addWidget(abs_thr_lbl)
 		self.min_distance_panel.addWidget(self.abs_thr_txt)
@@ -725,7 +736,7 @@ class Eval_disp_im_win(QtGui.QWidget):
 		self.min_distance_panel.addWidget(self.rel_thr_txt)
 		
 		self.top_right_grid.addLayout(self.min_distance_panel,4,1)
-		self.top_right_grid.addWidget(self.count_maxima_plot_on,4,2)
+		
 		#self.top_right_grid.addWidget(self.count_replot_btn_all,0,1)
 		#self.top_right_grid.addWidget(self.count_replot_btn,1,1)
 
@@ -798,8 +809,21 @@ class Eval_disp_im_win(QtGui.QWidget):
 	def count_all_fn(self):
 		for tpt in par_obj.time_pt_list:
 			self.count_maxima(tpt)
-
-		self.goto_img_fn(par_obj.curr_img,par_obj)
+		par_obj.show_pts = 1
+		self.kernel_btn_fn()
+	def kernel_btn_fn(self):
+		"""Shows the kernels on the image."""
+		
+		par_obj.show_pts = par_obj.show_pts+ 1
+		if par_obj.show_pts ==3:
+			 par_obj.show_pts = 1
+		
+		if par_obj.show_pts == 1:
+			self.kernel_show_btn.setText('Showing Probability')
+			v2.eval_goto_img_fn(par_obj.curr_img,par_obj,self)
+		elif par_obj.show_pts == 2:
+			self.kernel_show_btn.setText('Showing Counts')
+			v2.eval_goto_img_fn(par_obj.curr_img,par_obj,self)
 	def count_maxima_btn_fn(self):
 		par_obj.min_distance[0]= int(self.count_txt_1.text())
 		par_obj.min_distance[1]= int(self.count_txt_2.text())
@@ -807,6 +831,7 @@ class Eval_disp_im_win(QtGui.QWidget):
 		par_obj.abs_thr =float(self.abs_thr_txt.text())
 		par_obj.rel_thr =float(self.rel_thr_txt.text())
 		self.count_maxima(par_obj.time_pt)
+		par_obj.show_pts= 2
 		#v2.eval_pred_show_fn(par_obj.curr_img, par_obj,self)
 		self.goto_img_fn(par_obj.curr_img,par_obj)
 	def count_maxima(self,time_pt):
@@ -827,7 +852,6 @@ class Eval_disp_im_win(QtGui.QWidget):
 		for i in range(par_obj.test_im_start,par_obj.test_im_end):
 			par_obj.data_store[time_pt]['maxi_arr'][i] = detn[:,:,i]
 		
-
 		
 
 		pts = v2.peak_local_max(detn, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
@@ -875,7 +899,7 @@ class Eval_disp_im_win(QtGui.QWidget):
 					v2.im_pred_inline_fn(par_obj, self,inline=True,outer_loop=b,inner_loop=i,count=count)
 					v2.evaluate_forest(par_obj,self, False, 0,inline=True,outer_loop=b,inner_loop=i,count=count)
 					count = count+1
-			par_obj.data_store[tpt]['feat_arr'] = []
+			par_obj.data_store[tpt]['feat_arr'] = {}
 			self.count_maxima(tpt)
 
 		self.count_txt_1.setText(str(par_obj.min_distance[0]))
@@ -893,8 +917,8 @@ class Eval_disp_im_win(QtGui.QWidget):
 
 
 
-		self.count_maxima_plot_on.setCheckState(True)
 		self.count_maxima_btn.setEnabled(True)
+		self.count_all_btn.setEnabled(True)
 		self.save_output_data_btn.setEnabled(True)
 		self.image_status_text.showMessage('Status: evaluation finished.')
 		par_obj.eval_load_im_win_eval = True

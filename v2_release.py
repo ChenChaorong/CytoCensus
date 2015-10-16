@@ -457,6 +457,9 @@ class Load_win_fn(QtGui.QWidget):
             par_obj.data_store[time_pt]['maxi_arr'] = {}
             par_obj.data_store[time_pt]['pts'] ={}
             par_obj.data_store[time_pt]['roi_stk_x'] ={}
+            par_obj.data_store[time_pt]['roi_stk_y'] ={}
+            par_obj.data_store[time_pt]['roi_stkint_x'] ={}
+            par_obj.data_store[time_pt]['roi_stkint_y'] ={}
 
         
         par_obj.frames_2_load ={}
