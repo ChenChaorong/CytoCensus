@@ -336,7 +336,7 @@ def save_roi_fn(par_obj):
 	return False
 	
 
-def update_training_samples_fn(par_obj,model_num):
+def update_training_samples_fn(par_obj,int_obj,model_num):
 	"""Collects the pixels or patches which will be used for training and 
 	trains the forest."""
 	#Makes sure everything is refreshed for the training, encase any regions
@@ -367,7 +367,7 @@ def update_training_samples_fn(par_obj,model_num):
 			par_obj.data_store[par_obj.time_pt]['feat_arr'][img2load]
 		except:
 			'freshly loaded'
-			im_pred_inline_fn(par_obj,par_obj,True,img2load,0,img2load-1)
+			im_pred_inline_fn(par_obj,int_obj,True,img2load,0,img2load-1)
 
 		if(par_obj.p_size == 1):
 			#Finds and extracts the features and output density for the specific regions.
@@ -793,8 +793,8 @@ def eval_goto_img_fn(im_num, par_obj, int_obj):
 	int_obj.plt1.set_xticklabels([])
 	int_obj.plt1.set_yticklabels([])
 	
-	if par_obj.data_store[par_obj.time_pt]['roi_stk_x'] != {}:
-		int_obj.cursor.draw_ROI()
+	
+	int_obj.cursor.draw_ROI()
 	int_obj.canvas1.draw()
 	
 	int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_img+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
@@ -817,13 +817,13 @@ def eval_pred_show_fn(im_num,par_obj,int_obj):
 			for ind in par_obj.data_store[par_obj.time_pt]['dense_arr']:
 				if ind == im_num:
 					im2draw = par_obj.data_store[par_obj.time_pt]['dense_arr'][im_num].astype(np.float32)
-			
+			int_obj.plt2.imshow(im2draw)
 		if par_obj.show_pts == 1:
 			im2draw = np.zeros((par_obj.height,par_obj.width))
 			for ind in par_obj.data_store[par_obj.time_pt]['pred_arr']:
 				if ind == im_num:
 					im2draw = par_obj.data_store[par_obj.time_pt]['pred_arr'][im_num].astype(np.float32)
-
+			int_obj.plt2.imshow(im2draw)
 		if par_obj.show_pts == 2:
 			
 			pt_x = []
@@ -843,11 +843,12 @@ def eval_pred_show_fn(im_num,par_obj,int_obj):
 			for ind in par_obj.data_store[par_obj.time_pt]['maxi_arr']:
 				if ind == im_num:
 					im2draw = par_obj.data_store[par_obj.time_pt]['maxi_arr'][im_num].astype(np.float32)
-		
+			d = int_obj.plt2.imshow(im2draw)
+			d.set_clim(0,255)
 
 			
 		
-		int_obj.plt2.imshow(im2draw)
+		
 		
 		
 
@@ -1010,7 +1011,7 @@ def save_output_data_fn(par_obj,int_obj):
 
 	with open(par_obj.csvPath+'outputData.csv', 'a') as csvfile:
 		spamwriter = csv.writer(csvfile)
-		spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time piont: ')]+[str('Predicted count: ')])
+		spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('Predicted count: ')])
 	
 	count = -1
 	for tpt in par_obj.time_pt_list:
@@ -1030,6 +1031,15 @@ def save_output_data_fn(par_obj,int_obj):
 				
 
 	int_obj.report_progress('Data exported to '+ par_obj.csvPath)
+	with open(par_obj.csvPath+'outputPoints.csv', 'a') as csvfile:
+		spamwriter = csv.writer(csvfile)
+		spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('X: ')]+[str('Y: ')]+[str('Z: ')])
+		for tpt in par_obj.time_pt_list:
+			pts = par_obj.data_store[tpt]['pts']
+			for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
+				spamwriter.writerow([local_time]+[str(imStr)]+[tpt+1]+[par_obj.data_store[tpt]['pts'][i][0]]+[par_obj.data_store[tpt]['pts'][i][1]]+[par_obj.data_store[tpt]['pts'][i][2]])
+
+
 class ROI:
 	
 	def __init__(self, int_obj,par_obj):

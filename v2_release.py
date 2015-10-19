@@ -457,6 +457,9 @@ class Load_win_fn(QtGui.QWidget):
             par_obj.data_store[time_pt]['maxi_arr'] = {}
             par_obj.data_store[time_pt]['pts'] ={}
             par_obj.data_store[time_pt]['roi_stk_x'] ={}
+            par_obj.data_store[time_pt]['roi_stk_y'] ={}
+            par_obj.data_store[time_pt]['roi_stkint_x'] ={}
+            par_obj.data_store[time_pt]['roi_stkint_y'] ={}
 
         
         par_obj.frames_2_load ={}
@@ -1288,7 +1291,8 @@ class Win_fn(QtGui.QWidget):
         self.clear_dots_btn.setEnabled(False)
     def train_model_btn_fn(self):
         self.image_status_text.showMessage('Training Ensemble of Decision Trees. ')
-        v2.update_training_samples_fn(par_obj,0)
+        v2.im_pred_inline_fn(par_obj, self)
+        v2.update_training_samples_fn(par_obj,self,0)
         self.image_status_text.showMessage('Evaluating Images with the Trained Model. ')
         app.processEvents()    
         v2.evaluate_forest(par_obj,self, False,0)
