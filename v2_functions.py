@@ -336,7 +336,7 @@ def save_roi_fn(par_obj):
 	return False
 	
 
-def update_training_samples_fn(par_obj,model_num):
+def update_training_samples_fn(par_obj,int_obj,model_num):
 	"""Collects the pixels or patches which will be used for training and 
 	trains the forest."""
 	#Makes sure everything is refreshed for the training, encase any regions
@@ -367,7 +367,7 @@ def update_training_samples_fn(par_obj,model_num):
 			par_obj.data_store[par_obj.time_pt]['feat_arr'][img2load]
 		except:
 			'freshly loaded'
-			im_pred_inline_fn(par_obj,par_obj,True,img2load,0,img2load-1)
+			im_pred_inline_fn(par_obj,int_obj,True,img2load,0,img2load-1)
 
 		if(par_obj.p_size == 1):
 			#Finds and extracts the features and output density for the specific regions.
