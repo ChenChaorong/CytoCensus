@@ -362,56 +362,38 @@ def update_training_samples_fn(par_obj,int_obj,model_num):
 
 
 		#Loads necessary images only.
-		try:
-			'already loaded'
-			par_obj.data_store[par_obj.time_pt]['feat_arr'][img2load]
-		except:
-			'freshly loaded'
-			im_pred_inline_fn(par_obj,int_obj,True,img2load,0,img2load-1)
+		
+		#try:
+		#	'already loaded'
+			
+		#except:
+		#	'freshly loaded'
+		#	im_pred_inline_fn(par_obj,int_obj,True,img2load,0,img2load-1)
 
 		if(par_obj.p_size == 1):
-			#Finds and extracts the features and output density for the specific regions.
-			mImRegion = par_obj.data_store[par_obj.time_pt]['feat_arr'][rects[0]][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3],:]
-			denseRegion = par_obj.data_store[par_obj.time_pt]['dense_arr'][rects[0]][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3]]
-			#Find the linear form of the selected feature representation
-			mimg_lin = np.reshape(mImRegion, (mImRegion.shape[0]*mImRegion.shape[1],mImRegion.shape[2]))
-			#Find the linear form of the complementatory output region.
-			dense_lin = np.reshape(denseRegion, (denseRegion.shape[0]*denseRegion.shape[1]))
-			#Sample the input pixels sparsely or densely.
-			if(par_obj.limit_sample == True):
-				if(par_obj.limit_ratio == True):
-					par_obj.limit_size = round(mImRegion.shape[0]*mImRegion.shape[1]/calc_ratio,0)
-				#Randomly sample from input ROI or im a certain number (par_obj.limit_size) patches. With replacement.
-				indices =  np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
-				#Add to feature vector and output vector.
-				f_matrix.extend(mimg_lin[indices])
-				o_patches.extend(dense_lin[indices])
-			else:
-				#Add these to the end of the feature Matrix, input patches
-				f_matrix.extend(mimg_lin)
-				#And the the output matrix, output patches
-				o_patches.extend(dense_lin)
-		if(par_obj.p_size >1):
-			mgn = (win.p_size-1)/2
-			#Finds the corresponding image.
-			left_rect = rects[2]+1 -mgn
-			right_rect = rects[2]+rects[4] +mgn+1
-			top_rect = rects[1]+1 -mgn
-			bot_rect = rects[1]+rects[3]+mgn+1
-			if left_rect < 0:
-				left_rect = 0
-			if top_rect < 0:
-				top_rect = 0
-			if right_rect > par_obj.width - 1:
-				right_rect = par_obj.width - 1
-			if bot_rect > par_obj.height - 1:
-				bot_rect = par_obj.height - 1
-			#mImRegion = par_obj.data_store[par_obj.time_pt]['feat_arr'][rects[0]][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3]]
-
-			mImRegion = par_obj.data_store[par_obj.time_pt]['feat_arr'][rects[0]][left_rect:right_rect,top_rect:bot_rect,:]
-			denseRegion = par_obj.data_store[par_obj.time_pt]['dense_arr'][rects[0]][left_rect:right_rect,top_rect:bot_rect]
-
-			mimg_linPatch,dense_linPatch, pos = v2.extractPatch(win.p_size,mImRegion,denseRegion, 'sparse')
+			if rects[5] == par_obj.time_pt:
+				#Finds and extracts the features and output density for the specific regions.
+				mImRegion = par_obj.data_store[par_obj.time_pt]['feat_arr'][rects[0]][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3],:]
+				denseRegion = par_obj.data_store[par_obj.time_pt]['dense_arr'][rects[0]][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3]]
+				#Find the linear form of the selected feature representation
+				mimg_lin = np.reshape(mImRegion, (mImRegion.shape[0]*mImRegion.shape[1],mImRegion.shape[2]))
+				#Find the linear form of the complementatory output region.
+				dense_lin = np.reshape(denseRegion, (denseRegion.shape[0]*denseRegion.shape[1]))
+				#Sample the input pixels sparsely or densely.
+				if(par_obj.limit_sample == True):
+					if(par_obj.limit_ratio == True):
+						par_obj.limit_size = round(mImRegion.shape[0]*mImRegion.shape[1]/calc_ratio,0)
+					#Randomly sample from input ROI or im a certain number (par_obj.limit_size) patches. With replacement.
+					indices =  np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
+					#Add to feature vector and output vector.
+					f_matrix.extend(mimg_lin[indices])
+					o_patches.extend(dense_lin[indices])
+				else:
+					#Add these to the end of the feature Matrix, input patches
+					f_matrix.extend(mimg_lin)
+					#And the the output matrix, output patches
+					o_patches.extend(dense_lin)
+		
 			
 			
 	
@@ -429,6 +411,7 @@ def update_training_samples_fn(par_obj,int_obj,model_num):
 def update_density_fn(par_obj):
    
 	for im in par_obj.im_for_train:
+		
 		#Construct empty array for current image.
 		dots_im = np.zeros((par_obj.height,par_obj.width))
 		#In array of all saved dots.
@@ -477,7 +460,6 @@ def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=N
 			
 
 			for i in frames:
-				count = count+1
 				if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
 					
 					imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
@@ -530,7 +512,7 @@ def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=N
 					int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(i+1) +' Timepoint: '+str(par_obj.time_pt+1))
 					feat =feature_create(par_obj,imRGB,imStr,i)
 				par_obj.num_of_feat = feat.shape[2]
-				par_obj.data_store[par_obj.time_pt]['feat_arr'][count] = feat  
+				par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = feat  
 	
 	return
 def feature_create(par_obj,imRGB,imStr,i):
@@ -584,43 +566,38 @@ def evaluate_forest(par_obj,int_obj,withGT,model_num,inline=False,inner_loop=Non
 
 			if(par_obj.p_size >1):
 				
-				mimg_lin,dense_linPatch, pos = extractPatch(par_obj.p_size, par_obj.feat_arr[count], None, 'dense')
+				mimg_lin,dense_linPatch, pos = extractPatch(par_obj.p_size, par_obj.feat_arr[i], None, 'dense')
 				tree_pred = par_obj.RF[model_num].predict(mimg_lin)
 				linPred = v2.regenerateImg(par_obj.p_size, tree_pred, pos)
 					
 			else:
 				
-				mimg_lin = np.reshape(par_obj.data_store[par_obj.time_pt]['feat_arr'][count], (par_obj.height * par_obj.width, par_obj.data_store[par_obj.time_pt]['feat_arr'][count].shape[2]))
+				mimg_lin = np.reshape(par_obj.data_store[par_obj.time_pt]['feat_arr'][i], (par_obj.height * par_obj.width, par_obj.data_store[par_obj.time_pt]['feat_arr'][i].shape[2]))
 				t2 = time.time()
 				linPred = par_obj.RF[model_num].predict(mimg_lin)
 				t1 = time.time()
 				
 
 
-			par_obj.data_store[par_obj.time_pt]['pred_arr'][count] = linPred.reshape(par_obj.height, par_obj.width)
+			par_obj.data_store[par_obj.time_pt]['pred_arr'][i] = linPred.reshape(par_obj.height, par_obj.width)
 
 			maxPred = np.max(linPred)
 			sum_pred =np.sum(linPred/255)
-			par_obj.data_store[par_obj.time_pt]['sum_pred'][count] = sum_pred
+			par_obj.data_store[par_obj.time_pt]['sum_pred'][i] = sum_pred
 			print 'prediction time taken',t1 - t2
-			print 'Predicted count:',par_obj.data_store[par_obj.time_pt]['sum_pred'][count]
+			print 'Predicted i:',par_obj.data_store[par_obj.time_pt]['sum_pred'][i]
 			int_obj.report_progress('Making Prediction for Image: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
 					
 
 			if withGT == True:
 				try:
 					#If it has already been opened.
-					a = par_obj.data_store[par_obj.time_pt]['gt_sum'][count]
+					a = par_obj.data_store[par_obj.time_pt]['gt_sum'][i]
 				except:
 					#Else find the file.
-					gt_im =  pylab.imread(par_obj.data_store[par_obj.time_pt]['gt_array'][count])[:,:,0]
-					par_obj.data_store[par_obj.time_pt]['gt_sum'][count] = np.sum(gt_im)
+					gt_im =  pylab.imread(par_obj.data_store[par_obj.time_pt]['gt_array'][i])[:,:,0]
+					par_obj.data_store[par_obj.time_pt]['gt_sum'][i] = np.sum(gt_im)
 				
-				
-				#print('Ground Truth count: '+str(par_obj.gt_sum[count]))
-				#print('Absolute ERROR: '+str(np.abs(par_obj.sum_pred[count]-par_obj.gt_sum[count])))
-				#print('Percentage ERROR: '+str((np.abs(par_obj.sum_pred[count]-par_obj.gt_sum[count])*100)/par_obj.gt_sum[count]))
-			
 
 			
 
@@ -829,8 +806,11 @@ def eval_pred_show_fn(im_num,par_obj,int_obj):
 			pt_x = []
 			pt_y = []
 			pts = par_obj.data_store[par_obj.time_pt]['pts']
+			
+			ind = np.where(np.array(par_obj.frames_2_load[0]) == par_obj.curr_img)
+			print 'ind',ind
 			for pt2d in pts:
-				if pt2d[2] == par_obj.curr_img:
+				if pt2d[2] == ind:
 						pt_x.append(pt2d[1])
 						pt_y.append(pt2d[0])
 

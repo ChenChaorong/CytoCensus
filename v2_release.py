@@ -466,7 +466,7 @@ class Load_win_fn(QtGui.QWidget):
         par_obj.left_2_calc =[]
         par_obj.saved_ROI =[]
         par_obj.saved_dots=[]
-        par_obj.curr_img = 0
+        
         par_obj.eval_load_im_win_eval = False
 
         if self.r0.isChecked():
@@ -527,9 +527,7 @@ class Load_win_fn(QtGui.QWidget):
         par_obj.test_im_end= count
         
         
-        for i in par_obj.left_2_calc:
-            im_array = np.zeros((par_obj.height,par_obj.width))
-            par_obj.data_store[par_obj.time_pt]['dense_arr'][i]=im_array
+        par_obj.curr_img = par_obj.frames_2_load[0][0]
         
         self.image_status_text.showMessage('Status: Images loaded. Click \'Goto Training\'')
         self.selIntButton.setEnabled(True)
@@ -871,8 +869,8 @@ class Win_fn(QtGui.QWidget):
             v2.eval_pred_show_fn(par_obj.curr_img,par_obj,self)
     def count_maxima_btn_fn(self):
         predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.num_of_train_im))
-        for i in range(par_obj.test_im_start,par_obj.test_im_end):
-            predMtx[:,:,i]= par_obj.data_store[par_obj.time_pt]['pred_arr'][i]
+        for i in range(0,par_obj.frames_2_load[0].__len__()):
+            predMtx[:,:,i]= par_obj.data_store[par_obj.time_pt]['pred_arr'][par_obj.frames_2_load[0][i]]
         
 
         gau_stk = filters.gaussian_filter(predMtx,[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
@@ -884,8 +882,8 @@ class Win_fn(QtGui.QWidget):
         detl = -1*np.min(det)+det
         detn = detl/np.max(detl)*255
         par_obj.data_store[par_obj.time_pt]['maxi_arr'] = {}
-        for i in range(par_obj.test_im_start,par_obj.test_im_end):
-            par_obj.data_store[par_obj.time_pt]['maxi_arr'][i] = detn[:,:,i]
+        for i in range(0,par_obj.frames_2_load[0].__len__()):
+            par_obj.data_store[par_obj.time_pt]['maxi_arr'][par_obj.frames_2_load[0][i]] = detn[:,:,i]
         #instk = (255*(detn/np.max(detn))).astype(np.int32)
         par_obj.min_distance = [int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())]
         par_obj.abs_thr = float(self.abs_thr_txt.text())
@@ -893,7 +891,7 @@ class Win_fn(QtGui.QWidget):
 
 
 
-        pts = v2.peak_local_max(detn, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
+        pts = v2.peak_local_max(detn,min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
         par_obj.data_store[par_obj.time_pt]['pts'] = pts
 
         #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
@@ -1178,9 +1176,10 @@ class Win_fn(QtGui.QWidget):
         
         
         self.goto_img_fn(par_obj.curr_img)
-
         #Now we update a density image of the current Image.
         self.update_density_fn()
+
+        
     def update_density_fn(self):
         #Construct empty array for current image.
         par_obj.im_for_train = [par_obj.curr_img]
@@ -1203,16 +1202,20 @@ class Win_fn(QtGui.QWidget):
                 self.dots_and_square(dots,rects,'w')
         
     def prev_im_btn_fn(self):
-        im_num = par_obj.curr_img - 1
-        if im_num >-1:
-            par_obj.curr_img = im_num
-            self.goto_img_fn(im_num)
+        for ind, zim in enumerate(par_obj.frames_2_load[0]):
+            if zim == par_obj.curr_img:
+                if ind > 0:
+                    par_obj.curr_img  = par_obj.frames_2_load[0][ind-1]
+                    self.goto_img_fn(par_obj.curr_img)
+                    break;
             
     def next_im_btn_fn(self):
-        im_num = par_obj.curr_img + 1
-        if im_num <par_obj.test_im_end:
-            par_obj.curr_img = im_num
-            self.goto_img_fn(im_num)
+         for ind, zim in enumerate(par_obj.frames_2_load[0]):
+            if zim == par_obj.curr_img:
+                if ind < par_obj.frames_2_load[0].__len__()-1:
+                    par_obj.curr_img  = par_obj.frames_2_load[0][ind+1]
+                    self.goto_img_fn(par_obj.curr_img)
+                    break;
     def prev_time_btn_fn(self):
         for ind, tim in enumerate(par_obj.time_pt_list):
             if tim == par_obj.time_pt:
@@ -1292,6 +1295,7 @@ class Win_fn(QtGui.QWidget):
     def train_model_btn_fn(self):
         self.image_status_text.showMessage('Training Ensemble of Decision Trees. ')
         v2.im_pred_inline_fn(par_obj, self)
+        print 'hre',par_obj.data_store[par_obj.time_pt]['dense_arr']
         v2.update_training_samples_fn(par_obj,self,0)
         self.image_status_text.showMessage('Evaluating Images with the Trained Model. ')
         app.processEvents()    
@@ -1515,23 +1519,6 @@ win_tab.show()
 
 #Automates the loading for testing.
 
-"""
-par_obj.file_array = ['/Users/dwaithe/Documents/collaborators/YangLu/int_examples/20140905_DAPI_Phalloidin568_40x_WT01-1.tif']
-v2.import_data_fn(par_obj,par_obj.file_array)
-par_obj.test_im_start = 0
-par_obj.test_im_end = par_obj.tiff_file.maxFrames
-par_obj.left_2_calc = [0]
-par_obj.frames_2_load = [range(par_obj.test_im_start,par_obj.test_im_end)]
-win.loadTrainFn()
-
-
-pred_tiff = v2.Tiff_Controller('/Users/dwaithe/Documents/collaborators/YangLu/int_examples/output-2.tif')
-par_obj.pred_arr={}
-for ix in par_obj.frames_2_load[0]:
-    par_obj.pred_arr[ix] = pred_tiff.get_frame(ix)[:,:,0]
-par_obj.eval_load_im_win_eval = True
-win.goto_img_fn(0)
-win.count_maxima_btn.setEnabled(True)"""
 
 # Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
