@@ -1263,7 +1263,7 @@ class Win_fn(QtGui.QWidget):
             par_obj.draw_dots = False
             par_obj.remove_dots = False
             for i in range(0,par_obj.saved_ROI.__len__()):
-                if(par_obj.saved_ROI[i][0] == par_obj.curr_img):
+                if(par_obj.saved_ROI[i][0] == par_obj.curr_img and par_obj.saved_ROI[i][5] == par_obj.time_pt):
                     par_obj.ROI_index.append(i)
             for b in range(0,par_obj.ROI_index.__len__()):
                 dots = par_obj.saved_dots[par_obj.ROI_index[b]]
