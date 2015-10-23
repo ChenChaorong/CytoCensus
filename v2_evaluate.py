@@ -1,8 +1,11 @@
 #Experimental interface
 import pylab
 from PyQt4 import QtGui, QtCore, Qt, QtWebKit
+try:
+    from PyQt4.QtCore import QString as QString
+except:
+    QString=str
 import time
-
 import vigra
 import scipy
 from scipy.ndimage import filters
@@ -95,7 +98,7 @@ class Eval_load_im_win(QtGui.QWidget):
 		self.modelTabIm.setColumnCount(4)
 		self.modelTabIm.setColumnWidth(0,125)
 		self.modelTabIm.resize(550,200)
-		self.modelTabIm.setHorizontalHeaderLabels(QtCore.QString(",Image name, Range, Path").split(","))
+		self.modelTabIm.setHorizontalHeaderLabels(QString(",Image name, Range, Path").split(","))
 		self.modelTabIm.hide()
 		self.modelTabIm.setEditTriggers( QtGui.QTableWidget.NoEditTriggers )
 		self.modelTabIm_panel.addWidget(self.modelTabIm)
@@ -208,7 +211,7 @@ class Eval_load_model_win(QtGui.QWidget):
 		self.modelTabFor.setColumnCount(3)
 		self.modelTabFor.setColumnWidth(2,200)
 		self.modelTabFor.resize(600,500)
-		self.modelTabFor.setHorizontalHeaderLabels(QtCore.QString(",model name, date and time saved").split(","))
+		self.modelTabFor.setHorizontalHeaderLabels(QString(",model name, date and time saved").split(","))
 		self.modelTabFor.setEditTriggers( QtGui.QTableWidget.NoEditTriggers )
 
 		vbox0.addWidget(self.modelTabFor)
@@ -676,6 +679,9 @@ class Eval_disp_im_win(QtGui.QWidget):
 		self.save_output_data_btn = QtGui.QPushButton('Save Output Data')
 		self.save_output_data_btn.clicked.connect(self.save_output_data)
 
+		self.save_output_prediction_btn = QtGui.QPushButton('Save Prediction')
+		self.save_output_prediction_btn.clicked.connect(self.save_output_prediction)
+  
 		self.save_output_link = QtGui.QLabel()
 		self.save_output_link.setText('''<p><a href="'''+str(par_obj.csvPath)+'''">Goto output folder</a></p>
 		<p><span style="font-size: 17px;"><br /></span></p>''')
@@ -689,6 +695,7 @@ class Eval_disp_im_win(QtGui.QWidget):
 		#Populates the grid on the right with the different widgets.
 		self.top_right_grid.addWidget(self.eval_im_btn, 0, 0)
 		self.top_right_grid.addWidget(self.save_output_data_btn, 1, 0)
+		self.top_right_grid.addWidget(self.save_output_prediction_btn,1,1)
 		self.top_right_grid.addWidget(self.count_all_btn, 2,0)
 		self.top_right_grid.addWidget(self.output_count_txt,2,1,1,4)
 		#self.top_right_grid.addWidget(self.save_output_link, 2, 0)
@@ -920,12 +927,15 @@ class Eval_disp_im_win(QtGui.QWidget):
 		self.count_maxima_btn.setEnabled(True)
 		self.count_all_btn.setEnabled(True)
 		self.save_output_data_btn.setEnabled(True)
+		self.save_output_prediction_btn.setEnabled(True)
 		self.image_status_text.showMessage('Status: evaluation finished.')
 		par_obj.eval_load_im_win_eval = True
 		par_obj.time_pt = 0
 		v2.eval_pred_show_fn(par_obj.curr_img, par_obj,self)
 	def save_output_data(self):
 		v2.save_output_data_fn(par_obj,self)
+  	def save_output_prediction(self):
+		v2.save_output_prediction_fn(par_obj,self)
 	def report_progress(self,message):
 		self.image_status_text.showMessage('Status: ' + message)
 		app.processEvents()
