@@ -86,12 +86,12 @@ class fileDialog(QtGui.QMainWindow):
         
     def showDialog(self):
         par_obj.file_array =[]
-        par_obj.data_store[par_obj.time_pt]['feat_arr'] ={}
+        #par_obj.data_store[par_obj.file_id][par_obj.time_pt]['feat_arr'] ={}
         par_obj.RF ={}
 
         self.parent.selIntButton.setEnabled(False)
         #filepath = QtGui.QFileDialog.getOpenFileName(self, 'Open file', '/home')
-        for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file',self.parent.filepath,'Images(*.tif *.tiff *.png *.oib *.oif);;'):
+        for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file',self.parent.filepath,'Images(*.tif *.tiff *.oib *.oif);;'):
             par_obj.file_array.append(path)
 
             
@@ -104,7 +104,7 @@ class fileDialog(QtGui.QMainWindow):
         
         self.parent.image_status_text.showMessage(updateText)
         if success == True:
-            self.parent.updateAfterImport()
+            self.parent.update_after_import()
 
 
 
@@ -351,16 +351,26 @@ class Load_win_fn(QtGui.QWidget):
         """Updates on change of feature scale"""
         par_obj.feature_scale = float(text)
 
-    def updateAfterImport(self):
+    def update_after_import(self):
         """Specific to ui updates"""
 
+
+            
+        
+
+        if par_obj.zslice_array[0]> par_obj.zslice_limit:
+            par_obj.uploadLimit = par_obj.zslice_limit
+
+            
+
+
         if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
-            if par_obj.test_im_end >1:
+            if par_obj.zslice_array[0] >1:
                 self.linEdit_Frm.setText('1-'+str(par_obj.uploadLimit))
-                self.Text_FrmOpt2.setText('There are '+str(par_obj.test_im_end)+' z-slices in total. The image has dimensions x: '+str(par_obj.ori_width)+' and y: '+str(par_obj.ori_height))
-                if par_obj.total_time_pt != 0:
-                    self.linEdit_Frm2.setText('1-'+str(par_obj.total_time_pt))
-                    self.Text_FrmOpt4.setText('There are '+str(par_obj.total_time_pt)+' timepoints in total.')
+                self.Text_FrmOpt2.setText('There are '+str(par_obj.zslice_array[0])+' z-slices in total. The image has dimensions x: '+str(par_obj.width_array[0])+' and y: '+str(par_obj.height_array[0]))
+                if par_obj.tpoint_array[0] > 1:
+                    self.linEdit_Frm2.setText('1-'+str(par_obj.tpoint_array[0]))
+                    self.Text_FrmOpt4.setText('There are '+str(par_obj.tpoint_array[0])+' timepoints in total.')
                     self.linEdit_Frm2.show()
                     self.Text_FrmOpt4.show()
                     self.Text_FrmOpt3.show()
@@ -369,12 +379,12 @@ class Load_win_fn(QtGui.QWidget):
                 self.linEdit_Frm.show()
                 
         if par_obj.file_ext == 'oib' or  par_obj.file_ext == 'oif':
-            if par_obj.test_im_end >1:
+            if par_obj.zslice_array[0] >1:
                 self.linEdit_Frm.setText('1-'+str(par_obj.uploadLimit))
-                self.Text_FrmOpt2.setText('There are '+str(par_obj.test_im_end)+' frames in total. The image has dimensions x: '+str(par_obj.ori_width)+' and y: '+str(par_obj.ori_height))
-                if par_obj.total_time_pt != 0:
-                    self.linEdit_Frm2.setText('1-'+str(par_obj.total_time_pt))
-                    self.Text_FrmOpt4.setText('There are '+str(par_obj.total_time_pt)+' timepoints in total.')
+                self.Text_FrmOpt2.setText('There are '+str(par_obj.zslice_array[0])+' frames in total. The image has dimensions x: '+str(par_obj.width_array[0])+' and y: '+str(par_obj.height_array[0]))
+                if par_obj.tpoint_array[0] > 1:
+                    self.linEdit_Frm2.setText('1-'+str(par_obj.tpoint_array[0]))
+                    self.Text_FrmOpt4.setText('There are '+str(par_obj.tpoint_array[0])+' timepoints in total.')
                     self.linEdit_Frm2.show()
                     self.Text_FrmOpt4.show()
                     self.Text_FrmOpt3.show()
@@ -393,9 +403,9 @@ class Load_win_fn(QtGui.QWidget):
        
         
         par_obj.ch_active =[];
-        if par_obj.numCH> 0:
+        if par_obj.numCH_array[0]> 0:
             self.Text_CHopt.show()
-            for i in range(0,par_obj.numCH):
+            for i in range(0,par_obj.numCH_array[0]):
                 name = 'self.CH_cbx'+str(i+1)+'.show()'
                 exec(name)
                 name = 'self.CH_cbx'+str(i+1)+'_txt.show()'
@@ -437,35 +447,32 @@ class Load_win_fn(QtGui.QWidget):
         #Resets everything should this be another patch of images loaded.
         imgs =[]
         gt_im_sing_chgs =[]
-        fmStr = self.linEdit_Frm.text()
+        par_obj.data_storen={}
         
-        par_obj.height = par_obj.ori_height/par_obj.resize_factor
-        par_obj.width = par_obj.ori_width/par_obj.resize_factor
         
-        if par_obj.total_time_pt> 0:
-            tmStr = self.linEdit_Frm2.text()
-            par_obj.time_pt_list= np.array(list(self.hyphen_range(tmStr)))-1
-        else:
-            par_obj.time_pt_list = [0]
+       
         
-        for time_pt in par_obj.time_pt_list:
-            par_obj.data_store[time_pt] ={}
-            par_obj.data_store[time_pt]['dense_arr'] = {}
-            par_obj.data_store[time_pt]['feat_arr'] = {}
-            par_obj.data_store[time_pt]['pred_arr'] = {}
-            par_obj.data_store[time_pt]['sum_pred'] = {}
-            par_obj.data_store[time_pt]['maxi_arr'] = {}
-            par_obj.data_store[time_pt]['pts'] ={}
-            par_obj.data_store[time_pt]['roi_stk_x'] ={}
-            par_obj.data_store[time_pt]['roi_stk_y'] ={}
-            par_obj.data_store[time_pt]['roi_stkint_x'] ={}
-            par_obj.data_store[time_pt]['roi_stkint_y'] ={}
+        
+        #Reads the file array list which contains the loaded files.
+        time_pt_list = {}
+        zslice_list = {}
+        
+        for i in range(0,par_obj.file_array.__len__()):
+            
+            #par_obj.file_id_list.append(i)
+            if par_obj.tpoint_array[i]> 1:
+                tmStr = self.linEdit_Frm2.text()
+                
+                time_pt_list[i] = np.array(list(self.hyphen_range(tmStr)))-1
+            else:
+                time_pt_list[i] = [0]
 
-        
-        par_obj.frames_2_load ={}
-        par_obj.left_2_calc =[]
-        par_obj.saved_ROI =[]
-        par_obj.saved_dots=[]
+            if par_obj.zslice_array[i]> 1:
+                zmStr = self.linEdit_Frm.text()
+                
+                zslice_list[i] = np.array(list(self.hyphen_range(zmStr)))-1
+            else:
+                zslice_list[i] = [0]
         
         par_obj.eval_load_im_win_eval = False
 
@@ -473,65 +480,46 @@ class Load_win_fn(QtGui.QWidget):
             par_obj.feature_type = 'basic'
         if self.r1.isChecked():
             par_obj.feature_type = 'fine'
+
+        par_obj.data_store ={}
+        for file_id, file_nm in enumerate(par_obj.file_array):
+            par_obj.data_store[file_id] ={}
+            par_obj.data_store[file_id]['file_name'] = str(file_nm)
+            par_obj.data_store[file_id]['max_zslice'] = par_obj.zslice_array[file_id]
+            par_obj.data_store[file_id]['max_tpoint'] = par_obj.tpoint_array[file_id]
+            par_obj.data_store[file_id]['frames_2_load'] = zslice_list[file_id]
+            par_obj.data_store[file_id]['time_pt_list'] = time_pt_list[file_id]
+            par_obj.data_store[file_id]['ori_height'] = par_obj.height_array[file_id]
+            par_obj.data_store[file_id]['ori_width'] = par_obj.width_array[file_id]
+            par_obj.data_store[file_id]['height'] = par_obj.height_array[file_id]/par_obj.resize_factor
+            par_obj.data_store[file_id]['width'] = par_obj.width_array[file_id]/par_obj.resize_factor
+            par_obj.data_store[file_id]['numCH'] = par_obj.numCH_array[file_id]
+            par_obj.data_store[file_id]['file_ext'] = par_obj.file_ext_array[file_id]
+            for time_pt in par_obj.data_store[file_id]['time_pt_list']:
+                par_obj.data_store[file_id][time_pt] ={}
+                par_obj.data_store[file_id][time_pt]['dense_arr'] = {}
+                par_obj.data_store[file_id][time_pt]['feat_arr'] = {}
+                par_obj.data_store[file_id][time_pt]['pred_arr'] = {}
+                par_obj.data_store[file_id][time_pt]['sum_pred'] = {}
+                par_obj.data_store[file_id][time_pt]['maxi_arr'] = {}
+                par_obj.data_store[file_id][time_pt]['pts'] ={}
+                par_obj.data_store[file_id][time_pt]['roi_stkint_x'] ={}
+                par_obj.data_store[file_id][time_pt]['roi_stkint_y'] ={}
+                par_obj.data_store[file_id][time_pt]['roi_stk_x'] ={}
+                par_obj.data_store[file_id][time_pt]['roi_stk_y'] ={}
    
-        #Now we commit our options to our imported files.
-        if par_obj.file_ext == 'png':
-            for i in range(0,par_obj.file_array.__len__()):
-                par_obj.left_2_calc.append(i)
-                par_obj.frames_2_load[i] = [0]
-            self.image_status_text.showMessage('Status: Loading Images. Loading Image Num: '+str(par_obj.file_array.__len__()))
-                
-            v2.im_pred_inline_fn(par_obj, self)
-        elif par_obj.file_ext =='tiff' or par_obj.file_ext =='tif':
-            if par_obj.test_im_end>1:
-                for i in range(0,par_obj.file_array.__len__()):
-                    par_obj.left_2_calc.append(i)
-                    try:
-                        #np.array(list(self.hyphen_range(fmStr)))-1
-                        par_obj.frames_2_load[i] = np.array(list(self.hyphen_range(fmStr)))-1
-                    except:
-                        self.image_status_text.showMessage('Status: The supplied range of image frames is in the wrong format. Please correct and click confirm images.')
-                        return
-                self.image_status_text.showMessage('Status: Loading Images.')
-                v2.im_pred_inline_fn(par_obj, self)
-               
-            else:
-                for i in range(0,par_obj.file_array.__len__()):
-                    par_obj.left_2_calc.append(i)
-                    par_obj.frames_2_load[i] = [0]
-                v2.im_pred_inline_fn(par_obj, self)
-        elif par_obj.file_ext =='oib'or  par_obj.file_ext == 'oif':
-            if par_obj.test_im_end>1:
-                for i in range(0,par_obj.file_array.__len__()):
-                    par_obj.left_2_calc.append(i)
-                    try:
-                        par_obj.frames_2_load[i] = np.array(list(self.hyphen_range(fmStr)))-1
-                    except:
-                        self.image_status_text.showMessage('Status: The supplied range of image frames is in the wrong format. Please correct and click confirm images.')
-                        return
-                self.image_status_text.showMessage('Status: Loading Images.')
-                v2.im_pred_inline_fn(par_obj, self)
-               
-            else:
-                for i in range(0,par_obj.file_array.__len__()):
-                    par_obj.left_2_calc.append(i)
-                    par_obj.frames_2_load[i] = [0]
-                v2.im_pred_inline_fn(par_obj, self)
-        count = 0
-        for b in par_obj.left_2_calc:
-            frames =par_obj.frames_2_load[b]
-            for i in frames:
-                count = count+1
-                
-        par_obj.test_im_start= 0
-        par_obj.test_im_end= count
         
         
-        par_obj.curr_img = par_obj.frames_2_load[0][0]
+        
+        
+        par_obj.curr_file_id = 0
+        par_obj.time_pt = par_obj.data_store[par_obj.curr_file_id]['time_pt_list'][0]
+        par_obj.curr_img =par_obj.data_store[par_obj.curr_file_id]['frames_2_load'][0]
+        par_obj.eval_load_im_win_eval = False   
         
         self.image_status_text.showMessage('Status: Images loaded. Click \'Goto Training\'')
         self.selIntButton.setEnabled(True)
-        par_obj.imgs = imgs
+        
     def report_progress(self,message):
         self.image_status_text.showMessage('Status: '+message)
         app.processEvents()
@@ -868,32 +856,13 @@ class Win_fn(QtGui.QWidget):
     def replot_fn(self):
             v2.eval_pred_show_fn(par_obj.curr_img,par_obj,self)
     def count_maxima_btn_fn(self):
-        predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.num_of_train_im))
-        for i in range(0,par_obj.frames_2_load[0].__len__()):
-            predMtx[:,:,i]= par_obj.data_store[par_obj.time_pt]['pred_arr'][par_obj.frames_2_load[0][i]]
-        
-
-        gau_stk = filters.gaussian_filter(predMtx,[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-        y,x,z = np.gradient(gau_stk,1)
-        xy,xx,xz = np.gradient(x)
-        yy,yx,yz = np.gradient(y)
-        zy,zx,zz = np.gradient(z)
-        det = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
-        detl = -1*np.min(det)+det
-        detn = detl/np.max(detl)*255
-        par_obj.data_store[par_obj.time_pt]['maxi_arr'] = {}
-        for i in range(0,par_obj.frames_2_load[0].__len__()):
-            par_obj.data_store[par_obj.time_pt]['maxi_arr'][par_obj.frames_2_load[0][i]] = detn[:,:,i]
-        #instk = (255*(detn/np.max(detn))).astype(np.int32)
-        par_obj.min_distance = [int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())]
-        par_obj.abs_thr = float(self.abs_thr_txt.text())
+        par_obj.min_distance[0] = int(self.count_txt_1.text())
+        par_obj.min_distance[1] = int(self.count_txt_2.text())
+        par_obj.min_distance[2] = int(self.count_txt_3.text())
         par_obj.rel_thr = float(self.rel_thr_txt.text())
+        par_obj.abs_thr = float(self.abs_thr_txt.text())
 
-
-
-        pts = v2.peak_local_max(detn,min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
-        par_obj.data_store[par_obj.time_pt]['pts'] = pts
-
+        v2.count_maxima(par_obj,par_obj.time_pt)
         #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
 
         par_obj.show_pts = 1
@@ -989,6 +958,8 @@ class Win_fn(QtGui.QWidget):
     def on_unclick(self, event):
         """When the mouse is released"""
         par_obj.mouse_down = False
+        width = par_obj.data_store[par_obj.curr_file_id]['width']
+        height = par_obj.data_store[par_obj.curr_file_id]['height']
         
         #If we are in the roi drawing phase
         if(par_obj.draw_ROI == True):
@@ -1002,8 +973,8 @@ class Win_fn(QtGui.QWidget):
             #Corrects the corrdinates if out of rectangle.
             if(x < 0): x=0
             if(y < 0): y=0
-            if(x > par_obj.width): x=par_obj.width-1
-            if(y > par_obj.height): y=par_obj.height-1
+            if(x > width): x=width-1
+            if(y > height): y=height-1
             t1 = time.time()
             print t1-t2
         #If we are in the dot drawing phase
@@ -1185,7 +1156,7 @@ class Win_fn(QtGui.QWidget):
         par_obj.im_for_train = [par_obj.curr_img]
         v2.update_density_fn(par_obj)
         self.plt2.cla()
-        self.plt2.imshow(par_obj.data_store[par_obj.time_pt]['dense_arr'][par_obj.curr_img])
+        self.plt2.imshow(par_obj.data_store[par_obj.curr_file_id][par_obj.time_pt]['dense_arr'][par_obj.curr_img])
         self.plt2.set_xticklabels([])
         self.plt2.set_yticklabels([])
         self.canvas2.draw()
@@ -1202,37 +1173,39 @@ class Win_fn(QtGui.QWidget):
                 self.dots_and_square(dots,rects,'w')
         
     def prev_im_btn_fn(self):
-        for ind, zim in enumerate(par_obj.frames_2_load[0]):
+
+        for ind, zim in enumerate(par_obj.data_store[par_obj.curr_file_id]['frames_2_load']):
             if zim == par_obj.curr_img:
                 if ind > 0:
-                    par_obj.curr_img  = par_obj.frames_2_load[0][ind-1]
+                    par_obj.curr_img  = par_obj.data_store[par_obj.curr_file_id]['frames_2_load'][ind-1]
                     self.goto_img_fn(par_obj.curr_img)
                     break;
             
     def next_im_btn_fn(self):
-         for ind, zim in enumerate(par_obj.frames_2_load[0]):
+        
+        for ind, zim in enumerate(par_obj.data_store[par_obj.curr_file_id]['frames_2_load']):
             if zim == par_obj.curr_img:
-                if ind < par_obj.frames_2_load[0].__len__()-1:
-                    par_obj.curr_img  = par_obj.frames_2_load[0][ind+1]
+                if ind < par_obj.data_store[par_obj.curr_file_id]['frames_2_load'].__len__()-1:
+                    par_obj.curr_img  = par_obj.data_store[par_obj.curr_file_id]['frames_2_load'][ind+1]
                     self.goto_img_fn(par_obj.curr_img)
                     break;
     def prev_time_btn_fn(self):
-        for ind, tim in enumerate(par_obj.time_pt_list):
+        for ind, tim in enumerate(par_obj.data_store[par_obj.curr_file_id]['time_pt_list'] ):
             if tim == par_obj.time_pt:
                 if ind > 0:
-                    par_obj.time_pt  = par_obj.time_pt_list[ind-1]
+                    par_obj.time_pt  = par_obj.data_store[par_obj.curr_file_id]['time_pt_list'][ind-1]
                     self.goto_img_fn(par_obj.curr_img)
                     break;
             
     def next_time_btn_fn(self):
 
-        for ind, tim in enumerate(par_obj.time_pt_list):
+        for ind, tim in enumerate(par_obj.data_store[par_obj.curr_file_id]['time_pt_list'] ):
             if tim == par_obj.time_pt:
-                if ind < par_obj.time_pt_list.__len__()-1:
-                    par_obj.time_pt  = par_obj.time_pt_list[ind+1]
+                if ind < par_obj.data_store[par_obj.curr_file_id]['time_pt_list'].__len__()-1:
+                    par_obj.time_pt  = par_obj.data_store[par_obj.curr_file_id]['time_pt_list'] [ind+1]
                     self.goto_img_fn(par_obj.curr_img)
                     break;
-
+            
         
         
            
@@ -1287,7 +1260,7 @@ class Win_fn(QtGui.QWidget):
     def clear_dots_fn(self):
         par_obj.saved_dots = []
         par_obj.saved_ROI = []
-        par_obj.data_store[par_obj.time_pt]['dense_arr'] = {}
+        par_obj.data_store[par_obj.curr_file_id][par_obj.time_pt]['dense_arr'] = {}
         self.goto_img_fn(par_obj.curr_img)
         self.update_density_fn()
         self.train_model_btn.setEnabled(False)
@@ -1295,7 +1268,6 @@ class Win_fn(QtGui.QWidget):
     def train_model_btn_fn(self):
         self.image_status_text.showMessage('Training Ensemble of Decision Trees. ')
         v2.im_pred_inline_fn(par_obj, self)
-        print 'hre',par_obj.data_store[par_obj.time_pt]['dense_arr']
         v2.update_training_samples_fn(par_obj,self,0)
         self.image_status_text.showMessage('Evaluating Images with the Trained Model. ')
         app.processEvents()    
@@ -1485,10 +1457,12 @@ class parameterClass:
         self.c = 0
         self.M =1
         self.time_pt = 0
-        self.total_time_pt = 0
-        self.data_store ={}
-        self.data_store[self.time_pt] ={}
-        self.data_store[self.time_pt]['dense_arr'] ={}
+        
+        self.zslice_limit = 8;
+        self.tpoint_limit = 30000;
+        #self.data_store ={}
+        #self.data_store[self.time_pt] ={}
+        #self.data_store[self.time_pt]['dense_arr'] ={}
 
 
 #generate layout
