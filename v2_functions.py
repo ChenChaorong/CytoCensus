@@ -985,7 +985,18 @@ def import_data_fn(par_obj,file_array):
 	
 	statusText= str(file_array.__len__())+' Files Loaded.'
 	return True, statusText
+def save_output_prediction_fn(par_obj,int_obj):
 
+	count = -1
+	for tpt in par_obj.time_pt_list:
+
+		for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
+			count=count+1
+			n = str(count)
+			string = par_obj.csvPath+'output' + n.zfill(3)+'.tif'
+			im_to_save= PIL.Image.fromarray(par_obj.data_store[par_obj.time_pt]['pred_arr'][i].astype(np.float32))
+			im_to_save.save(string)
+	print 'Prediction written to disk'
 def save_output_data_fn(par_obj,int_obj):
 	local_time = time.asctime( time.localtime(time.time()) )
 
