@@ -1004,6 +1004,8 @@ class Win_fn(QtGui.QWidget):
             x = event.xdata
             y = event.ydata
             self.draw_saved_dots_and_roi()
+            print 'curr_img',par_obj.curr_img
+            print 'timepoint',par_obj.time_pt
             #Are we with an existing box.
             if(x > par_obj.rects[1]-par_obj.roi_tolerance and x < (par_obj.rects[1]+ par_obj.rects[3])+par_obj.roi_tolerance and y > par_obj.rects[2]-par_obj.roi_tolerance and y < (par_obj.rects[2]+ par_obj.rects[4])+par_obj.roi_tolerance):
                 #Appends dots to array if in an empty pixel.
@@ -1014,10 +1016,11 @@ class Win_fn(QtGui.QWidget):
                             par_obj.saved_dots.append(par_obj.dots)
                             par_obj.saved_ROI.append(par_obj.rects)
                             self.update_density_fn()
-                            par_obj.dots = par_obj.saved_dots[par_obj.ROI_index[par_obj.roi_select]]
-                            par_obj.rects =  par_obj.saved_ROI[par_obj.ROI_index[par_obj.roi_select]]
-                            par_obj.saved_dots.pop(par_obj.ROI_index[par_obj.roi_select])
-                            par_obj.saved_ROI.pop(par_obj.ROI_index[par_obj.roi_select])
+                            #Reloads the roi so can edited again. It is now at the end of the array.
+                            par_obj.dots = par_obj.saved_dots[-1]
+                            par_obj.rects =  par_obj.saved_ROI[-1]
+                            par_obj.saved_dots.pop(-1)
+                            par_obj.saved_ROI.pop(-1)
                             break 
             
 
@@ -1267,8 +1270,26 @@ class Win_fn(QtGui.QWidget):
         self.clear_dots_btn.setEnabled(False)
     def train_model_btn_fn(self):
         self.image_status_text.showMessage('Training Ensemble of Decision Trees. ')
-        v2.im_pred_inline_fn(par_obj, self)
+
+        
+        prev_curr_img = par_obj.curr_img
+        prev_time_pt = par_obj.time_pt
+        for i in range(0,par_obj.saved_ROI.__len__()):
+            par_obj.curr_img = par_obj.saved_ROI[i][0]
+            par_obj.time_pt =par_obj.saved_ROI[i][5]
+            try:
+                par_obj.data_store[par_obj.curr_file_id][par_obj.time_pt]['feat_arr'][par_obj.curr_img]
+            except:
+                print 'calculating features, time point',par_obj.time_pt+1,' image slice ',par_obj.curr_img+1
+                v2.im_pred_inline_fn(par_obj, self)
+
+        par_obj.curr_img = prev_curr_img
+        par_obj.time_pt = prev_time_pt      
+        
         v2.update_training_samples_fn(par_obj,self,0)
+
+
+
         self.image_status_text.showMessage('Evaluating Images with the Trained Model. ')
         app.processEvents()    
         v2.evaluate_forest(par_obj,self, False,0)
