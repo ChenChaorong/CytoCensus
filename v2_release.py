@@ -21,7 +21,7 @@ from matplotlib.figure import Figure
 from scipy.ndimage import filters
 import v2_functions as v2
 
-
+import pdb
 
 
 
@@ -345,7 +345,8 @@ class Load_win_fn(QtGui.QWidget):
         self.about_win.raise_()
     def resize_factor_change(self,text):
         """Updates on change of feature scale"""
-        par_obj.resize_factor = float(text)
+        if text != "":
+            par_obj.resize_factor = float(text)
 
     def feature_scale_change(self,text):
         """Updates on change of feature scale"""
@@ -493,8 +494,8 @@ class Load_win_fn(QtGui.QWidget):
                         self.image_status_text.showMessage('Status: The supplied range of image frames is in the wrong format. Please correct and click confirm images.')
                         return
                 self.image_status_text.showMessage('Status: Loading Images.')
-                v2.im_pred_inline_fn(par_obj, self)
-
+                #v2.im_pred_inline_fn(par_obj, self)
+                v2.im_pred_inline_fn_eval(par_obj, self,threaded=True)
             else:
                 for i in range(0,par_obj.file_array.__len__()):
                     par_obj.left_2_calc.append(i)
@@ -834,28 +835,29 @@ class Win_fn(QtGui.QWidget):
         self.m_Cursor = self.makeCursor()
     def evaluate_forest_fn(self):
         #Don't want to train for all the images so we select them.
-        #try:
-        #    par_obj.data_store[par_obj.time_pt]['feat_arr']
-        #except:
+        for i in par_obj.frames_2_load[0]:
+            try:
+                par_obj.data_store[par_obj.time_pt]['feat_arr']
+            except:
+                v2.im_pred_inline_fn_eval(par_obj, self,threaded=True) #v2.im_pred_inline_fn(par_obj, self)
+                break
         #    par_obj.data_store[par_obj.time_pt] = {}
         #    par_obj.data_store[par_obj.time_pt]['feat_arr'] = {}
         #    par_obj.data_store[par_obj.time_pt]['pred_arr'] = {}
         #    par_obj.data_store[par_obj.time_pt]['sum_pred'] = {}
-
-        v2.im_pred_inline_fn(par_obj, self)
-        v2.evaluate_forest(par_obj,self,False,0)
+        v2.evaluate_forest(par_obj,self,inline=False,outer_loop=0,inner_loop=par_obj.frames_2_load[0])
         par_obj.show_pts= 0
         self.kernel_btn_fn()
         print 'evaluating'
 
     def save_gt_fn(self):
         file_to_save = {'dots':par_obj.saved_dots,'rect':par_obj.saved_ROI}
-        fileName = QtGui.QFileDialog.getSaveFileName(self, "Save dots and regions", "/home/", ".quantiROI");
+        fileName = QtGui.QFileDialog.getSaveFileName(self, "Save dots and regions", "/home/Documents", ".quantiROI");
         print 'the filename address',fileName
         pickle.dump( file_to_save, open( fileName+".quantiROI", "wb" ) )
     def load_gt_fn(self):
         print 'load the gt'
-        fileName = QtGui.QFileDialog.getOpenFileName(self, "Save dots and regions", "/home/", "QuantiFly ROI files (*.quantiROI)");
+        fileName = QtGui.QFileDialog.getOpenFileName(self, "Save dots and regions", "/home/Documents", "QuantiFly ROI files (*.quantiROI)");
         print 'load the file', fileName
         the_file = pickle.load( open( fileName, "rb" ) )
         par_obj.saved_dots = the_file['dots']
@@ -1297,17 +1299,19 @@ class Win_fn(QtGui.QWidget):
         self.clear_dots_btn.setEnabled(False)
     def train_model_btn_fn(self):
         self.image_status_text.showMessage('Training Ensemble of Decision Trees. ')
-
+        #added to make sure current timepoint has all features precalculated
+        v2.im_pred_inline_fn(par_obj, self,threaded=True)
         prev_curr_img = par_obj.curr_img
         prev_time_pt = par_obj.time_pt
+
         for i in range(0,par_obj.saved_ROI.__len__()):
             par_obj.curr_img = par_obj.saved_ROI[i][0]
             par_obj.time_pt =par_obj.saved_ROI[i][5]
             try:
-                par_obj.data_store[par_obj.curr_file_id][par_obj.time_pt]['feat_arr'][par_obj.curr_img]
+                par_obj.data_store[par_obj.time_pt]['feat_arr'][par_obj.curr_img]
             except:
                 print 'calculating features, time point',par_obj.time_pt+1,' image slice ',par_obj.curr_img+1
-                v2.im_pred_inline_fn(par_obj, self)
+                v2.im_pred_inline_fn(par_obj, self,inline=True,outer_loop=0,inner_loop=par_obj.curr_img)
 
         par_obj.curr_img = prev_curr_img
         par_obj.time_pt = prev_time_pt
@@ -1469,7 +1473,7 @@ class parameterClass:
         self.min_samples_split=20
         self.min_samples_leaf=10
         self.max_features = 7
-        self.num_of_tree = 30
+        self.num_of_tree = 50#30
         self.feature_scale = 0.8
         self.x_limit = 5024
         self.y_limit = 5024

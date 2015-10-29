@@ -902,9 +902,11 @@ class Eval_disp_im_win(QtGui.QWidget):
 			count = -1
 			for b in par_obj.left_2_calc:
 				frames =par_obj.frames_2_load[b]
+				#try to make it threadable
+				v2.im_pred_inline_fn_eval(par_obj, self,outer_loop=b,inner_loop=frames,threaded=True)
+
 				for i in frames:
-					
-					v2.im_pred_inline_fn(par_obj, self,inline=True,outer_loop=b,inner_loop=i,count=count)
+					#v2.im_pred_inline_fn(par_obj, self,inline=True,outer_loop=b,inner_loop=frames,count=count)
 					v2.evaluate_forest(par_obj,self, False, 0,inline=True,outer_loop=b,inner_loop=i,count=count)
 					count = count+1
 			par_obj.data_store[tpt]['feat_arr'] = {}
