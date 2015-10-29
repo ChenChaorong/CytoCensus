@@ -837,7 +837,7 @@ class Win_fn(QtGui.QWidget):
         #Don't want to train for all the images so we select them.
         for i in par_obj.frames_2_load[0]:
             try:
-                par_obj.data_store[par_obj.time_pt]['feat_arr']
+                par_obj.data_store[par_obj.time_pt]['feat_arr'][i]
             except:
                 v2.im_pred_inline_fn_eval(par_obj, self,threaded=True) #v2.im_pred_inline_fn(par_obj, self)
                 break
@@ -845,7 +845,7 @@ class Win_fn(QtGui.QWidget):
         #    par_obj.data_store[par_obj.time_pt]['feat_arr'] = {}
         #    par_obj.data_store[par_obj.time_pt]['pred_arr'] = {}
         #    par_obj.data_store[par_obj.time_pt]['sum_pred'] = {}
-        v2.evaluate_forest(par_obj,self,inline=False,outer_loop=0,inner_loop=par_obj.frames_2_load[0])
+        v2.evaluate_forest(par_obj,self,False,0)
         par_obj.show_pts= 0
         self.kernel_btn_fn()
         print 'evaluating'
