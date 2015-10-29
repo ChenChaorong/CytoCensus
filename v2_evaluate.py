@@ -21,6 +21,7 @@ import os
 import numpy as np
 import copy
 import datetime
+import functools
 from scipy.special import _ufuncs_cxx
 import sklearn.utils.lgamma
 from gnu import return_license

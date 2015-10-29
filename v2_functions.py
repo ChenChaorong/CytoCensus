@@ -14,8 +14,12 @@ from tifffile import TiffFile
 import itertools as itt
 import struct
 import copy
+import functools
 from matplotlib.lines import Line2D
 from matplotlib.path import Path
+
+from multiprocessing import Pool
+from multiprocessing.dummy import Pool as ThreadPool 
 """QuantiFly3d Software v0.0
 
 	Copyright (C) 2015  Dominic Waithe
@@ -436,7 +440,7 @@ def update_density_fn(par_obj):
 		
 		par_obj.data_store[par_obj.time_pt]['dense_arr'][im] = dense_im
 
-def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=None,count=None):
+def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=None,count=None,threaded=False):
 	"""Accesses TIFF file slice or opens png. Calculates features to indices present in par_obj.left_2_calc"""
 	if inline == False:
 		outer_loop = par_obj.left_2_calc
@@ -446,75 +450,165 @@ def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=N
 		#par_obj.feat_arr ={}
 		inner_loop_arr ={outer_loop:[inner_loop]}
 		outer_loop = [outer_loop]
-
-
-	#Goes through the list of files.
-	for b in outer_loop:
-			
-			imStr = str(par_obj.file_array[b])
-			frames = inner_loop_arr[b]
-			#if par_obj.file_ext== 'tif' or par_obj.file_ext == 'tiff':
-			 #   par_obj.tif_file = TifFile(imStr).asarray()[:,:,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
-
-
-			
-
-			for i in frames:
-				if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
-					
-					imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
-					keyframe = (par_obj.max_zslices*par_obj.time_pt)+ i
-					
-					
-					if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
-						input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
+	if threaded == False:
 						
-						for c in range(0,par_obj.ch_active.__len__()):
-							imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
-					else:
-						input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
-						imRGB[:,:,0] = input_im
-
-
-
-				elif par_obj.file_ext == 'png':
-					imRGB = pylab.imread(str(imStr))*255
-				elif par_obj.file_ext == 'oib'or  par_obj.file_ext == 'oif':
-					
-					imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
-
-					print 'par_obj.ch_active',par_obj.ch_active
-					for c in range(0,par_obj.ch_active.__len__()):
-						
-						f  = par_obj.oib_prefix+'/s_C'+str(par_obj.ch_active[c]+1).zfill(3)+'Z'+str(i+1).zfill(3)
-						if par_obj.total_time_pt>0:
-							f = f+'T'+str(par_obj.time_pt+1).zfill(3)
-						f = f+'.tif'
-						
-						imRGB[:,:,par_obj.ch_active[c]] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
-						
-						
-
-				if par_obj.fresh_features == False:
-					try:
-						#Try loading features.
-						time1 = time.time()
-						feat = pickle.load(open(imStr[:-4]+'_'+str(i)+'.p', "rb"))
-						time2 = time.time()
-						int_obj.report_progress('Loading Features for Image: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
-			
-					except:
-						#If don't exist create them.
-						int_obj.report_progress('Calculating Features for File: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
-						feat = feature_create(par_obj,imRGB,imStr,i)
-				else:
-					#If you want to ignore previous features which have been saved.
-					int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(i+1) +' Timepoint: '+str(par_obj.time_pt+1))
-					feat =feature_create(par_obj,imRGB,imStr,i)
-				par_obj.num_of_feat = feat.shape[2]
-				par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = feat  
+		#Goes through the list of files.
+		for b in outer_loop:
+				
+				imStr = str(par_obj.file_array[b])
+				frames = inner_loop_arr[b]
+				#if par_obj.file_ext== 'tif' or par_obj.file_ext == 'tiff':
+				 #   par_obj.tif_file = TifFile(imStr).asarray()[:,:,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
 	
+				for i in frames:
+					if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
+						
+						imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
+						keyframe = (par_obj.max_zslices*par_obj.time_pt)+ i
+						
+						
+						if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
+							input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
+							
+							for c in range(0,par_obj.ch_active.__len__()):
+								imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
+						else:
+							input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
+							imRGB[:,:,0] = input_im
+	
+	
+	
+					elif par_obj.file_ext == 'png':
+						imRGB = pylab.imread(str(imStr))*255
+					elif par_obj.file_ext == 'oib'or  par_obj.file_ext == 'oif':
+						
+						imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
+	
+						print 'par_obj.ch_active',par_obj.ch_active
+						for c in range(0,par_obj.ch_active.__len__()):
+							
+							f  = par_obj.oib_prefix+'/s_C'+str(par_obj.ch_active[c]+1).zfill(3)+'Z'+str(i+1).zfill(3)
+							if par_obj.total_time_pt>0:
+								f = f+'T'+str(par_obj.time_pt+1).zfill(3)
+							f = f+'.tif'
+							
+							imRGB[:,:,par_obj.ch_active[c]] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
+							
+					#checks if features for this tp have been calculated already
+					if par_obj.fresh_features == False:
+						try:
+								#Try loading features.
+								
+								time1 = time.time()
+								feat=pickle.load(open(imStr[:-4]+'_'+str(i)+'.p', "rb"))
+								time2 = time.time()
+								int_obj.report_progress('Loading Features for Image: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
+						except:
+							#If don't exist create them.
+							int_obj.report_progress('Calculating Features for File: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
+							feat = feature_create(par_obj,imRGB,imStr,i)
+					else:
+						#If you want to ignore previous features which have been saved.
+						int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(i+1) +' Timepoint: '+str(par_obj.time_pt+1))
+						feat =feature_create(par_obj,imRGB,imStr,i)
+					par_obj.num_of_feat = feat.shape[2]
+					par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = feat  
+	else:
+		#threaded version
+						
+		#Goes through the list of files.
+		for b in outer_loop:
+				
+				imStr = str(par_obj.file_array[b])
+				frames = inner_loop_arr[b]
+				#if par_obj.file_ext== 'tif' or par_obj.file_ext == 'tiff':
+				 #   par_obj.tif_file = TifFile(imStr).asarray()[:,:,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
+	
+	
+				
+				imRGBlist=[]
+				for i in frames:
+					if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
+						
+						imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
+						keyframe = (par_obj.max_zslices*par_obj.time_pt)+ i
+						
+						
+						if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
+							input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
+							
+							for c in range(0,par_obj.ch_active.__len__()):
+								imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
+						else:
+							input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
+							imRGB[:,:,0] = input_im
+	
+	
+	
+					elif par_obj.file_ext == 'png':
+						imRGB = pylab.imread(str(imStr))*255
+					elif par_obj.file_ext == 'oib'or  par_obj.file_ext == 'oif':
+						
+						imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
+	
+						print 'par_obj.ch_active',par_obj.ch_active
+						for c in range(0,par_obj.ch_active.__len__()):
+							
+							f  = par_obj.oib_prefix+'/s_C'+str(par_obj.ch_active[c]+1).zfill(3)+'Z'+str(i+1).zfill(3)
+							if par_obj.total_time_pt>0:
+								f = f+'T'+str(par_obj.time_pt+1).zfill(3)
+							f = f+'.tif'
+							
+							imRGB[:,:,par_obj.ch_active[c]] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
+					imRGBlist.append(imRGB)
+							
+				# consider cropping
+				if par_obj.to_crop == False:
+					par_obj.crop_x1 = 0
+					par_obj.crop_x2=par_obj.width
+					par_obj.crop_y1 = 0
+					par_obj.crop_y2=par_obj.height
+				par_obj.height = par_obj.crop_y2-par_obj.crop_y1
+				par_obj.width = par_obj.crop_x2-par_obj.crop_x1
+				#initiate pool and start caclulating features
+				int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Timepoint: '+str(par_obj.time_pt+1) +' All  Frames')
+				featlist=[]
+				tee1=time.time()
+				pool = ThreadPool(8) 
+				featlist=pool.map(functools.partial(feature_create_threaded,par_obj,imStr),imRGBlist)
+				pool.close() 
+				pool.join() 
+				tee2=time.time()
+				#feat =feature_create(par_obj,imRGB,imStr,i)
+				print tee2-tee1
+				lcount=-1
+				for i in frames:
+					lcount=lcount+1
+					feat=featlist[lcount]
+					int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
+					feat =feature_create(par_obj,imRGBlist[lcount],imStr,i)
+					par_obj.num_of_feat = feat.shape[2]
+					par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = feat  
+		int_obj.report_progress('Features calculated')
 	return
+	
+def feature_create_threaded(par_obj,imStr,imRGB):
+	time1 = time.time()
+	
+	if (par_obj.feature_type == 'basic'):
+		feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),13*par_obj.ch_active.__len__()))
+	if (par_obj.feature_type == 'fine'):
+		feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),21*par_obj.ch_active.__len__()))
+
+	for b in range(0,par_obj.ch_active.__len__()):
+		if (par_obj.feature_type == 'basic'):
+			imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
+			feat[:,:,(b*13):((b+1)*13)] = local_shape_features_basic(imG,par_obj.feature_scale)   
+		if (par_obj.feature_type == 'fine'):
+			imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
+			feat[:,:,(b*21):((b+1)*21)] = local_shape_features_fine(imG,par_obj.feature_scale)
+
+	return feat
 def feature_create(par_obj,imRGB,imStr,i):
 	time1 = time.time()
 	if par_obj.to_crop == False:

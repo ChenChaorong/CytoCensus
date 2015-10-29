@@ -63,8 +63,8 @@ class fileDialog(QtGui.QMainWindow):
             except:
                 'unable to make directory: ',os.path.expanduser('~')+'/.densitycount/'
 
-        
-    def initUI(self):      
+
+    def initUI(self):
 
         self.textEdit = QtGui.QTextEdit()
         self.setCentralWidget(self.textEdit)
@@ -78,12 +78,12 @@ class fileDialog(QtGui.QMainWindow):
 
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&File')
-        fileMenu.addAction(openFile)       
-        
+        fileMenu.addAction(openFile)
+
         self.setGeometry(300, 300, 350, 500)
         self.setWindowTitle('File dialog')
         #self.show()
-        
+
     def showDialog(self):
         par_obj.file_array =[]
         par_obj.data_store[par_obj.time_pt]['feat_arr'] ={}
@@ -94,21 +94,21 @@ class fileDialog(QtGui.QMainWindow):
         for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file',self.parent.filepath,'Images(*.tif *.tiff *.png *.oib *.oif);;'):
             par_obj.file_array.append(path)
 
-            
+
             self.parent.config['filepath'] = str(QtCore.QFileInfo(path).absolutePath())+'/'
             pickle.dump(self.parent.config, open(str(os.path.expanduser('~')+'/.densitycount/config.p'), "w" ))
-            
-        self.parent.image_status_text.showMessage('Status: Loading Images. ')                
+
+        self.parent.image_status_text.showMessage('Status: Loading Images. ')
         success, updateText = v2.import_data_fn(par_obj, par_obj.file_array)
         #loadWin.CH_cbx1.stateChange()
-        
+
         self.parent.image_status_text.showMessage(updateText)
         if success == True:
             self.parent.updateAfterImport()
 
 
 
-        
+
 class Load_win_fn(QtGui.QWidget):
     """The class for loading and processing images"""
     def __init__(self,par_obj,win):
@@ -124,7 +124,7 @@ class Load_win_fn(QtGui.QWidget):
         hbox0.addWidget(self.loadImages_button)
         hbox0.addStretch()
 
-        
+
         about_btn = QtGui.QPushButton('About')
         about_btn.clicked.connect(self.on_about)
         hbox0.addWidget(about_btn)
@@ -134,25 +134,25 @@ class Load_win_fn(QtGui.QWidget):
         vbox.addWidget(self.Text_CHopt)
         self.ex = fileDialog(self)
         self.loadImages_button.clicked.connect(self.ex.showDialog)
-        
-        
+
+
         #SigmaData input field.
         self.feature_scale_input = QtGui.QLineEdit(str(par_obj.feature_scale))
         #SigmaData input Text.
         self.feature_scaleText = QtGui.QLabel()
-        
+
         hbox1 = QtGui.QHBoxLayout()
         vbox.addWidget(self.feature_scaleText)
         vbox.addLayout(hbox1)
-        
-        
+
+
         self.feature_scaleText.resize(40,20)
         self.feature_scaleText.setText('Input sigma for feature calculation default (0.8):')
         self.feature_scaleText.hide()
 
         hbox1.addWidget(self.feature_scale_input)
         hbox1.addStretch()
-        
+
         self.feature_scale_input.resize(10,10)
         self.feature_scale_input.textChanged[str].connect(self.feature_scale_change)
         self.feature_scale_input.hide()
@@ -165,20 +165,20 @@ class Load_win_fn(QtGui.QWidget):
 
         vbox.addWidget(self.resize_factor_text)
         vbox.addWidget(self.resize_factor_input)
-        
-        
+
+
         CH_pX = 0
         CH_pY = 50
 
         #Channel dialog generation.
-        
+
         vbox.addWidget(self.Text_CHopt)
         self.Text_CHopt.setText('Please select which channels you want to include in the feature calculation')
         self.Text_CHopt.resize(500,40)
         self.Text_CHopt.hide()
 
-        
-        hbox2 = QtGui.QHBoxLayout()           
+
+        hbox2 = QtGui.QHBoxLayout()
         #Object factory for channel selection.
         for i in range(0,10):
             name = 'self.CH_cbx'+str(i+1)+'_txt = QtGui.QLabel()'
@@ -205,7 +205,7 @@ class Load_win_fn(QtGui.QWidget):
 
         self.figure1 = Figure(figsize=(2,2))
         self.canvas1 = FigureCanvas(self.figure1)
-        
+
 
         #self.figure1.patch.set_facecolor('white')
         self.plt1 = self.figure1.add_subplot(1,1,1)
@@ -214,7 +214,7 @@ class Load_win_fn(QtGui.QWidget):
         self.figure1.subplots_adjust(left=0.001, right=0.999, top=0.999, bottom=0.001)
         self.plt1.set_xticklabels([])
         self.plt1.set_yticklabels([])
-        
+
         hbox3 = QtGui.QHBoxLayout()
         vbox.addLayout(hbox3)
         hbox3.addWidget(self.canvas1)
@@ -236,7 +236,7 @@ class Load_win_fn(QtGui.QWidget):
         self.Text_FrmOpt1.hide()
         vbox.addLayout(Text_FrmOpt1_panel)
 
-        
+
 
         #Image frames input.
         linEdit_Frm_panel = QtGui.QHBoxLayout()
@@ -254,15 +254,15 @@ class Load_win_fn(QtGui.QWidget):
         Text_FrmOpt3_panel.addWidget(self.Text_FrmOpt3)
         vbox.addLayout(Text_FrmOpt3_panel)
 
-        
-        
+
+
         linEdit_Frm_panel2 = QtGui.QHBoxLayout()
         self.linEdit_Frm2 = QtGui.QLineEdit()
         self.linEdit_Frm2.hide()
         linEdit_Frm_panel2.addWidget(self.linEdit_Frm2)
         linEdit_Frm_panel2.addStretch()
         vbox.addLayout(linEdit_Frm_panel2)
-        
+
 
         #Feature calculation to perform:
         self.Text_Radio = QtGui.QLabel()
@@ -270,22 +270,22 @@ class Load_win_fn(QtGui.QWidget):
         self.Text_Radio.setText('Feature select which kind of feature detection you would like to use:')
         self.Text_Radio.resize(500,40)
         self.Text_Radio.hide()
-        self.radio_group=QtGui.QButtonGroup(self) # Number 
+        self.radio_group=QtGui.QButtonGroup(self) # Number
         self.r0 = QtGui.QRadioButton("Basic",self)
         self.r1 = QtGui.QRadioButton("Fine",self)
-        
+
         self.r0.setChecked(True)
         self.radio_group.addButton(self.r0)
         self.radio_group.addButton(self.r1)
-        
+
         vbox.addWidget(self.r0)
         vbox.addWidget(self.r1)
-        
+
         self.r0.hide()
         self.r1.hide()
         vbox.addStretch()
         #Green status text.
-        
+
         #Load images button
         hbox1 = QtGui.QHBoxLayout()
         vbox.addLayout(hbox1)
@@ -303,38 +303,38 @@ class Load_win_fn(QtGui.QWidget):
         self.image_status_text.setStyleSheet("QLabel {  color : green }")
         self.image_status_text.showMessage('Status: Highlight training images in folder. ')
         vbox.addWidget(self.image_status_text)
-        
-        
+
+
         hbox1.addStretch()
 
-       
+
         #File browsing functions
-        layout = QtGui.QVBoxLayout() 
+        layout = QtGui.QVBoxLayout()
     def on_about(self):
         self.about_win = QtGui.QWidget()
         self.about_win.setWindowTitle('About QuantiFly Software v2.0')
-        
+
         license = return_license()
         #with open (sys.path[0]+'/GNU GENERAL PUBLIC LICENSE.txt', "r") as myfile:
         #    data=myfile.read().replace('\n', ' ')
         #    license.append(data)
-        
+
         # And give it a layout
         layout = QtGui.QVBoxLayout()
-        
+
         self.view = QtWebKit.QWebView()
         self.view.setHtml('''
           <html>
-            
-         
+
+
             <body>
               <form>
                 <h1 >About</h1>
-                
+
                 <p>Software written by Dominic Waithe (c) 2015</p>
                 '''+str(license)+'''
-                
-                
+
+
               </form>
             </body>
           </html>
@@ -367,7 +367,7 @@ class Load_win_fn(QtGui.QWidget):
                 self.Text_FrmOpt1.show()
                 self.Text_FrmOpt2.show()
                 self.linEdit_Frm.show()
-                
+
         if par_obj.file_ext == 'oib' or  par_obj.file_ext == 'oif':
             if par_obj.test_im_end >1:
                 self.linEdit_Frm.setText('1-'+str(par_obj.uploadLimit))
@@ -383,15 +383,15 @@ class Load_win_fn(QtGui.QWidget):
                 self.linEdit_Frm.show()
 
         self.confirmImages_button.setEnabled(True)
-        
+
         self.plt1.cla()
         self.plt1.imshow(par_obj.ex_img)
         self.plt1.set_xticklabels([])
         self.plt1.set_yticklabels([])
         self.canvas1.show()
         self.canvas1.draw()
-       
-        
+
+
         par_obj.ch_active =[];
         if par_obj.numCH> 0:
             self.Text_CHopt.show()
@@ -438,16 +438,16 @@ class Load_win_fn(QtGui.QWidget):
         imgs =[]
         gt_im_sing_chgs =[]
         fmStr = self.linEdit_Frm.text()
-        
+
         par_obj.height = par_obj.ori_height/par_obj.resize_factor
         par_obj.width = par_obj.ori_width/par_obj.resize_factor
-        
+
         if par_obj.total_time_pt> 0:
             tmStr = self.linEdit_Frm2.text()
             par_obj.time_pt_list= np.array(list(self.hyphen_range(tmStr)))-1
         else:
             par_obj.time_pt_list = [0]
-        
+
         for time_pt in par_obj.time_pt_list:
             par_obj.data_store[time_pt] ={}
             par_obj.data_store[time_pt]['dense_arr'] = {}
@@ -461,26 +461,26 @@ class Load_win_fn(QtGui.QWidget):
             par_obj.data_store[time_pt]['roi_stkint_x'] ={}
             par_obj.data_store[time_pt]['roi_stkint_y'] ={}
 
-        
+
         par_obj.frames_2_load ={}
         par_obj.left_2_calc =[]
         par_obj.saved_ROI =[]
         par_obj.saved_dots=[]
-        
+
         par_obj.eval_load_im_win_eval = False
 
         if self.r0.isChecked():
             par_obj.feature_type = 'basic'
         if self.r1.isChecked():
             par_obj.feature_type = 'fine'
-   
+
         #Now we commit our options to our imported files.
         if par_obj.file_ext == 'png':
             for i in range(0,par_obj.file_array.__len__()):
                 par_obj.left_2_calc.append(i)
                 par_obj.frames_2_load[i] = [0]
             self.image_status_text.showMessage('Status: Loading Images. Loading Image Num: '+str(par_obj.file_array.__len__()))
-                
+
             v2.im_pred_inline_fn(par_obj, self)
         elif par_obj.file_ext =='tiff' or par_obj.file_ext =='tif':
             if par_obj.test_im_end>1:
@@ -494,7 +494,7 @@ class Load_win_fn(QtGui.QWidget):
                         return
                 self.image_status_text.showMessage('Status: Loading Images.')
                 v2.im_pred_inline_fn(par_obj, self)
-               
+
             else:
                 for i in range(0,par_obj.file_array.__len__()):
                     par_obj.left_2_calc.append(i)
@@ -511,7 +511,7 @@ class Load_win_fn(QtGui.QWidget):
                         return
                 self.image_status_text.showMessage('Status: Loading Images.')
                 v2.im_pred_inline_fn(par_obj, self)
-               
+
             else:
                 for i in range(0,par_obj.file_array.__len__()):
                     par_obj.left_2_calc.append(i)
@@ -522,13 +522,13 @@ class Load_win_fn(QtGui.QWidget):
             frames =par_obj.frames_2_load[b]
             for i in frames:
                 count = count+1
-                
+
         par_obj.test_im_start= 0
         par_obj.test_im_end= count
-        
-        
+
+
         par_obj.curr_img = par_obj.frames_2_load[0][0]
-        
+
         self.image_status_text.showMessage('Status: Images loaded. Click \'Goto Training\'')
         self.selIntButton.setEnabled(True)
         par_obj.imgs = imgs
@@ -545,66 +545,66 @@ class Win_fn(QtGui.QWidget):
         self.canvas1 = FigureCanvas(self.figure1)
         self.figure1.patch.set_facecolor('grey')
         self.cursor = v2.ROI(self,par_obj)
-        
+
         self.plt1 = self.figure1.add_subplot(1, 1, 1)
         im_RGB = np.zeros((512, 512))
         #Makes sure it spans the whole figure.
         self.figure1.subplots_adjust(left=0.001, right=0.999, top=0.999, bottom=0.001)
-        
+
         toolbar = NavigationToolbar(self.canvas1,self)
-        
+
 
         self.plt1.imshow(im_RGB)
 
         #Removes the tick labels
         self.plt1.set_xticklabels([])
         self.plt1.set_yticklabels([])
-        
+
         #Initialises the second figure.
         self.figure2 = Figure(figsize=(8, 8), dpi=100)
         self.canvas2 = FigureCanvas(self.figure2)
         self.figure2.patch.set_facecolor('grey')
         self.plt2 = self.figure2.add_subplot(1, 1, 1)
 
-        
+
         #Makes sure it spans the whole figure.
         self.figure2.subplots_adjust(left=0.001, right=0.999, top=0.999, bottom=0.001)
         self.plt2.imshow(im_RGB)
         self.plt2.set_xticklabels([])
         self.plt2.set_yticklabels([])
-        
+
         #The ui for training
         self.count_txt = QtGui.QLabel()
         self.image_num_txt = QtGui.QLabel()
         box = QtGui.QVBoxLayout()
         self.setLayout(box)
-        
+
         #Widget containing the top panel.
         top_panel = QtGui.QHBoxLayout()
-        
+
         #Top left and right widget panels
         top_left_panel = QtGui.QGroupBox('Basic Controls')
         top_right_panel = QtGui.QGroupBox('Advanced Controls')
-        
+
         #Grid layouts for the top and left panels.
         self.top_left_grid = QtGui.QGridLayout()
         self.top_right_grid = QtGui.QGridLayout()
         self.top_left_grid.setSpacing(2)
         self.top_right_grid.setSpacing(2)
-        
+
         #Widgets for the top panel.
         top_panel.addWidget(top_left_panel)
         top_panel.addWidget(top_right_panel)
         top_panel.addStretch()
-        
+
         #Set the layout of the panels to be the grids.
         top_left_panel.setLayout(self.top_left_grid)
         top_right_panel.setLayout(self.top_right_grid)
-        
+
         #Sets up the button which changes to the prev image
         self.prev_im_btn = QtGui.QPushButton('Z-slice (<)')
         self.prev_im_btn.setEnabled(True)
-        
+
         #Sets up the button which changes to the next Image.
         self.next_im_btn = QtGui.QPushButton('Z-slice (>)')
         self.next_im_btn.setEnabled(True)
@@ -612,32 +612,32 @@ class Win_fn(QtGui.QWidget):
         #Sets up the button which changes to the prev image
         self.prev_time_btn = QtGui.QPushButton('Time-pt (<)')
         self.prev_time_btn.setEnabled(True)
-        
+
         #Sets up the button which changes to the next Image.
         self.next_time_btn = QtGui.QPushButton('Time-pt (>)')
         self.next_time_btn.setEnabled(True)
-        
+
         #Sets the current text.
         self.image_num_txt.setText(' Image is: ' + str(par_obj.curr_img +1))
         self.count_txt = QtGui.QLabel()
-        
+
         #Sets up the button which saves the ROI.
         self.save_ROI_btn = QtGui.QPushButton('Save ROI')
         self.save_ROI_btn.setEnabled(True)
-        
+
         #Sets up the button which saves the ROI.
         self.save_dots_btn = QtGui.QPushButton('Save Dots')
         self.save_dots_btn.setEnabled(False)
-        
+
         #Button for training model
         self.train_model_btn = QtGui.QPushButton('Train Model')
-        self.train_model_btn.setEnabled(False) 
-        
+        self.train_model_btn.setEnabled(False)
+
         #Selects and reactivates an existing ROI.
         self.sel_ROI_btn = QtGui.QPushButton('Select ROI')
         self.sel_ROI_btn.setEnabled(True)
         self.select_ROI= False
-        
+
         #Allows deletion of dots.
         self.remove_dots_btn = QtGui.QPushButton('Remove Dots')
         self.remove_dots_btn.setEnabled(False)
@@ -661,7 +661,7 @@ class Win_fn(QtGui.QWidget):
 
         #Populates the grid with the different widgets.
         self.top_left_grid.addLayout(panel_buttons, 0, 0,1,4)
-        
+
         self.top_left_grid.addWidget(self.image_num_txt, 2, 0, 2, 3)
         self.top_left_grid.addWidget(self.save_ROI_btn, 4, 0)
         self.top_left_grid.addWidget(self.save_dots_btn, 4, 1)
@@ -687,7 +687,7 @@ class Win_fn(QtGui.QWidget):
         #self.sigma_data_text = QtGui.QLabel()
         #self.sigma_data_text.setText('Scale of Feature Descriptor:')
         #self.top_right_grid.addWidget(self.sigma_data_text, 1, 0)
-        
+
         #Feature scale input field
         #self.feature_scale_input = QtGui.QLineEdit(str(par_obj.feature_scale))
         #self.feature_scale_input.onChanged = self.feature_scale_change
@@ -695,21 +695,21 @@ class Win_fn(QtGui.QWidget):
         #self.feature_scale_input.textChanged[str].connect(self.feature_scale_change)
         #self.feature_scale_input.setFixedWidth(40)
         #self.top_right_grid.addWidget(self.feature_scale_input, 1, 1)
-        
+
         #Feature scale input btn.
         #self.feat_scale_change_btn = QtGui.QPushButton('Recalculate Features')
         #self.feat_scale_change_btn.setEnabled(True)
         #self.top_right_grid.addWidget(self.feat_scale_change_btn, 1, 2)
-        
+
         #Saves the model
         self.save_model_btn = QtGui.QPushButton('Save Training Model')
         self.save_model_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.save_model_btn, 1, 0)
-        
+
         #Saves the extremel random decision tree model
         self.save_model_name_txt = QtGui.QLineEdit('Insert Model Name')
         self.top_right_grid.addWidget(self.save_model_name_txt, 1, 1)
-        
+
         self.output_count_txt = QtGui.QLabel()
         self.top_right_grid.addWidget(self.output_count_txt, 3,1,1,4)
 
@@ -734,13 +734,13 @@ class Win_fn(QtGui.QWidget):
         self.count_maxima_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.count_maxima_btn, 4, 0)
 
-        
+
 
         self.count_replot_btn = QtGui.QPushButton('Replot')
 
         self.count_maxima_plot_on = QtGui.QCheckBox()
         self.count_maxima_plot_on.setChecked = False
-        
+
 
         self.count_txt_1 = QtGui.QLineEdit(str(par_obj.min_distance[0]))
         self.count_txt_1.setFixedWidth(20)
@@ -755,7 +755,7 @@ class Win_fn(QtGui.QWidget):
         rel_thr_lbl = QtGui.QLabel('Rel Thr:')
         self.rel_thr_txt = QtGui.QLineEdit(str(par_obj.rel_thr))
         self.rel_thr_txt.setFixedWidth(25)
-        
+
 
         self.min_distance_panel = QtGui.QHBoxLayout()
         self.min_distance_panel.addStretch()
@@ -769,11 +769,11 @@ class Win_fn(QtGui.QWidget):
         self.min_distance_panel.addWidget(self.abs_thr_txt)
         self.min_distance_panel.addWidget(rel_thr_lbl)
         self.min_distance_panel.addWidget(self.rel_thr_txt)
-        
+
         self.top_right_grid.addLayout(self.min_distance_panel,4,1,1,2)
         #self.top_right_grid.addWidget(self.count_maxima_plot_on,4,2)
 
-        
+
 
         self.top_right_grid.setRowStretch(4,2)
 
@@ -802,7 +802,7 @@ class Win_fn(QtGui.QWidget):
         box.addWidget(toolbar)
         box.addWidget(self.image_status_text)
         self.image_status_text.showMessage('Status: Please Select a Region and Click \'Save ROI\'. ')
-        
+
         #Connects the buttons.
         self.save_ROI_btn.clicked.connect(self.save_roi_fn)
         self.save_dots_btn.clicked.connect(self.save_dots_fn)
@@ -822,7 +822,7 @@ class Win_fn(QtGui.QWidget):
         self.clear_dots_btn.clicked.connect(self.clear_dots_fn)
         self.save_model_btn.clicked.connect(self.saveForestFn)
         self.evaluate_btn.clicked.connect(self.evaluate_forest_fn)
-        
+
         #Initialises the variables for the beginning of the counting.
         par_obj.first_time = True
         par_obj.dots = []
@@ -871,7 +871,7 @@ class Win_fn(QtGui.QWidget):
         predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.num_of_train_im))
         for i in range(0,par_obj.frames_2_load[0].__len__()):
             predMtx[:,:,i]= par_obj.data_store[par_obj.time_pt]['pred_arr'][par_obj.frames_2_load[0][i]]
-        
+
 
         gau_stk = filters.gaussian_filter(predMtx,[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
         y,x,z = np.gradient(gau_stk,1)
@@ -898,7 +898,7 @@ class Win_fn(QtGui.QWidget):
 
         par_obj.show_pts = 1
         self.kernel_btn_fn()
-        
+
     def report_progress(self,message):
         self.image_status_text.showMessage('Status: '+message)
         app.processEvents()
@@ -918,11 +918,11 @@ class Win_fn(QtGui.QWidget):
         #Win_fn()
         channel_wid = QtGui.QWidget()
         channel_lay = QtGui.QHBoxLayout()
-        for b in range(0,par_obj.numCH):    
+        for b in range(0,par_obj.numCH):
             name = 'self.CH_cbx'+str(b)+'= checkBoxCH()'
             exec(name)
             name = 'self.CH_cbx'+str(b)+'.setText(\'CH '+str(b+1)+'\')'
-            exec(name)  
+            exec(name)
             name = 'self.CH_cbx'+str(b)+'.setChecked(True)'
             exec(name)
             name = 'self.CH_cbx'+str(b)+'.type=\'visual_ch\''
@@ -941,16 +941,16 @@ class Win_fn(QtGui.QWidget):
     def on_click(self,event):
         """When the image is clicked"""
         par_obj.mouse_down = True
-        
+
         #When the draw ROI functionality is enabled:
         if(par_obj.draw_ROI == True):
-            
+
             self.x1 = event.xdata
             self.y1 = event.ydata
             par_obj.ori_x = event.xdata
             par_obj.ori_y = event.ydata
-            
-            
+
+
 
 
     def on_motion(self,event):
@@ -958,18 +958,18 @@ class Win_fn(QtGui.QWidget):
         #When the draw ROI functionality is enabled:
         if(par_obj.draw_ROI == True and par_obj.mouse_down == True):
             #Finds current cursor position
-            
+
             par_obj.ori_x_2 = event.xdata
             par_obj.ori_y_2 = event.ydata
             try:
-                
-                    
+
+
                     self.plt1.lines.remove(self.l1[0])
                     self.plt1.lines.remove(self.l2[0])
                     self.plt1.lines.remove(self.l3[0])
                     self.plt1.lines.remove(self.l4[0])
-                    
-                
+
+
             except:
                 pass
             self.plt1.autoscale(False)
@@ -977,28 +977,28 @@ class Win_fn(QtGui.QWidget):
             self.l2 = self.plt1.plot([event.xdata, event.xdata], [self.y1, event.ydata], '-' ,color='r')
             self.l3 = self.plt1.plot([event.xdata, self.x1], [ event.ydata,  event.ydata], '-' ,color='r')
             self.l4 = self.plt1.plot([self.x1, self.x1], [ event.ydata, self.y1], '-' ,color='r')
-            
-            
+
+
             #self.plt1.Line2D([event.xdata, event.xdata], [self.y1, event.ydata], transform=self.plt1.transData,  figure=self.plt1,color='r')
             #self.plt1.Line2D([event.xdata, self.x1], [ event.ydata,  event.ydata], transform=self.plt1.transData,  figure=self.plt1,color='r')
             #self.plt1.Line2D([self.x1, self.x1], [ event.ydata, self.y1], transform=self.plt1.transData,  figure=self.plt1,color='r')
-            
+
             self.canvas1.draw()
-            
-            
+
+
     def on_unclick(self, event):
         """When the mouse is released"""
         par_obj.mouse_down = False
-        
+
         #If we are in the roi drawing phase
         if(par_obj.draw_ROI == True):
             t2 = time.time()
             x = event.xdata
             y = event.ydata
-            
+
             par_obj.rect_w = x - par_obj.ori_x
             par_obj.rect_h = y - par_obj.ori_y
-            
+
             #Corrects the corrdinates if out of rectangle.
             if(x < 0): x=0
             if(y < 0): y=0
@@ -1007,10 +1007,10 @@ class Win_fn(QtGui.QWidget):
             t1 = time.time()
             print t1-t2
         #If we are in the dot drawing phase
-        if(par_obj.draw_dots == True):   
+        if(par_obj.draw_dots == True):
             x = int(np.round(event.xdata,0))
             y = int(np.round(event.ydata,0))
-        
+
             #Are we with an existing box.
             if(x > par_obj.rects[1]-par_obj.roi_tolerance and x < (par_obj.rects[1]+ par_obj.rects[3])+par_obj.roi_tolerance and y > par_obj.rects[2]-par_obj.roi_tolerance and y < (par_obj.rects[2]+ par_obj.rects[4])+par_obj.roi_tolerance):
                 appendDot = True
@@ -1018,7 +1018,7 @@ class Win_fn(QtGui.QWidget):
                 if(par_obj.dots.__len__()>0):
                     for i in range(0,par_obj.dots.__len__()):
                         if (x == par_obj.dots[i][1] and y == par_obj.dots[i][2]):
-                            appendDot = False                            
+                            appendDot = False
 
                 if(appendDot == True):
                     par_obj.dots.append((par_obj.curr_img,x,y))
@@ -1028,11 +1028,13 @@ class Win_fn(QtGui.QWidget):
                     self.plt1.plot([i[1],i[1]],[i[2]-5,i[2]+5],'-',color='r')
                     self.canvas1.draw()
 
-        if(par_obj.remove_dots == True): 
+        if(par_obj.remove_dots == True):
             #par_obj.pixMap = QtGui.QPixmap(q2r.rgb2qimage(par_obj.imgs[par_obj.curr_img]))
             x = event.xdata
             y = event.ydata
             self.draw_saved_dots_and_roi()
+            print 'curr_img',par_obj.curr_img
+            print 'timepoint',par_obj.time_pt
             #Are we with an existing box.
             if(x > par_obj.rects[1]-par_obj.roi_tolerance and x < (par_obj.rects[1]+ par_obj.rects[3])+par_obj.roi_tolerance and y > par_obj.rects[2]-par_obj.roi_tolerance and y < (par_obj.rects[2]+ par_obj.rects[4])+par_obj.roi_tolerance):
                 #Appends dots to array if in an empty pixel.
@@ -1043,20 +1045,21 @@ class Win_fn(QtGui.QWidget):
                             par_obj.saved_dots.append(par_obj.dots)
                             par_obj.saved_ROI.append(par_obj.rects)
                             self.update_density_fn()
-                            par_obj.dots = par_obj.saved_dots[par_obj.ROI_index[par_obj.roi_select]]
-                            par_obj.rects =  par_obj.saved_ROI[par_obj.ROI_index[par_obj.roi_select]]
-                            par_obj.saved_dots.pop(par_obj.ROI_index[par_obj.roi_select])
-                            par_obj.saved_ROI.pop(par_obj.ROI_index[par_obj.roi_select])
-                            break 
-            
+                            #Reloads the roi so can edited again. It is now at the end of the array.
+                            par_obj.dots = par_obj.saved_dots[-1]
+                            par_obj.rects =  par_obj.saved_ROI[-1]
+                            par_obj.saved_dots.pop(-1)
+                            par_obj.saved_ROI.pop(-1)
+                            break
+
 
             for i in range(0,self.plt1.lines.__len__()):
                 self.plt1.lines.pop(0)
-            
+
 
             self.dots_and_square(par_obj.dots,par_obj.rects,'y')
             self.canvas1.draw()
-            
+
         if(par_obj.select_ROI== True):
             x = event.xdata
             y = event.ydata
@@ -1064,13 +1067,13 @@ class Win_fn(QtGui.QWidget):
                 dots = par_obj.saved_dots[par_obj.ROI_index[b]]
                 rects = par_obj.saved_ROI[par_obj.ROI_index[b]]
                 if(x > rects[1] and x < (rects[1]+ rects[3]) and y > rects[2] and y < (rects[2]+ rects[4])):
-                    
+
                     par_obj.roi_select = b
                     par_obj.dots = par_obj.saved_dots[par_obj.ROI_index[par_obj.roi_select]]
                     par_obj.rects =  par_obj.saved_ROI[par_obj.ROI_index[par_obj.roi_select]]
                     par_obj.saved_dots.pop(par_obj.ROI_index[par_obj.roi_select])
                     par_obj.saved_ROI.pop(par_obj.ROI_index[par_obj.roi_select])
-                   
+
                     for i in range(0,self.plt1.lines.__len__()):
                         self.plt1.lines.pop(0)
                     self.draw_saved_dots_and_roi()
@@ -1083,8 +1086,8 @@ class Win_fn(QtGui.QWidget):
                     par_obj.draw_ROI = False
                     par_obj.draw_dots = True
     def dots_and_square(self, dots,rects,colour):
-       
-        
+
+
         #self.l5 = lines.Line2D([rects[1], rects[1]+rects[3]], [rects[2],rects[2]], transform=self.plt1.transData,  figure=self.plt1,color=colour)
         #self.l6 = lines.Line2D([rects[1]+rects[3], rects[1]+rects[3]], [rects[2],rects[2]+rects[4]], transform=self.plt1.transData,  figure=self.plt1,color=colour)
         #self.l7 = lines.Line2D([rects[1]+rects[3], rects[1]], [rects[2]+rects[4],rects[2]+rects[4]], transform=self.plt1.transData,  figure=self.plt1,color=colour)
@@ -1095,16 +1098,16 @@ class Win_fn(QtGui.QWidget):
         self.plt1.plot([rects[1]+rects[3], rects[1]+rects[3]], [rects[2],rects[2]+rects[4]], '-',color=colour)
         self.plt1.plot([rects[1]+rects[3], rects[1]], [rects[2]+rects[4],rects[2]+rects[4]], '-',  figure=self.plt1,color=colour)
         self.plt1.plot([rects[1], rects[1]], [rects[2]+rects[4],rects[2]], '-',  figure=self.plt1,color=colour)
-        
+
 
             #Draws dots in list
         for i in iter(dots):
             self.plt1.plot([i[1]-5,i[1]+5],[i[2],i[2]],'-',color=colour)
             self.plt1.plot([i[1],i[1]],[i[2]-5,i[2]+5],'-',color=colour)
-            
-        
-        
-    
+
+
+
+
         return
     def makeCursor(self):
         m_LPixmap = QtGui.QPixmap(28, 28)
@@ -1126,7 +1129,7 @@ class Win_fn(QtGui.QWidget):
     def on_leave(self,ev):
         QtGui.QApplication.restoreOverrideCursor()
     def save_roi_fn(self):
-        #If there is no width or height either no roi is selected or it is too thin.        
+        #If there is no width or height either no roi is selected or it is too thin.
         success = v2.save_roi_fn(par_obj)
         if success == True:
             print ('Saved ROI')
@@ -1147,8 +1150,8 @@ class Win_fn(QtGui.QWidget):
         par_obj.saved_dots.pop(par_obj.ROI_index[par_obj.roi_select])
         par_obj.saved_ROI.pop(par_obj.ROI_index[par_obj.roi_select])
         #Creates the qpainter object
-          
-       
+
+
         #Now we update a density image of the current Image.
         self.update_density_fn()
     def save_dots_fn(self):
@@ -1173,13 +1176,13 @@ class Win_fn(QtGui.QWidget):
         par_obj.ori_y=0
         par_obj.rect_w=0
         par_obj.rect_h =0
-        
-        
+
+
         self.goto_img_fn(par_obj.curr_img)
         #Now we update a density image of the current Image.
         self.update_density_fn()
 
-        
+
     def update_density_fn(self):
         #Construct empty array for current image.
         par_obj.im_for_train = [par_obj.curr_img]
@@ -1200,7 +1203,7 @@ class Win_fn(QtGui.QWidget):
                 dots = par_obj.saved_dots[i]
                 rects = par_obj.saved_ROI[i]
                 self.dots_and_square(dots,rects,'w')
-        
+
     def prev_im_btn_fn(self):
         for ind, zim in enumerate(par_obj.frames_2_load[0]):
             if zim == par_obj.curr_img:
@@ -1208,7 +1211,7 @@ class Win_fn(QtGui.QWidget):
                     par_obj.curr_img  = par_obj.frames_2_load[0][ind-1]
                     self.goto_img_fn(par_obj.curr_img)
                     break;
-            
+
     def next_im_btn_fn(self):
          for ind, zim in enumerate(par_obj.frames_2_load[0]):
             if zim == par_obj.curr_img:
@@ -1223,7 +1226,7 @@ class Win_fn(QtGui.QWidget):
                     par_obj.time_pt  = par_obj.time_pt_list[ind-1]
                     self.goto_img_fn(par_obj.curr_img)
                     break;
-            
+
     def next_time_btn_fn(self):
 
         for ind, tim in enumerate(par_obj.time_pt_list):
@@ -1233,10 +1236,10 @@ class Win_fn(QtGui.QWidget):
                     self.goto_img_fn(par_obj.curr_img)
                     break;
 
-        
-        
-           
-            
+
+
+
+
 
 
     def goto_img_fn(self,im_num):
@@ -1254,12 +1257,12 @@ class Win_fn(QtGui.QWidget):
         self.remove_dots_btn.setEnabled(False)
         self.sel_ROI_btn.setEnabled(True)
         par_obj.ROI_index=[]
-            
-            
+
+
     def sel_ROI_btn_fn(self):
         par_obj.ROI_index =[]
         if(par_obj.select_ROI== False):
-            
+
             self.save_ROI_btn.setEnabled(False)
             par_obj.select_ROI= True
             par_obj.draw_ROI = False
@@ -1294,18 +1297,34 @@ class Win_fn(QtGui.QWidget):
         self.clear_dots_btn.setEnabled(False)
     def train_model_btn_fn(self):
         self.image_status_text.showMessage('Training Ensemble of Decision Trees. ')
-        v2.im_pred_inline_fn(par_obj, self)
-        print 'hre',par_obj.data_store[par_obj.time_pt]['dense_arr']
+
+        prev_curr_img = par_obj.curr_img
+        prev_time_pt = par_obj.time_pt
+        for i in range(0,par_obj.saved_ROI.__len__()):
+            par_obj.curr_img = par_obj.saved_ROI[i][0]
+            par_obj.time_pt =par_obj.saved_ROI[i][5]
+            try:
+                par_obj.data_store[par_obj.curr_file_id][par_obj.time_pt]['feat_arr'][par_obj.curr_img]
+            except:
+                print 'calculating features, time point',par_obj.time_pt+1,' image slice ',par_obj.curr_img+1
+                v2.im_pred_inline_fn(par_obj, self)
+
+        par_obj.curr_img = prev_curr_img
+        par_obj.time_pt = prev_time_pt
+
         v2.update_training_samples_fn(par_obj,self,0)
+
+
+
         self.image_status_text.showMessage('Evaluating Images with the Trained Model. ')
-        app.processEvents()    
+        app.processEvents()
         v2.evaluate_forest(par_obj,self, False,0)
         #v2.make_correction(par_obj, 0)
         self.image_status_text.showMessage('Model Trained. Continue adding samples, or click \'Save Training Model\'. ')
         par_obj.eval_load_im_win_eval = True
         par_obj.show_pts= 0
         self.kernel_btn_fn()
-        self.save_model_btn.setEnabled(True)  
+        self.save_model_btn.setEnabled(True)
         self.count_maxima_btn.setEnabled(True)
         self.evaluate_btn.setEnabled(True)
     def sigmaOnChange(self,text):
@@ -1319,8 +1338,8 @@ class Win_fn(QtGui.QWidget):
         processImgs()
         v2.update_density_fn()
         self.feat_scale_change_btn.setEnabled(True)
-        self.image_status_text.showMessage('Model Trained. Continue adding samples, or click \'Save Training Model\'. ')  
-        self.save_model_btn.setEnabled(True)  
+        self.image_status_text.showMessage('Model Trained. Continue adding samples, or click \'Save Training Model\'. ')
+        self.save_model_btn.setEnabled(True)
         v2.eval_pred_show_fn(par_obj.curr_img,par_obj,self)
 
     def kernel_btn_fn(self):
@@ -1344,7 +1363,7 @@ class Win_fn(QtGui.QWidget):
         v2.eval_pred_show_fn(par_obj.curr_img,par_obj,self)
 
     def saveForestFn(self):
-        
+
         path = os.path.expanduser('~')+'/.densitycount/models/'
         try:
             os.makedirs(path)
@@ -1352,10 +1371,10 @@ class Win_fn(QtGui.QWidget):
             if exception.errno != errno.EEXIST:
                 raise
 
-        local_time = time.asctime( time.localtime(time.time()) )   
+        local_time = time.asctime( time.localtime(time.time()) )
         par_obj.modelName = str(self.save_model_name_txt.text())
         par_obj.modelDescription = str(self.save_model_desc_txt.text())
-        
+
         cleanString = re.sub('\W+', '', par_obj.modelName )
 
         basename = path+"pv20"
@@ -1386,18 +1405,18 @@ class Win_fn(QtGui.QWidget):
                 save_im[:,:,0] = par_obj.save_im[:, :,0]
                 save_im[:,:,1] = par_obj.save_im[:, :,0]
                 save_im[:,:,2] = par_obj.save_im[:, :,0]
-        
+
         save_file ={"name":par_obj.modelName,'description':par_obj.modelDescription,"c":par_obj.c,"M":par_obj.M,\
         "sigma_data":par_obj.sigma_data, "model":par_obj.RF, "date":local_time, "feature_type":par_obj.feature_type, \
         "feature_scale":par_obj.feature_scale, "ch_active":par_obj.ch_active, "limit_ratio_size":par_obj.limit_ratio_size, \
         "max_depth":par_obj.max_depth, "min_samples":par_obj.min_samples_split, "min_samples_leaf":par_obj.min_samples_leaf,\
         "max_features":par_obj.max_features, "num_of_tree":par_obj.num_of_tree, "file_ext":par_obj.file_ext, "imFile":save_im,\
         "resize_factor":par_obj.resize_factor, "min_distance":par_obj.min_distance, "abs_thr":par_obj.abs_thr,"rel_thr":par_obj.rel_thr};
-        
+
         pickle.dump(save_file, open(filename, "wb"))
         self.save_model_btn.setEnabled(False)
         self.report_progress('Model Saved.')
-        
+
     def checkChange(self):
         v2.eval_goto_img_fn(par_obj.curr_img, par_obj, self)
 
@@ -1417,7 +1436,7 @@ class checkBoxCH(QtGui.QCheckBox):
 
             newImg = np.zeros((par_obj.ex_img.shape[0], par_obj.ex_img.shape[1], 3))
             if par_obj.ch_active.__len__() > 1:
-                 
+
                  for b in par_obj.ch_active:
                     newImg[:, :, b] = par_obj.ex_img[:, :, b]
 
@@ -1433,12 +1452,12 @@ class checkBoxCH(QtGui.QCheckBox):
             #print 'visualisation changed channel'
             win.goto_img_fn(par_obj.curr_img)
 
-        
+
 class parameterClass:
     def __init__(self):
-      
+
         self.roi_tolerance = 10
-        
+
         #Parameters of sampling
         self.limit_sample = True
         self.limit_ratio = True #whether to use ratio of roi pixels
@@ -1447,8 +1466,8 @@ class parameterClass:
         #Random Forest parameters
         self.pw = 1
         self.max_depth=10
-        self.min_samples_split=20 
-        self.min_samples_leaf=10  
+        self.min_samples_split=20
+        self.min_samples_leaf=10
         self.max_features = 7
         self.num_of_tree = 30
         self.feature_scale = 0.8
@@ -1463,7 +1482,7 @@ class parameterClass:
         self.curr_img = 0
         self.numCH =0;
         self.RF ={}
-        
+
         self.frames_2_load ={}
         #self.curr_img = None
         #Auto mode.
@@ -1503,7 +1522,7 @@ app.processEvents()
 #Creates tab widget.
 win_tab = QtGui.QTabWidget()
 #Creates win, an instance of QWidget
-par_obj  = parameterClass() 
+par_obj  = parameterClass()
 win = Win_fn(par_obj)
 loadWin= Load_win_fn(par_obj,win)
 
