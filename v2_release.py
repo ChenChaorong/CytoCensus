@@ -82,7 +82,7 @@ class fileDialog(QtGui.QMainWindow):
 
         self.setGeometry(300, 300, 350, 500)
         self.setWindowTitle('File dialog')
-        #self.show()
+
 
     def showDialog(self):
         par_obj.file_array =[]
@@ -833,6 +833,7 @@ class Win_fn(QtGui.QWidget):
         par_obj.saved_ROI = []
         par_obj.subdivide_ROI = []
         self.m_Cursor = self.makeCursor()
+
     def evaluate_forest_fn(self):
         #Don't want to train for all the images so we select them.
         for i in par_obj.frames_2_load[0]:
@@ -852,12 +853,12 @@ class Win_fn(QtGui.QWidget):
 
     def save_gt_fn(self):
         file_to_save = {'dots':par_obj.saved_dots,'rect':par_obj.saved_ROI}
-        fileName = QtGui.QFileDialog.getSaveFileName(self, "Save dots and regions", "/home/Documents", ".quantiROI");
+        fileName = QtGui.QFileDialog.getSaveFileName(self, "Save dots and regions", "~/Documents", ".quantiROI");
         print 'the filename address',fileName
         pickle.dump( file_to_save, open( fileName+".quantiROI", "wb" ) )
     def load_gt_fn(self):
         print 'load the gt'
-        fileName = QtGui.QFileDialog.getOpenFileName(self, "Save dots and regions", "/home/Documents", "QuantiFly ROI files (*.quantiROI)");
+        fileName = QtGui.QFileDialog.getOpenFileName(self, "Save dots and regions", "~/Documents", "QuantiFly ROI files (*.quantiROI)");
         print 'load the file', fileName
         the_file = pickle.load( open( fileName, "rb" ) )
         par_obj.saved_dots = the_file['dots']
@@ -960,25 +961,25 @@ class Win_fn(QtGui.QWidget):
         #When the draw ROI functionality is enabled:
         if(par_obj.draw_ROI == True and par_obj.mouse_down == True):
             #Finds current cursor position
-
-            par_obj.ori_x_2 = event.xdata
-            par_obj.ori_y_2 = event.ydata
-            try:
-
-
-                    self.plt1.lines.remove(self.l1[0])
-                    self.plt1.lines.remove(self.l2[0])
-                    self.plt1.lines.remove(self.l3[0])
-                    self.plt1.lines.remove(self.l4[0])
-
-
-            except:
-                pass
-            self.plt1.autoscale(False)
-            self.l1 = self.plt1.plot([self.x1, event.xdata], [self.y1, self.y1], '-' ,color='r')
-            self.l2 = self.plt1.plot([event.xdata, event.xdata], [self.y1, event.ydata], '-' ,color='r')
-            self.l3 = self.plt1.plot([event.xdata, self.x1], [ event.ydata,  event.ydata], '-' ,color='r')
-            self.l4 = self.plt1.plot([self.x1, self.x1], [ event.ydata, self.y1], '-' ,color='r')
+            if (event.xdata != None and event.ydata != None):
+                par_obj.ori_x_2 = event.xdata
+                par_obj.ori_y_2 = event.ydata
+                try:
+    
+    
+                        self.plt1.lines.remove(self.l1[0])
+                        self.plt1.lines.remove(self.l2[0])
+                        self.plt1.lines.remove(self.l3[0])
+                        self.plt1.lines.remove(self.l4[0])
+    
+    
+                except:
+                    pass
+                self.plt1.autoscale(False)
+                self.l1 = self.plt1.plot([self.x1, event.xdata], [self.y1, self.y1], '-' ,color='r')
+                self.l2 = self.plt1.plot([event.xdata, event.xdata], [self.y1, event.ydata], '-' ,color='r')
+                self.l3 = self.plt1.plot([event.xdata, self.x1], [ event.ydata,  event.ydata], '-' ,color='r')
+                self.l4 = self.plt1.plot([self.x1, self.x1], [ event.ydata, self.y1], '-' ,color='r')
 
 
             #self.plt1.Line2D([event.xdata, event.xdata], [self.y1, event.ydata], transform=self.plt1.transData,  figure=self.plt1,color='r')
@@ -997,15 +998,18 @@ class Win_fn(QtGui.QWidget):
             t2 = time.time()
             x = event.xdata
             y = event.ydata
-
-            par_obj.rect_w = x - par_obj.ori_x
-            par_obj.rect_h = y - par_obj.ori_y
-
-            #Corrects the corrdinates if out of rectangle.
-            if(x < 0): x=0
-            if(y < 0): y=0
-            if(x > par_obj.width): x=par_obj.width-1
-            if(y > par_obj.height): y=par_obj.height-1
+            if (x != None and y != None):
+                par_obj.rect_w = x - par_obj.ori_x
+                par_obj.rect_h = y - par_obj.ori_y
+    
+                #Corrects the corrdinates if out of rectangle.
+                if(x < 0): x=0
+                if(y < 0): y=0
+                if(x > par_obj.width): x=par_obj.width-1
+                if(y > par_obj.height): y=par_obj.height-1
+            else:
+                par_obj.rect_w = par_obj.ori_x_2 - par_obj.ori_x
+                par_obj.rect_h = par_obj.ori_y_2 - par_obj.ori_y
             t1 = time.time()
             print t1-t2
         #If we are in the dot drawing phase
@@ -1536,9 +1540,10 @@ win_tab.addTab(win, "Train Model")
 
 #Defines size of the widget.
 win_tab.resize(1000,600)
+
 time.sleep(2.0)
 splash.finish(win_tab)
-win_tab.show()
+win_tab.showMaximized()
 
 #Automates the loading for testing.
 
