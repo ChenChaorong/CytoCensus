@@ -351,7 +351,8 @@ class Load_win_fn(QtGui.QWidget):
     def feature_scale_change(self,text):
         """Updates on change of feature scale"""
         par_obj.feature_scale = float(text)
-
+        par_obj.data_store[par_obj.time_pt]['feat_arr'] = {}        
+        
     def updateAfterImport(self):
         """Specific to ui updates"""
 
@@ -836,12 +837,14 @@ class Win_fn(QtGui.QWidget):
 
     def evaluate_forest_fn(self):
         #Don't want to train for all the images so we select them.
+
         for i in par_obj.frames_2_load[0]:
             try:
                 par_obj.data_store[par_obj.time_pt]['feat_arr'][i]
             except:
                 v2.im_pred_inline_fn_eval(par_obj, self,threaded=True) #v2.im_pred_inline_fn(par_obj, self)
                 break
+
         #    par_obj.data_store[par_obj.time_pt] = {}
         #    par_obj.data_store[par_obj.time_pt]['feat_arr'] = {}
         #    par_obj.data_store[par_obj.time_pt]['pred_arr'] = {}
@@ -1305,12 +1308,14 @@ class Win_fn(QtGui.QWidget):
         self.image_status_text.showMessage('Training Ensemble of Decision Trees. ')
         #added to make sure current timepoint has all features precalculated
         v2.im_pred_inline_fn(par_obj, self,threaded=True)
+        
         prev_curr_img = par_obj.curr_img
         prev_time_pt = par_obj.time_pt
 
         for i in range(0,par_obj.saved_ROI.__len__()):
             par_obj.curr_img = par_obj.saved_ROI[i][0]
             par_obj.time_pt =par_obj.saved_ROI[i][5]
+            
             try:
                 par_obj.data_store[par_obj.time_pt]['feat_arr'][par_obj.curr_img]
             except:
@@ -1336,8 +1341,11 @@ class Win_fn(QtGui.QWidget):
         self.count_maxima_btn.setEnabled(True)
         self.evaluate_btn.setEnabled(True)
     def sigmaOnChange(self,text):
-        par_obj.sigma_data = float(text)
-        self.update_density_fn()
+        if (text != ""):
+            par_obj.sigma_data = float(text)
+            self.update_density_fn()
+            par_obj.data_store[par_obj.time_pt]['feat_arr'] = {}   
+        
     def feature_scale_change(self,text):
         par_obj.feature_scale = float(text)
     def feat_scale_change_btn_fn(self):
