@@ -983,7 +983,7 @@ def eval_pred_show_fn(im_num,par_obj,int_obj):
     """Shows Prediction Image when forest is loaded"""
     if par_obj.eval_load_im_win_eval == True:
         
-        int_obj.image_num_txt.setText('The Current Image is No. ' + str(par_obj.curr_img+1))
+        int_obj.image_num_txt.setText('The Current Image is No. ' + str(par_obj.curr_img+1)+' and the time point is: '+str(par_obj.time_pt+1))
 
         #if int_obj.count_maxima_plot_on.isChecked() == True:
         #    par_obj.show_pts = True
@@ -1192,11 +1192,12 @@ def save_output_prediction_fn(par_obj,int_obj):
     count = -1
     for tpt in par_obj.time_pt_list:
 
-        for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
+        #for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
+        for i in range(0,par_obj.max_zslices):
             count=count+1
             n = str(count)
             string = par_obj.csvPath+'output' + n.zfill(3)+'.tif'
-            im_to_save= PIL.Image.fromarray(par_obj.data_store[par_obj.time_pt]['pred_arr'][i].astype(np.float32))
+            im_to_save= PIL.Image.fromarray(par_obj.data_store[tpt]['pred_arr'][i].astype(np.float32))
             im_to_save.save(string)
     print 'Prediction written to disk'
 def save_output_data_fn(par_obj,int_obj):
