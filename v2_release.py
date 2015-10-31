@@ -147,7 +147,7 @@ class Load_win_fn(QtGui.QWidget):
 
 
         self.feature_scaleText.resize(40,20)
-        self.feature_scaleText.setText('Input sigma for feature calculation default (0.8):')
+        self.feature_scaleText.setText('Input sigma for features (default 0.8):')
         self.feature_scaleText.hide()
 
         hbox1.addWidget(self.feature_scale_input)
@@ -350,8 +350,9 @@ class Load_win_fn(QtGui.QWidget):
 
     def feature_scale_change(self,text):
         """Updates on change of feature scale"""
-        par_obj.feature_scale = float(text)
-        par_obj.data_store[par_obj.time_pt]['feat_arr'] = {}        
+        if (text != ""):
+            par_obj.feature_scale = float(text)
+            par_obj.data_store[par_obj.time_pt]['feat_arr'] = {}        
         
     def updateAfterImport(self):
         """Specific to ui updates"""
@@ -483,7 +484,7 @@ class Load_win_fn(QtGui.QWidget):
                 par_obj.frames_2_load[i] = [0]
             self.image_status_text.showMessage('Status: Loading Images. Loading Image Num: '+str(par_obj.file_array.__len__()))
 
-            v2.im_pred_inline_fn(par_obj, self)
+            ###v2.im_pred_inline_fn(par_obj, self)
         elif par_obj.file_ext =='tiff' or par_obj.file_ext =='tif':
             if par_obj.test_im_end>1:
                 for i in range(0,par_obj.file_array.__len__()):
@@ -496,7 +497,7 @@ class Load_win_fn(QtGui.QWidget):
                         return
                 self.image_status_text.showMessage('Status: Loading Images.')
                 #v2.im_pred_inline_fn(par_obj, self)
-                v2.im_pred_inline_fn_eval(par_obj, self,threaded=True)
+                ###v2.im_pred_inline_fn_eval(par_obj, self,threaded=True) commenting these because calculation of features is now considered by later functions
             else:
                 for i in range(0,par_obj.file_array.__len__()):
                     par_obj.left_2_calc.append(i)
@@ -512,7 +513,7 @@ class Load_win_fn(QtGui.QWidget):
                         self.image_status_text.showMessage('Status: The supplied range of image frames is in the wrong format. Please correct and click confirm images.')
                         return
                 self.image_status_text.showMessage('Status: Loading Images.')
-                v2.im_pred_inline_fn(par_obj, self)
+                ###v2.im_pred_inline_fn(par_obj, self)
 
             else:
                 for i in range(0,par_obj.file_array.__len__()):
@@ -866,10 +867,16 @@ class Win_fn(QtGui.QWidget):
         the_file = pickle.load( open( fileName, "rb" ) )
         par_obj.saved_dots = the_file['dots']
         par_obj.saved_ROI = the_file['rect']
+        number_of_saved_roi=range(0,len(par_obj.saved_ROI))
         self.clear_dots_btn.setEnabled(True)
         if par_obj.saved_ROI !=[]:
+            curr_tp_store=par_obj.time_pt
+            for it in number_of_saved_roi:
+                par_obj.time_pt=int(par_obj.saved_ROI[it][5])
+                par_obj.im_for_train=[int(par_obj.saved_ROI[it][0])]
+                v2.update_density_fn(par_obj)
+            par_obj.time_pt=curr_tp_store
             self.train_model_btn.setEnabled(True)
-            self.update_density_fn()
         self.goto_img_fn(par_obj.curr_img)
     def replot_fn(self):
             v2.eval_pred_show_fn(par_obj.curr_img,par_obj,self)
@@ -1324,7 +1331,6 @@ class Win_fn(QtGui.QWidget):
 
         par_obj.curr_img = prev_curr_img
         par_obj.time_pt = prev_time_pt
-
         v2.update_training_samples_fn(par_obj,self,0)
 
 
@@ -1484,17 +1490,17 @@ class parameterClass:
         self.max_depth=10
         self.min_samples_split=20
         self.min_samples_leaf=10
-        self.max_features = 7
+        self.max_features = 14#7
         self.num_of_tree = 50#30
-        self.feature_scale = 0.8
+        self.feature_scale = 1.2
         self.x_limit = 5024
         self.y_limit = 5024
-        self.sigma_data = 1.0
+        self.sigma_data = 2.0
         self.p_size = 1
         self.fresh_features = True
         self.crop_x2 = 0
         self.crop_x1 =0
-        self.resize_factor = 2
+        self.resize_factor = 1
         self.curr_img = 0
         self.numCH =0;
         self.RF ={}
