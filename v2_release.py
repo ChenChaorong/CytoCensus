@@ -1530,7 +1530,7 @@ class parameterClass:
         self.data_store ={}
         self.data_store[self.time_pt] ={}
         self.data_store[self.time_pt]['dense_arr'] ={}
-
+        self.maxPred=0
 
 #generate layout
 app = QtGui.QApplication([])

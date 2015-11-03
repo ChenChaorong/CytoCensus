@@ -749,6 +749,7 @@ def feature_create(par_obj,imRGB,imStr,i):
     return feat
     
 def evaluate_forest(par_obj,int_obj,withGT,model_num,inline=False,inner_loop=None,outer_loop=None,count=None):
+
     if inline == False:
         outer_loop = par_obj.left_2_calc
         inner_loop_arr = par_obj.frames_2_load
@@ -758,7 +759,7 @@ def evaluate_forest(par_obj,int_obj,withGT,model_num,inline=False,inner_loop=Non
         outer_loop = [outer_loop]
 
     #Finds the current frame and file.
-    
+    par_obj.maxPred=0 #resets scaling for display between models
     for b in outer_loop:
         frames =inner_loop_arr[b]
         for i in frames:
@@ -784,6 +785,7 @@ def evaluate_forest(par_obj,int_obj,withGT,model_num,inline=False,inner_loop=Non
             par_obj.data_store[par_obj.time_pt]['pred_arr'][i] = linPred.reshape(par_obj.height, par_obj.width)
 
             maxPred = np.max(linPred)
+            par_obj.maxPred=max([par_obj.maxPred,maxPred])
             sum_pred =np.sum(linPred/255)
             par_obj.data_store[par_obj.time_pt]['sum_pred'][i] = sum_pred
             print 'prediction time taken',t1 - t2
@@ -1002,7 +1004,7 @@ def eval_pred_show_fn(im_num,par_obj,int_obj):
             for ind in par_obj.data_store[par_obj.time_pt]['pred_arr']:
                 if ind == im_num:
                     im2draw = par_obj.data_store[par_obj.time_pt]['pred_arr'][im_num].astype(np.float32)
-            int_obj.plt2.imshow(im2draw)
+            int_obj.plt2.imshow(im2draw,vmax=par_obj.maxPred)
         if par_obj.show_pts == 2:
             
             pt_x = []
@@ -1096,6 +1098,7 @@ def import_data_fn(par_obj,file_array):
                 par_obj.oib_file = OifFile(imStr)
                 
                 meta = par_obj.oib_file.meta_data(imStr)
+
                 
                
 
