@@ -1,6 +1,7 @@
 from PyQt4 import QtGui, QtCore, Qt
 import PIL.Image
 import numpy as np
+import pywt
 import os
 import vigra
 import pylab
@@ -410,6 +411,13 @@ def update_training_samples_fn(par_obj,int_obj,model_num):
     print 'fmatrix',np.array(f_matrix).shape
     print 'o_patches',np.array(o_patches).shape
     par_obj.RF[model_num].fit(np.asfortranarray(f_matrix), np.asfortranarray(o_patches))
+    importances = par_obj.RF[model_num].feature_importances_
+    indices = np.argsort(importances)[::-1]
+    print("Feature ranking:")
+    X=np.asfortranarray(f_matrix)
+    for f in range(X.shape[1]):
+        print("%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]]))
+
     t4 = time.time()
     print 'actual training',t4-t3 
 def update_density_fn(par_obj):
@@ -664,6 +672,54 @@ def im_pred_inline_fn_eval(par_obj, int_obj,outer_loop=None,inner_loop=None,thre
             par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = feat  
         int_obj.report_progress('Features calculated')
     return
+
+def append_pred_features(par_obj, int_obj,outer_loop=None,inner_loop=None,threaded=False):
+    """Accesses TIFF file slice or opens png. Calculates features to indices present in par_obj.left_2_calc"""
+    if outer_loop == None:
+        outer_loop = 0
+        inner_loop_arr = par_obj.frames_2_load
+        inner_loop=inner_loop_arr[outer_loop]
+    #file looping is outside this function when considering inline
+    b =outer_loop 
+    imStr = str(par_obj.file_array[b])
+    frames = inner_loop #the use of [] or not is properly hinky and needs some fixing
+    if threaded == False:                        
+        #Goes through the list of frames
+        for i in frames:
+
+            #If you want to ignore previous features which have been saved.
+            int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(i+1) +' Timepoint: '+str(par_obj.time_pt+1))
+            imPred=par_obj.data_store[par_obj.time_pt]['pred_arr'][i]
+            feat=par_obj.data_store[par_obj.time_pt]['feat_arr'][i]
+            newfeat=feature_append(par_obj,imStr,feat,imPred)
+            par_obj.num_of_feat = newfeat.shape[2]
+            par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = newfeat  
+    else:
+        #threaded version
+                        
+        #Goes through the list of frames
+        predlist=[] #this will be the list that the threads iterate over
+        featlist=[]
+        for i in frames:
+            predlist.append(par_obj.data_store[par_obj.time_pt]['pred_arr'][i]) #add this on each iteration of the loop
+            featlist.append(par_obj.data_store[par_obj.time_pt]['feat_arr'][i])
+        #initiate pool and start caclulating features
+        int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Timepoint: '+str(par_obj.time_pt+1) +' All  Frames')
+        tee1=time.time()
+        pool = ThreadPool(8) 
+        newfeatlist=pool.map(functools.partial(feature_append_threaded,par_obj,imStr,featlist,predlist),frames)
+        pool.close() 
+        pool.join() 
+        tee2=time.time()
+        print tee2-tee1
+        lcount=-1
+        for i in frames:
+            lcount=lcount+1 #because using list not arrays, can't guarrantee i corresponds to the right point in the list
+            feat=newfeatlist[lcount]
+            par_obj.num_of_feat = feat.shape[2]
+            par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = feat  
+        int_obj.report_progress('Features calculated')
+    return
     
 def return_imRGB_slice(par_obj,i):
     '''Fetches slice i of current timepoint and file'''
@@ -747,6 +803,65 @@ def feature_create(par_obj,imRGB,imStr,i):
             feat[:,:,(b*23):((b+1)*23)] = local_shape_features_fine_spatial(imG,par_obj.feature_scale,i)
     #pickle.dump(feat,open(imStr[:-4]+'_'+str(i)+'.p', "wb"),protocol=2)
     return feat
+    
+def feature_append_threaded(par_obj,imStr,featlist,predlist,i):
+    feat=featlist[i]
+    imPred=predlist[i]
+    time1 = time.time()
+    '''if par_obj.to_crop == False:
+            par_obj.crop_x1 = 0
+            par_obj.crop_x2=par_obj.width
+            par_obj.crop_y1 = 0
+            par_obj.crop_y2=par_obj.height
+    par_obj.height = par_obj.crop_y2-par_obj.crop_y1
+    par_obj.width = par_obj.crop_x2-par_obj.crop_x1'''
+    
+    
+    if (par_obj.feature_type == 'basic'):
+        newfeat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),13*(par_obj.ch_active.__len__()+1)))
+    if (par_obj.feature_type == 'fine'):
+        newfeat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),21*(par_obj.ch_active.__len__()+1)))
+        
+    b = par_obj.ch_active.__len__()
+    if (par_obj.feature_type == 'basic'):
+        imG = imPred.astype(np.float32)
+        newfeat[:,:,(0):((b)*13)]=feat[:,:,(0):((b)*13)]
+        newfeat[:,:,(b*13):((b+1)*13)] = local_shape_features_basic(imG,par_obj.feature_scale)   
+    if (par_obj.feature_type == 'fine'):
+        imG = imPred.astype(np.float32)
+        newfeat[:,:,(0):((b)*21)]=feat[:,:,(0):((b)*13)]
+        newfeat[:,:,(b*21):((b+1)*21)] = local_shape_features_fine(imG,par_obj.feature_scale)
+    return newfeat
+    
+def feature_append(par_obj,imStr,feat,imPred):
+    time1 = time.time()
+    if par_obj.to_crop == False:
+            par_obj.crop_x1 = 0
+            par_obj.crop_x2=par_obj.width
+            par_obj.crop_y1 = 0
+            par_obj.crop_y2=par_obj.height
+    par_obj.height = par_obj.crop_y2-par_obj.crop_y1
+    par_obj.width = par_obj.crop_x2-par_obj.crop_x1
+    
+    
+    if (par_obj.feature_type == 'basic'):
+        newfeat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),13*(par_obj.ch_active.__len__()+1)))
+    if (par_obj.feature_type == 'fine'):
+        newfeat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),21*(par_obj.ch_active.__len__()+1)))
+        
+         
+        
+    b = par_obj.ch_active.__len__()
+    if (par_obj.feature_type == 'basic'):
+        imG = imPred.astype(np.float32)
+        newfeat[:,:,(0):((b)*13)]=feat[:,:,(0):((b)*13)]
+        newfeat[:,:,(b*13):((b+1)*13)] = local_shape_features_basic(imG,par_obj.feature_scale)   
+    if (par_obj.feature_type == 'fine'):
+        imG = imPred.astype(np.float32)
+        newfeat[:,:,(0):((b)*21)]=feat[:,:,(0):((b)*13)]
+        newfeat[:,:,(b*21):((b+1)*21)] = local_shape_features_fine(imG,par_obj.feature_scale)
+
+    return newfeat
     
 def evaluate_forest(par_obj,int_obj,withGT,model_num,inline=False,inner_loop=None,outer_loop=None,count=None):
 
@@ -836,11 +951,11 @@ def local_shape_features_fine(im,scaleStart):
     f[:,:, 10] =  st32[:,:,0]
     f[:,:, 11] =  st32[:,:,1]
     f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 )
-    f[:,:, 13]  = vigra.filters.gaussianGradientMagnitude(im, s*8) 
+    f[:,:, 13] = vigra.filters.gaussianGradientMagnitude(im, s*8) 
     f[:,:, 14] =  st64[:,:,0]
     f[:,:, 15] =  st64[:,:,1]
     f[:,:, 16] = vigra.filters.laplacianOfGaussian(im, s*8 )
-    f[:,:, 17]  = vigra.filters.gaussianGradientMagnitude(im, s*16) 
+    f[:,:, 17] = vigra.filters.gaussianGradientMagnitude(im, s*16) 
     f[:,:, 18] =  st128[:,:,0]
     f[:,:, 19] =  st128[:,:,1]
     f[:,:, 20] = vigra.filters.laplacianOfGaussian(im, s*16 )
@@ -875,8 +990,16 @@ def local_shape_features_basic(im,scaleStart):
     f[:,:, 10] =  st32[:,:,0]
     f[:,:, 11] =  st32[:,:,1]
     f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 )
-    
-    
+    '''
+    mode= 'sym2'
+    level=2
+    coeffs=pywt.wavedec2(im, mode, level=level)
+    coeffs_H=list(coeffs)  
+    #imArray_H=pywt.waverec2(coeffs_H[0:level], mode);
+    f[:,:, 10] =  np.float32(PIL.Image.fromarray(pywt.waverec2(coeffs_H[0:level], mode)).resize((imSizeR,imSizeC)))
+    coeffs_H[0] *= 0; 
+    f[:,:, 11] =  np.float32(PIL.Image.fromarray(pywt.waverec2(coeffs_H[0:level+1], mode)).resize((imSizeR,imSizeC)))
+    '''
     
     return f
 
@@ -895,76 +1018,89 @@ def eval_goto_img_fn(im_num, par_obj, int_obj):
             continue 
         break 
     
-
-    
-    if ( par_obj.file_ext == 'png'):
-        imStr = str(par_obj.file_array[b])
-        imRGB = pylab.imread(imStr)*255
-
-    if ( par_obj.file_ext == 'tif' or  par_obj.file_ext == 'tiff'):
-        imStr = str(par_obj.file_array[b])
-        temp = TiffFile(imStr)
-        imRGB = np.zeros((int(par_obj.height),int(par_obj.width),par_obj.ch_active.__len__()))
-        keyframe = (par_obj.max_zslices*par_obj.time_pt)+ im_num
-        if par_obj.numCH > 1:
-            input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
-            
-            imRGB = input_im
-        else:
-            input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
-            imRGB[:,:,0] = input_im[:,:]
-    
-    if ( par_obj.file_ext == 'oib' or par_obj.file_ext == 'oif'):
-        imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
-        for c in range(0,par_obj.numCH):
-            f  = par_obj.oib_prefix+'/s_C'+str(c+1).zfill(3)+'Z'+str(i+1).zfill(3)
-            if par_obj.total_time_pt>0:
-                f = f+'T'+str(par_obj.time_pt+1).zfill(3)
-            f = f+'.tif'
-
-            imRGB[:,:,c] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
-            
-    
-
-    count = 0
-    CH = [0]*5
-    for c in range(0,par_obj.numCH):
-        name = 'a = int_obj.CH_cbx'+str(c)+'.checkState()'
-        exec(name)
-        if a ==2:
-            count = count + 1
-            CH[c] = 1
-
-    newImg =np.zeros((par_obj.height,par_obj.width,3))
-    
-    if count == 0 and par_obj.numCH==0:
-        newImg = imRGB[:,:,0]
-        
-
-    elif count == 1:
-        
-        if imRGB.shape> 2:
-            ch = par_obj.ch_active[np.where(np.array(CH)==1)[0]]
-            newImg[:,:,0] = imRGB[:,:,ch]
-            newImg[:,:,1] = imRGB[:,:,ch]
-            newImg[:,:,2] = imRGB[:,:,ch]
-        else:
-            newImg[:,:,0] = imRGB
-            newImg[:,:,1] = imRGB
-            newImg[:,:,2] = imRGB
+    #check if have accessed image recently and get index, t, use that image rather than reading from disk
+    if (par_obj.curr_img,par_obj.time_pt) in par_obj.prev_img:
+        print 'using stored image for speed'
+        t=par_obj.prev_img.index((par_obj.curr_img,par_obj.time_pt))
+        print t
+        newImg=par_obj.oldImg[t]
     else:
-        if CH[0] == 1:
-            newImg[:,:,0] = imRGB[:,:,0]
-        if CH[1] == 1:
-            newImg[:,:,1] = imRGB[:,:,1]
-        if CH[2] == 1:
-            newImg[:,:,2] = imRGB[:,:,2]
-
+        if ( par_obj.file_ext == 'png'):
+            imStr = str(par_obj.file_array[b])
+            imRGB = pylab.imread(imStr)*255
     
-    par_obj.save_im = imRGB
+        if ( par_obj.file_ext == 'tif' or  par_obj.file_ext == 'tiff'):
+            imStr = str(par_obj.file_array[b])
+            temp = TiffFile(imStr)
+            imRGB = np.zeros((int(par_obj.height),int(par_obj.width),par_obj.ch_active.__len__()))
+            keyframe = (par_obj.max_zslices*par_obj.time_pt)+ im_num
+            if par_obj.numCH > 1:
+                input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
+                
+                imRGB = input_im
+            else:
+                input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
+                imRGB[:,:,0] = input_im[:,:]
+        
+        if ( par_obj.file_ext == 'oib' or par_obj.file_ext == 'oif'):
+            imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
+            for c in range(0,par_obj.numCH):
+                f  = par_obj.oib_prefix+'/s_C'+str(c+1).zfill(3)+'Z'+str(i+1).zfill(3)
+                if par_obj.total_time_pt>0:
+                    f = f+'T'+str(par_obj.time_pt+1).zfill(3)
+                f = f+'.tif'
+    
+                imRGB[:,:,c] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
+                
+        
+    
+        count = 0
+        CH = [0]*5
+        for c in range(0,par_obj.numCH):
+            name = 'a = int_obj.CH_cbx'+str(c)+'.checkState()'
+            exec(name)
+            if a ==2:
+                count = count + 1
+                CH[c] = 1
+    
+        newImg =np.zeros((par_obj.height,par_obj.width,3))
+        
+        if count == 0 and par_obj.numCH==0:
+            newImg = imRGB[:,:,0]
+            
+    
+        elif count == 1:
+            
+            if imRGB.shape> 2:
+                ch = par_obj.ch_active[np.where(np.array(CH)==1)[0]]
+                newImg[:,:,0] = imRGB[:,:,ch]
+                newImg[:,:,1] = imRGB[:,:,ch]
+                newImg[:,:,2] = imRGB[:,:,ch]
+            else:
+                newImg[:,:,0] = imRGB
+                newImg[:,:,1] = imRGB
+                newImg[:,:,2] = imRGB
+        else:
+            if CH[0] == 1:
+                newImg[:,:,0] = imRGB[:,:,0]
+            if CH[1] == 1:
+                newImg[:,:,1] = imRGB[:,:,1]
+            if CH[2] == 1:
+                newImg[:,:,2] = imRGB[:,:,2]
+    
+        
+        par_obj.save_im = imRGB
 
     for i in range(0,int_obj.plt1.lines.__len__()):
         int_obj.plt1.lines.pop(0)
+        
+    if (par_obj.curr_img,par_obj.time_pt) not in par_obj.prev_img: #append set of images to list if not already there
+        par_obj.oldImg.append(newImg)
+        par_obj.prev_img.append((par_obj.curr_img,par_obj.time_pt))
+    if len(par_obj.prev_img)>par_obj.cache_length: #delete cached images if cache full (first in)
+        par_obj.prev_img.pop(0)
+        par_obj.oldImg.pop(0)
+        
     par_obj.newImg = newImg
     int_obj.plt1.cla()
     int_obj.plt1.imshow(256-newImg)
@@ -973,7 +1109,6 @@ def eval_goto_img_fn(im_num, par_obj, int_obj):
     int_obj.draw_saved_dots_and_roi()
     int_obj.plt1.set_xticklabels([])
     int_obj.plt1.set_yticklabels([])
-    
     
     int_obj.cursor.draw_ROI()
     int_obj.canvas1.draw()

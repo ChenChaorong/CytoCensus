@@ -1250,8 +1250,10 @@ class Parameter_class:
 				raise
 
 		self.csvPath = os.path.expanduser('~')+'/'
-		
-
+		self.cache_length=3
+		self.prev_img=[]
+		self.oldImg=[]
+		self.newImg=[]
 
 
 #Creates win, an instance of QWidget

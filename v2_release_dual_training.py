@@ -845,12 +845,16 @@ class Win_fn(QtGui.QWidget):
             except:
                 v2.im_pred_inline_fn_eval(par_obj, self,threaded=True) #v2.im_pred_inline_fn(par_obj, self)
                 break
-
         #    par_obj.data_store[par_obj.time_pt] = {}
         #    par_obj.data_store[par_obj.time_pt]['feat_arr'] = {}
         #    par_obj.data_store[par_obj.time_pt]['pred_arr'] = {}
         #    par_obj.data_store[par_obj.time_pt]['sum_pred'] = {}
         v2.evaluate_forest(par_obj,self,False,0)
+        
+        v2.append_pred_features(par_obj, self,threaded=True)
+
+        v2.update_training_samples_fn(par_obj,self,1)
+        v2.evaluate_forest(par_obj,self,False,1)
         par_obj.show_pts= 0
         self.kernel_btn_fn()
         print 'evaluating'
@@ -860,7 +864,7 @@ class Win_fn(QtGui.QWidget):
         fileName = QtGui.QFileDialog.getSaveFileName(self, "Save dots and regions", "~/Documents", ".quantiROI");
         print 'the filename address',fileName
         pickle.dump( file_to_save, open( fileName+".quantiROI", "wb" ) )
-    def load_gt_fn(self):
+    def load_gt_fn(self): 
         print 'load the gt'
         fileName = QtGui.QFileDialog.getOpenFileName(self, "Save dots and regions", "~/Documents", "QuantiFly ROI files (*.quantiROI)");
         print 'load the file', fileName
@@ -1250,7 +1254,6 @@ class Win_fn(QtGui.QWidget):
                 if ind < par_obj.time_pt_list.__len__()-1:
                     par_obj.time_pt  = par_obj.time_pt_list[ind+1]
                     self.goto_img_fn(par_obj.curr_img)
-
                     break;
 
 
@@ -1313,6 +1316,7 @@ class Win_fn(QtGui.QWidget):
         self.train_model_btn.setEnabled(False)
         self.clear_dots_btn.setEnabled(False)
     def train_model_btn_fn(self):
+        par_obj.data_store[par_obj.time_pt]['feat_arr']={}
         self.image_status_text.showMessage('Training Ensemble of Decision Trees. ')
         #added to make sure current timepoint has all features precalculated
         v2.im_pred_inline_fn(par_obj, self,threaded=True)
@@ -1333,13 +1337,29 @@ class Win_fn(QtGui.QWidget):
         par_obj.curr_img = prev_curr_img
         par_obj.time_pt = prev_time_pt
         v2.update_training_samples_fn(par_obj,self,0)
-
-
-
-        self.image_status_text.showMessage('Evaluating Images with the Trained Model. ')
         app.processEvents()
         v2.evaluate_forest(par_obj,self, False,0)
+        self.image_status_text.showMessage('Evaluating Images with the Trained Model. ')
+
         #v2.make_correction(par_obj, 0)
+        ##level 2 prediction
+
+        for i in range(0,par_obj.saved_ROI.__len__()):
+            par_obj.curr_img = par_obj.saved_ROI[i][0]
+            par_obj.time_pt =par_obj.saved_ROI[i][5]
+            v2.evaluate_forest(par_obj,self, False,0,inline=True,inner_loop=par_obj.curr_img ,outer_loop=0,count=0)
+            par_obj.curr_img = par_obj.saved_ROI[i][0]
+            par_obj.time_pt =par_obj.saved_ROI[i][5]
+            v2.append_pred_features(par_obj, self,outer_loop=0,inner_loop=[par_obj.curr_img] ,threaded=False)  
+        par_obj.curr_img = prev_curr_img
+        par_obj.time_pt = prev_time_pt
+        v2.append_pred_features(par_obj, self,threaded=True)
+        par_obj.curr_img = prev_curr_img
+        par_obj.time_pt = prev_time_pt
+        v2.update_training_samples_fn(par_obj,self,1)
+        app.processEvents()
+        v2.evaluate_forest(par_obj,self, False,1)
+        
         self.image_status_text.showMessage('Model Trained. Continue adding samples, or click \'Save Training Model\'. ')
         par_obj.eval_load_im_win_eval = True
         par_obj.show_pts= 0
@@ -1525,18 +1545,14 @@ class parameterClass:
         self.rel_thr = 0.5
         self.left_2_calc =[]
         self.c = 0
-        self.M = 1
+        self.M =1
         self.time_pt = 0
         self.total_time_pt = 0
         self.data_store ={}
         self.data_store[self.time_pt] ={}
         self.data_store[self.time_pt]['dense_arr'] ={}
-        
         self.maxPred=0
-        self.cache_length=15
-        self.prev_img=[]
-        self.oldImg=[]
-        self.newImg=[]
+
 #generate layout
 app = QtGui.QApplication([])
 
