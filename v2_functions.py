@@ -7,20 +7,26 @@ import vigra
 import pylab
 import csv
 import time
+from skimage.filters.rank import entropy
+from skimage.morphology import disk
 from sklearn.ensemble import ExtraTreesRegressor
 import cPickle as pickle
 from scipy.ndimage import filters
 from oiffile import OifFile
-from tifffile import TiffFile
+from tifffile2 import TiffFile
+from tifffile2 import imsave
 import itertools as itt
 import struct
 import copy
 import functools
 from matplotlib.lines import Line2D
 from matplotlib.path import Path
-
+import scipy
 from multiprocessing import Pool
 from multiprocessing.dummy import Pool as ThreadPool 
+
+
+import pdb
 """QuantiFly3d Software v0.0
 
     Copyright (C) 2015  Dominic Waithe
@@ -388,6 +394,7 @@ def update_training_samples_fn(par_obj,int_obj,model_num):
                 if(par_obj.limit_sample == True):
                     if(par_obj.limit_ratio == True):
                         par_obj.limit_size = round(mImRegion.shape[0]*mImRegion.shape[1]/calc_ratio,0)
+                        print mImRegion.shape[0]*mImRegion.shape[1]
                     #Randomly sample from input ROI or im a certain number (par_obj.limit_size) patches. With replacement.
                     indices =  np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
                     #Add to feature vector and output vector.
@@ -417,7 +424,6 @@ def update_training_samples_fn(par_obj,int_obj,model_num):
     X=np.asfortranarray(f_matrix)
     for f in range(X.shape[1]):
         print("%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]]))
-
     t4 = time.time()
     print 'actual training',t4-t3 
 def update_density_fn(par_obj):
@@ -470,6 +476,8 @@ def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=N
                  #   par_obj.tif_file = TifFile(imStr).asarray()[:,:,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
     
                 for i in frames:
+                    imRGB=return_imRGB_slice(par_obj,i)
+                    '''
                     if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
                         
                         imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
@@ -502,7 +510,7 @@ def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=N
                             f = f+'.tif'
                             
                             imRGB[:,:,par_obj.ch_active[c]] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
-                            
+                    '''
                     #checks if features for this tp have been calculated already
                     if par_obj.fresh_features == False:
                         try:
@@ -537,8 +545,9 @@ def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=N
                 
                 imRGBlist=[]
                 for i in frames:
+                    imRGB=return_imRGB_slice(par_obj,i)
+                    '''
                     if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
-                        
                         imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
                         keyframe = (par_obj.max_zslices*par_obj.time_pt)+ i
                         
@@ -569,6 +578,7 @@ def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=N
                             f = f+'.tif'
                             
                             imRGB[:,:,par_obj.ch_active[c]] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
+                    '''
                     imRGBlist.append(imRGB)
                             
                 # consider cropping
@@ -727,8 +737,17 @@ def return_imRGB_slice(par_obj,i):
         
         imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
         keyframe = (par_obj.max_zslices*par_obj.time_pt)+ i
-        
-        
+
+        if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
+            input_im = par_obj.tiffarray[par_obj.time_pt,i,::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
+            
+            for c in range(0,par_obj.ch_active.__len__()):
+                imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
+        else:
+            input_im = par_obj.tiffarray[par_obj.time_pt,i,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
+            imRGB[:,:,0] = input_im[:,:]
+                
+        '''
         if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
             input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
             
@@ -737,7 +756,7 @@ def return_imRGB_slice(par_obj,i):
         else:
             input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
             imRGB[:,:,0] = input_im
-
+        '''
 
 
     elif par_obj.file_ext == 'png':
@@ -771,6 +790,7 @@ def feature_create_threaded(par_obj,imStr,imRGB):
         if (par_obj.feature_type == 'fine'):
             imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
             feat[:,:,(b*21):((b+1)*21)] = local_shape_features_fine(imG,par_obj.feature_scale)
+
 
     return feat
 def feature_create(par_obj,imRGB,imStr,i):
@@ -976,7 +996,6 @@ def local_shape_features_basic(im,scaleStart):
     st16 = vigra.filters.structureTensorEigenvalues(im,s*2,s*4)
     st32 = vigra.filters.structureTensorEigenvalues(im,s*4,s*8)
     
-    
     f[:,:, 0]  = im
     f[:,:, 1]  = vigra.filters.gaussianGradientMagnitude(im, s)
     f[:,:, 2]  = st08[:,:,0]
@@ -990,22 +1009,37 @@ def local_shape_features_basic(im,scaleStart):
     f[:,:, 10] =  st32[:,:,0]
     f[:,:, 11] =  st32[:,:,1]
     f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 )
+    
     '''
-    mode= 'sym2'
+    f[:,:, 10]=vigra.filters.gaussianSmoothing(im,s*16)
+    f[:,:, 11]=vigra.filters.gaussianSharpening2D(im,s*2)
+    ''''''
+    abd=vigra.filters.hessianOfGaussian2D(im,s*2)
+    f[:,:, 7] =  abd[:,:,0] 
+    f[:,:, 10] =  abd[:,:,1]
+    f[:,:, 11] =  abd[:,:,2]   
+    
+    f[:,:, 10] =  vigra.filters.hessianOfGaussianEigenvalues(im,s)[:,:,1]
+    f[:,:, 11] =  vigra.filters.hessianOfGaussianEigenvalues(im,s*2)[:,:,1]    
+    ''''''
+    mode= 'haar'
     level=2
     coeffs=pywt.wavedec2(im, mode, level=level)
     coeffs_H=list(coeffs)  
     #imArray_H=pywt.waverec2(coeffs_H[0:level], mode);
-    f[:,:, 10] =  np.float32(PIL.Image.fromarray(pywt.waverec2(coeffs_H[0:level], mode)).resize((imSizeR,imSizeC)))
-    coeffs_H[0] *= 0; 
-    f[:,:, 11] =  np.float32(PIL.Image.fromarray(pywt.waverec2(coeffs_H[0:level+1], mode)).resize((imSizeR,imSizeC)))
+    f[:,:, 10] =  np.float32(PIL.Image.fromarray(pywt.waverec2(coeffs_H[0:level], mode)).resize((imSizeR,imSizeC),PIL.Image.BILINEAR))
+    mode= 'haar'
+    level=3
+    coeffs=pywt.wavedec2(im, mode, level=level)
+    coeffs_H=list(coeffs)  
+    f[:,:, 11] =  np.float32(PIL.Image.fromarray(pywt.waverec2(coeffs_H[0:level], mode)).resize((imSizeR,imSizeC),PIL.Image.BILINEAR))
     '''
     
     return f
 
 def eval_goto_img_fn(im_num, par_obj, int_obj):
     """Loads up and converts image to correct format"""
-
+    
     #Finds the current frame and file.
     count = -1
     for b in par_obj.left_2_calc:
@@ -1017,18 +1051,17 @@ def eval_goto_img_fn(im_num, par_obj, int_obj):
         else:
             continue 
         break 
-    
+    par_obj.tiffarray=par_obj.tiff_file.asarray(memmap=True)
     #check if have accessed image recently and get index, t, use that image rather than reading from disk
     if (par_obj.curr_img,par_obj.time_pt) in par_obj.prev_img:
-        print 'using stored image for speed'
+        #print 'using stored image for speed'
         t=par_obj.prev_img.index((par_obj.curr_img,par_obj.time_pt))
-        print t
         newImg=par_obj.oldImg[t]
     else:
         if ( par_obj.file_ext == 'png'):
             imStr = str(par_obj.file_array[b])
             imRGB = pylab.imread(imStr)*255
-    
+        '''
         if ( par_obj.file_ext == 'tif' or  par_obj.file_ext == 'tiff'):
             imStr = str(par_obj.file_array[b])
             temp = TiffFile(imStr)
@@ -1041,7 +1074,20 @@ def eval_goto_img_fn(im_num, par_obj, int_obj):
             else:
                 input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
                 imRGB[:,:,0] = input_im[:,:]
-        
+        '''
+        if ( par_obj.file_ext == 'tif' or  par_obj.file_ext == 'tiff'):
+            imStr = str(par_obj.file_array[b])
+            temp = TiffFile(imStr)
+            imRGB = np.zeros((int(par_obj.height),int(par_obj.width),par_obj.ch_active.__len__()))
+            keyframe = (par_obj.max_zslices*par_obj.time_pt)+ im_num
+            if par_obj.numCH > 1:
+                input_im = par_obj.tiffarray[par_obj.time_pt,im_num,::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
+                
+                imRGB = input_im
+            else:
+                input_im = par_obj.tiffarray[par_obj.time_pt,im_num,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
+                imRGB[:,:,0] = input_im[:,:]
+                
         if ( par_obj.file_ext == 'oib' or par_obj.file_ext == 'oif'):
             imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
             for c in range(0,par_obj.numCH):
@@ -1201,25 +1247,26 @@ def import_data_fn(par_obj,file_array):
 
                 
                 
-                order = meta['axes']
+                order = meta.axes
                 
 
                 for n,b in enumerate(order):
                     if b == 'T':
-                        par_obj.total_time_pt = meta['shape'][n]
+                        par_obj.total_time_pt = meta.shape[n]
                     if b == 'Z':
-                        par_obj.max_zslices = meta['shape'][n]
+                        par_obj.max_zslices = meta.shape[n]
                     if b == 'Y':
-                        par_obj.ori_height = meta['shape'][n]
+                        par_obj.ori_height = meta.shape[n]
                     if b == 'X':
-                        par_obj.ori_width = meta['shape'][n]
+                        par_obj.ori_width = meta.shape[n]
                     if b == 'S':
-                        par_obj.numCH = meta['shape'][n]
+                        par_obj.numCH = meta.shape[n]
 
 
-                par_obj.bitDepth = meta['dtype']
+                par_obj.bitDepth = meta.dtype
                 par_obj.test_im_end = par_obj.max_zslices
-                imRGB = par_obj.tiff_file.asarray(key=0)[::par_obj.resize_factor,::par_obj.resize_factor]
+                par_obj.tiffarray=par_obj.tiff_file.asarray(memmap=True)
+                imRGB = par_obj.tiffarray[0,0,::par_obj.resize_factor,::par_obj.resize_factor]
                 
 
 
@@ -1326,18 +1373,25 @@ def import_data_fn(par_obj,file_array):
     statusText= str(file_array.__len__())+' Files Loaded.'
     return True, statusText
 def save_output_prediction_fn(par_obj,int_obj):
-
+    #funky ordering TZCYX
+    image = np.zeros([par_obj.total_time_pt,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'float32')
     count = -1
+    print 'probably broken'
     for tpt in par_obj.time_pt_list:
 
         #for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
         for i in range(0,par_obj.max_zslices):
+            '''
             count=count+1
             n = str(count)
             string = par_obj.csvPath+'output' + n.zfill(3)+'.tif'
             im_to_save= PIL.Image.fromarray(par_obj.data_store[tpt]['pred_arr'][i].astype(np.float32))
             im_to_save.save(string)
+            '''
+            image[tpt,i,:,:,:]=par_obj.data_store[tpt]['pred_arr'][i].astype(np.float32)
     print 'Prediction written to disk'
+    _imagej_metadata = dict([("ImageJ","1.47a"),("images",np.size(image)),("channels",1),("slices",par_obj.max_zslices),("frames",par_obj.total_time_pt),("hyperstack","true"),("mode","composite"),("loop","false")])
+    imsave('Newput.tif', np.reshape(image,[par_obj.height,par_obj.width,par_obj.max_zslices* par_obj.total_time_pt]))
 def save_output_data_fn(par_obj,int_obj):
     local_time = time.asctime( time.localtime(time.time()) )
 

@@ -1350,9 +1350,15 @@ class Win_fn(QtGui.QWidget):
     def sigmaOnChange(self,text):
         if (text != ""):
             par_obj.sigma_data = float(text)
+            number_of_saved_roi=range(0,len(par_obj.saved_ROI))
+            ot=par_obj.time_pt
+            for it in number_of_saved_roi:
+                par_obj.time_pt=int(par_obj.saved_ROI[it][5])
+                par_obj.im_for_train=[int(par_obj.saved_ROI[it][0])]
+            v2.update_density_fn(par_obj)
+            par_obj.time_pt=ot
             self.update_density_fn()
-            par_obj.data_store[par_obj.time_pt]['feat_arr'] = {}   
-        
+            
     def feature_scale_change(self,text):
         par_obj.feature_scale = float(text)
     def feat_scale_change_btn_fn(self):
@@ -1484,15 +1490,15 @@ class parameterClass:
         #Parameters of sampling
         self.limit_sample = True
         self.limit_ratio = True #whether to use ratio of roi pixels
-        self.limit_ratio_size =21 #Gives 3000 patches for 255*255 image.
+        self.limit_ratio_size =21/7 #Gives 3000 patches for 255*255 image.
         self.limit_size = 3000 #patches per image or ROI.
         #Random Forest parameters
         self.pw = 1
         self.max_depth=10
         self.min_samples_split=20
         self.min_samples_leaf=10
-        self.max_features = 14#7
-        self.num_of_tree = 50#30
+        self.max_features = 20#14#7
+        self.num_of_tree = 75#50#30
         self.feature_scale = 1.2
         self.x_limit = 5024
         self.y_limit = 5024
