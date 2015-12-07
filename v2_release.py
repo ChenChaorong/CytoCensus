@@ -352,8 +352,8 @@ class Load_win_fn(QtGui.QWidget):
         """Updates on change of feature scale"""
         if (text != ""):
             par_obj.feature_scale = float(text)
-            par_obj.data_store[par_obj.time_pt]['feat_arr'] = {}        
-        
+            for tp in range(0,par_obj.total_time_pt):
+                par_obj.data_store[tp]['feat_arr'] = {}   
     def updateAfterImport(self):
         """Specific to ui updates"""
 
@@ -656,6 +656,7 @@ class Win_fn(QtGui.QWidget):
         self.save_gt_btn.setEnabled(True)
         self.save_gt = False
 
+
         panel_buttons = QtGui.QHBoxLayout()
         panel_buttons.addWidget(self.prev_im_btn)
         panel_buttons.addWidget(self.next_im_btn)
@@ -736,7 +737,11 @@ class Win_fn(QtGui.QWidget):
         self.count_maxima_btn = QtGui.QPushButton('Count Maxima')
         self.count_maxima_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.count_maxima_btn, 4, 0)
-
+        
+        #Button for overlay
+        self.overlay_prediction_btn = QtGui.QPushButton('Overlay Prediction')
+        self.overlay_prediction_btn.setEnabled(True)
+        self.top_right_grid.addWidget(self.overlay_prediction_btn, 0,2)
 
 
         self.count_replot_btn = QtGui.QPushButton('Replot')
@@ -820,6 +825,7 @@ class Win_fn(QtGui.QWidget):
         self.count_replot_btn.clicked.connect(self.replot_fn)
         self.load_gt_btn.clicked.connect(self.load_gt_fn)
         self.save_gt_btn.clicked.connect(self.save_gt_fn)
+        self.overlay_prediction_btn.clicked.connect(self.overlay_prediction_btn_fn)
         #self.feat_scale_change_btn.clicked.connect(self.feat_scale_change_btn_fn)
         self.kernel_show_btn.clicked.connect(self.kernel_btn_fn)
         self.clear_dots_btn.clicked.connect(self.clear_dots_fn)
@@ -839,26 +845,20 @@ class Win_fn(QtGui.QWidget):
     def evaluate_forest_fn(self):
         #Don't want to train for all the images so we select them.
 
-        for i in par_obj.frames_2_load[0]:
-            try:
-                par_obj.data_store[par_obj.time_pt]['feat_arr'][i]
-            except:
-                v2.im_pred_inline_fn_eval(par_obj, self,threaded=True) #v2.im_pred_inline_fn(par_obj, self)
-                break
+        v2.im_pred_inline_fn_new(par_obj, self,par_obj.frames_2_load[0],[par_obj.time_pt],threaded=True)
 
-        #    par_obj.data_store[par_obj.time_pt] = {}
-        #    par_obj.data_store[par_obj.time_pt]['feat_arr'] = {}
-        #    par_obj.data_store[par_obj.time_pt]['pred_arr'] = {}
-        #    par_obj.data_store[par_obj.time_pt]['sum_pred'] = {}
-        v2.evaluate_forest(par_obj,self,False,0)
+        v2.evaluate_forest_new(par_obj,self, False,0,par_obj.frames_2_load[0],[par_obj.time_pt])
         par_obj.show_pts= 0
         self.kernel_btn_fn()
         print 'evaluating'
+        self.image_status_text.showMessage('Evaluation complete')
 
     def save_gt_fn(self):
         file_to_save = {'dots':par_obj.saved_dots,'rect':par_obj.saved_ROI}
         fileName = QtGui.QFileDialog.getSaveFileName(self, "Save dots and regions", "~/Documents", ".quantiROI");
         print 'the filename address',fileName
+        if fileName[-10:]=='.quantiROI':
+            fileName=fileName[0:-10]
         pickle.dump( file_to_save, open( fileName+".quantiROI", "wb" ) )
     def load_gt_fn(self):
         print 'load the gt'
@@ -867,17 +867,15 @@ class Win_fn(QtGui.QWidget):
         the_file = pickle.load( open( fileName, "rb" ) )
         par_obj.saved_dots = the_file['dots']
         par_obj.saved_ROI = the_file['rect']
-        number_of_saved_roi=range(0,len(par_obj.saved_ROI))
         self.clear_dots_btn.setEnabled(True)
+        
         if par_obj.saved_ROI !=[]:
-            curr_tp_store=par_obj.time_pt
-            for it in number_of_saved_roi:
-                par_obj.time_pt=int(par_obj.saved_ROI[it][5])
-                par_obj.im_for_train=[int(par_obj.saved_ROI[it][0])]
-                v2.update_density_fn(par_obj)
-            par_obj.time_pt=curr_tp_store
+            v2.refresh_all_density(par_obj)
             self.train_model_btn.setEnabled(True)
-        self.goto_img_fn(par_obj.curr_img)
+        self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+    def overlay_prediction_btn_fn(self):
+        par_obj.overlay=not par_obj.overlay
+        self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
     def replot_fn(self):
             v2.eval_pred_show_fn(par_obj.curr_img,par_obj,self)
     def count_maxima_btn_fn(self):
@@ -1194,19 +1192,25 @@ class Win_fn(QtGui.QWidget):
         par_obj.rect_h =0
 
 
-        self.goto_img_fn(par_obj.curr_img)
+        self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
         #Now we update a density image of the current Image.
         self.update_density_fn()
 
 
     def update_density_fn(self):
         #Construct empty array for current image.
-        par_obj.im_for_train = [par_obj.curr_img]
-        v2.update_density_fn(par_obj)
+        tpt=par_obj.time_pt
+        zslice=par_obj.curr_img
+        
+        v2.update_density_fn_new(par_obj,tpt,zslice)
+        
+        self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+        '''
         self.plt2.cla()
-        self.plt2.imshow(par_obj.data_store[par_obj.time_pt]['dense_arr'][par_obj.curr_img])
+        self.plt2.imshow(par_obj.data_store[tpt]['dense_arr'][zslice])
         self.plt2.set_xticklabels([])
         self.plt2.set_yticklabels([])
+        '''
         self.canvas2.draw()
     def draw_saved_dots_and_roi(self):
         for i in range(0,par_obj.subdivide_ROI.__len__()):
@@ -1225,7 +1229,7 @@ class Win_fn(QtGui.QWidget):
             if zim == par_obj.curr_img:
                 if ind > 0:
                     par_obj.curr_img  = par_obj.frames_2_load[0][ind-1]
-                    self.goto_img_fn(par_obj.curr_img)
+                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
                     break;
 
     def next_im_btn_fn(self):
@@ -1233,14 +1237,14 @@ class Win_fn(QtGui.QWidget):
             if zim == par_obj.curr_img:
                 if ind < par_obj.frames_2_load[0].__len__()-1:
                     par_obj.curr_img  = par_obj.frames_2_load[0][ind+1]
-                    self.goto_img_fn(par_obj.curr_img)
+                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
                     break;
     def prev_time_btn_fn(self):
         for ind, tim in enumerate(par_obj.time_pt_list):
             if tim == par_obj.time_pt:
                 if ind > 0:
                     par_obj.time_pt  = par_obj.time_pt_list[ind-1]
-                    self.goto_img_fn(par_obj.curr_img)
+                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
                     break;
 
     def next_time_btn_fn(self):
@@ -1249,19 +1253,14 @@ class Win_fn(QtGui.QWidget):
             if tim == par_obj.time_pt:
                 if ind < par_obj.time_pt_list.__len__()-1:
                     par_obj.time_pt  = par_obj.time_pt_list[ind+1]
-                    self.goto_img_fn(par_obj.curr_img)
+                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
 
                     break;
 
-
-
-
-
-
-
-    def goto_img_fn(self,im_num):
+    def goto_img_fn(self,zslice,tpt):
         #Goto and evaluate image function.
-        v2.eval_goto_img_fn(im_num,par_obj,self)
+        v2.goto_img_fn_new(par_obj,self,zslice,tpt)
+        v2.return_imRGB_slice_new(par_obj,zslice,tpt)
         self.draw_saved_dots_and_roi()
         par_obj.dots = []
         par_obj.rects = np.zeros((1,4))
@@ -1307,7 +1306,7 @@ class Win_fn(QtGui.QWidget):
     def clear_dots_fn(self):
         par_obj.saved_dots = []
         par_obj.saved_ROI = []
-        par_obj.data_store[par_obj.time_pt]['dense_arr'] = {}
+        par_obj.data_store[range(par_obj.total_time_pt)]['dense_arr'] = {}
         self.goto_img_fn(par_obj.curr_img)
         self.update_density_fn()
         self.train_model_btn.setEnabled(False)
@@ -1315,30 +1314,28 @@ class Win_fn(QtGui.QWidget):
     def train_model_btn_fn(self):
         self.image_status_text.showMessage('Training Ensemble of Decision Trees. ')
         #added to make sure current timepoint has all features precalculated
-        v2.im_pred_inline_fn(par_obj, self,threaded=True)
+        v2.im_pred_inline_fn_new(par_obj, self,par_obj.frames_2_load[0],[par_obj.time_pt],True)
         
-        prev_curr_img = par_obj.curr_img
-        prev_time_pt = par_obj.time_pt
+        for i in range(0,par_obj.saved_ROI.__len__()):
+            zslice = par_obj.saved_ROI[i][0]
+            tpt =par_obj.saved_ROI[i][5]
+            print 'calculating features, time point',tpt+1,' image slice ',zslice+1
+            v2.im_pred_inline_fn_new(par_obj, self,[zslice],[tpt],threaded=False)
+                
+        par_obj.f_matrix=[]
+        par_obj.o_patches=[]
 
         for i in range(0,par_obj.saved_ROI.__len__()):
-            par_obj.curr_img = par_obj.saved_ROI[i][0]
-            par_obj.time_pt =par_obj.saved_ROI[i][5]
-            
-            try:
-                par_obj.data_store[par_obj.time_pt]['feat_arr'][par_obj.curr_img]
-            except:
-                print 'calculating features, time point',par_obj.time_pt+1,' image slice ',par_obj.curr_img+1
-                v2.im_pred_inline_fn(par_obj, self,inline=True,outer_loop=0,inner_loop=par_obj.curr_img)
+            zslice = par_obj.saved_ROI[i][0]
+            tpt =par_obj.saved_ROI[i][5]
+            v2.update_training_samples_fn_new_only(par_obj,self,0,tpt,zslice)
 
-        par_obj.curr_img = prev_curr_img
-        par_obj.time_pt = prev_time_pt
-        v2.update_training_samples_fn(par_obj,self,0)
-
-
-
+        t0=time.time()       
+        self.image_status_text.showMessage('Training Model')
+        v2.update_training_samples_fn_train_only(par_obj,self,0)
         self.image_status_text.showMessage('Evaluating Images with the Trained Model. ')
         app.processEvents()
-        v2.evaluate_forest(par_obj,self, False,0)
+        v2.evaluate_forest_new(par_obj,self, False,0,par_obj.frames_2_load[0],[par_obj.time_pt])
         #v2.make_correction(par_obj, 0)
         self.image_status_text.showMessage('Model Trained. Continue adding samples, or click \'Save Training Model\'. ')
         par_obj.eval_load_im_win_eval = True
@@ -1350,17 +1347,9 @@ class Win_fn(QtGui.QWidget):
     def sigmaOnChange(self,text):
         if (text != ""):
             par_obj.sigma_data = float(text)
-            number_of_saved_roi=range(0,len(par_obj.saved_ROI))
-            ot=par_obj.time_pt
-            for it in number_of_saved_roi:
-                par_obj.time_pt=int(par_obj.saved_ROI[it][5])
-                par_obj.im_for_train=[int(par_obj.saved_ROI[it][0])]
-            v2.update_density_fn(par_obj)
-            par_obj.time_pt=ot
+            v2.refresh_all_density(par_obj)
             self.update_density_fn()
             
-    def feature_scale_change(self,text):
-        par_obj.feature_scale = float(text)
     def feat_scale_change_btn_fn(self):
         self.feat_scale_change_btn.setEnabled(False)
         print('Training Features')
@@ -1371,21 +1360,28 @@ class Win_fn(QtGui.QWidget):
         self.save_model_btn.setEnabled(True)
         v2.eval_pred_show_fn(par_obj.curr_img,par_obj,self)
 
-    def kernel_btn_fn(self):
+    def kernel_btn_fn(self,set=False):
         """Shows the kernels on the image."""
-        par_obj.show_pts = par_obj.show_pts+ 1
+        if set == 'Kernel':
+            par_obj.show_pts =0
+        elif set=='Probability':
+            par_obj.show_pts =1
+        elif set=='Counts':
+            par_obj.show_pts =2
+        elif set==False:
+            par_obj.show_pts = (par_obj.show_pts+ 1)%3
+            
         print 'show',par_obj.show_pts
-        if par_obj.show_pts ==3:
-             par_obj.show_pts = 0
+
         if par_obj.show_pts == 0:
             self.kernel_show_btn.setText('Showing Kernel')
             self.update_density_fn()
         elif par_obj.show_pts == 1:
             self.kernel_show_btn.setText('Showing Probability')
-            v2.eval_goto_img_fn(par_obj.curr_img,par_obj,self)
+            v2.goto_img_fn_new(par_obj,self,par_obj.curr_img,par_obj.time_pt)
         elif par_obj.show_pts == 2:
             self.kernel_show_btn.setText('Showing Counts')
-            v2.eval_goto_img_fn(par_obj.curr_img,par_obj,self)
+            v2.goto_img_fn_new(par_obj,self,par_obj.curr_img,par_obj.time_pt)
 
     def predShowFn(self):
         #Captures the button event.
@@ -1447,7 +1443,8 @@ class Win_fn(QtGui.QWidget):
         self.report_progress('Model Saved.')
 
     def checkChange(self):
-        v2.eval_goto_img_fn(par_obj.curr_img, par_obj, self)
+        #v2.eval_goto_img_fn(par_obj, self,par_obj.curr_img,par_obj.time_pt)
+        v2.load_and_initiate_plots(par_obj, self,par_obj.curr_img,par_obj.time_pt)
 
 class checkBoxCH(QtGui.QCheckBox):
     def __init__(self):
@@ -1479,7 +1476,7 @@ class checkBoxCH(QtGui.QCheckBox):
             loadWin.canvas1.draw()
         if self.type == 'visual_ch':
             #print 'visualisation changed channel'
-            win.goto_img_fn(par_obj.curr_img)
+            win.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
 
 
 class parameterClass:
@@ -1490,7 +1487,7 @@ class parameterClass:
         #Parameters of sampling
         self.limit_sample = True
         self.limit_ratio = True #whether to use ratio of roi pixels
-        self.limit_ratio_size =21/7 #Gives 3000 patches for 255*255 image.
+        self.limit_ratio_size =21/4 #Gives 3000 patches for 255*255 image.
         self.limit_size = 3000 #patches per image or ROI.
         #Random Forest parameters
         self.pw = 1
@@ -1537,8 +1534,11 @@ class parameterClass:
         self.data_store ={}
         self.data_store[self.time_pt] ={}
         self.data_store[self.time_pt]['dense_arr'] ={}
-        
+
+        self.tiff_reorder=False        
+        self.overlay=False
         self.maxPred=0
+        self.minPred=100
         self.cache_length=15
         self.prev_img=[]
         self.oldImg=[]

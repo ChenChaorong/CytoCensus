@@ -347,18 +347,18 @@ def save_roi_fn(par_obj):
     return False
     
 
-def update_training_samples_fn(par_obj,int_obj,model_num):
+def update_training_samples_fn_new_only(par_obj,int_obj,model_num,tpt,zslice):
     """Collects the pixels or patches which will be used for training and 
     trains the forest."""
     #Makes sure everything is refreshed for the training, encase any regions
     #were changed. May have to be rethinked for speed later on.
-    f_matrix =[]
-    o_patches=[]
+
     region_size = 0
+    '''
     for b in range(0,par_obj.saved_ROI.__len__()):
         rects = par_obj.saved_ROI[b]
-        region_size += rects[4]*rects[3]        
-    
+        region_size += rects[4]*rects[3]       
+    '''
     calc_ratio = par_obj.limit_ratio_size
     
     #print 'calcratio',calc_ratio
@@ -368,24 +368,13 @@ def update_training_samples_fn(par_obj,int_obj,model_num):
 
         #Iterates through saved ROI.
         rects = par_obj.saved_ROI[b]
-        img2load = rects[0]
-
-
-
-        #Loads necessary images only.
-        
-        #try:
-        #    'already loaded'
-            
-        #except:
-        #    'freshly loaded'
-        #    im_pred_inline_fn(par_obj,int_obj,True,img2load,0,img2load-1)
 
         if(par_obj.p_size == 1):
-            if rects[5] == par_obj.time_pt:
+            if rects[5] == tpt and rects[0] == zslice:
+                print rects[5]
                 #Finds and extracts the features and output density for the specific regions.
-                mImRegion = par_obj.data_store[par_obj.time_pt]['feat_arr'][rects[0]][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3],:]
-                denseRegion = par_obj.data_store[par_obj.time_pt]['dense_arr'][rects[0]][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3]]
+                mImRegion = par_obj.data_store[tpt]['feat_arr'][zslice][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3],:]
+                denseRegion = par_obj.data_store[tpt]['dense_arr'][zslice][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3]]
                 #Find the linear form of the selected feature representation
                 mimg_lin = np.reshape(mImRegion, (mImRegion.shape[0]*mImRegion.shape[1],mImRegion.shape[2]))
                 #Find the linear form of the complementatory output region.
@@ -398,215 +387,127 @@ def update_training_samples_fn(par_obj,int_obj,model_num):
                     #Randomly sample from input ROI or im a certain number (par_obj.limit_size) patches. With replacement.
                     indices =  np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
                     #Add to feature vector and output vector.
-                    f_matrix.extend(mimg_lin[indices])
-                    o_patches.extend(dense_lin[indices])
+                    par_obj.f_matrix.extend(mimg_lin[indices])
+                    par_obj.o_patches.extend(dense_lin[indices])
                 else:
                     #Add these to the end of the feature Matrix, input patches
-                    f_matrix.extend(mimg_lin)
+                    par_obj.f_matrix.extend(mimg_lin)
                     #And the the output matrix, output patches
-                    o_patches.extend(dense_lin)
+                    par_obj.o_patches.extend(dense_lin)
         
-            
+
+def update_training_samples_fn_train_only(par_obj,int_obj,model_num):
             
     
+    
+    if par_obj.max_features>par_obj.num_of_feat:
+        par_obj.max_features=par_obj.num_of_feat
     par_obj.RF[model_num] = ExtraTreesRegressor(par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features, bootstrap=True, n_jobs=-1)
     
-
-
     #Fits the data.
     t3 = time.time()
-    print 'fmatrix',np.array(f_matrix).shape
-    print 'o_patches',np.array(o_patches).shape
-    par_obj.RF[model_num].fit(np.asfortranarray(f_matrix), np.asfortranarray(o_patches))
+    print 'fmatrix',np.array(par_obj.f_matrix).shape
+    print 'o_patches',np.array(par_obj.o_patches).shape
+    par_obj.RF[model_num].fit(np.asfortranarray(par_obj.f_matrix), np.asfortranarray(par_obj.o_patches))
     importances = par_obj.RF[model_num].feature_importances_
     indices = np.argsort(importances)[::-1]
     print("Feature ranking:")
-    X=np.asfortranarray(f_matrix)
+    X=np.asfortranarray(par_obj.f_matrix)
     for f in range(X.shape[1]):
         print("%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]]))
     t4 = time.time()
     print 'actual training',t4-t3 
-def update_density_fn(par_obj):
-   
-    for im in par_obj.im_for_train:
-        
-        #Construct empty array for current image.
-        dots_im = np.zeros((par_obj.height,par_obj.width))
-        #In array of all saved dots.
+    par_obj.o_patches=[]
+    par_obj.f_matrix=[]    
+    
+def refresh_all_density(par_obj):
+    number_of_saved_roi=range(0,len(par_obj.saved_ROI))
 
-        for i in range(0,par_obj.saved_dots.__len__()):
-            #Any ROI in the present image.
-            #print 'iiiii',win.saved_dots.__len__()
-            if(par_obj.saved_ROI[i][0] == im and par_obj.saved_ROI[i][5] == par_obj.time_pt):
-                #Save the corresponding dots.
-                dots = par_obj.saved_dots[i]
-                #Scan through the dots
-                for b in range(0,dots.__len__()):
-                   
-                    #save the column and row 
-                    c_dot = dots[b][2]
-                    r_dot = dots[b][1]
-                    #Set it to register as dot.
-                    dots_im[c_dot, r_dot] = 255
-        #Convolve the dots to represent density estimation.
-        dense_im = filters.gaussian_filter(dots_im.astype(np.float32),   float(par_obj.sigma_data), order=0, output=None, mode='reflect', cval=0.0)
-        #Replace member of dense_array with new image.
-        
-        par_obj.data_store[par_obj.time_pt]['dense_arr'][im] = dense_im
+    for it in number_of_saved_roi:
+        tpt=int(par_obj.saved_ROI[it][5])
+        zslice=int(par_obj.saved_ROI[it][0])
+        update_density_fn_new(par_obj,tpt,zslice)
 
-def im_pred_inline_fn(par_obj, int_obj,inline=False,outer_loop=None,inner_loop=None,count=None,threaded=False):
+def update_density_fn_new(par_obj,tpt,zslice):
+    #Construct empty array for current image.
+    dots_im = np.zeros((par_obj.height,par_obj.width))
+    #In array of all saved dots.
+
+    for i in range(0,par_obj.saved_dots.__len__()):
+        #Any ROI in the present image.
+        #print 'iiiii',win.saved_dots.__len__()
+        if(par_obj.saved_ROI[i][0] == zslice and par_obj.saved_ROI[i][5] == tpt):
+            #Save the corresponding dots.
+            dots = par_obj.saved_dots[i]
+            #Scan through the dots
+            for b in range(0,dots.__len__()):
+               
+                #save the column and row 
+                c_dot = dots[b][2]
+                r_dot = dots[b][1]
+                #Set it to register as dot.
+                dots_im[c_dot, r_dot] = 255
+    #Convolve the dots to represent density estimation.
+    dense_im = filters.gaussian_filter(dots_im.astype(np.float32),float(par_obj.sigma_data), order=0, output=None, mode='reflect', cval=0.0)
+    #Replace member of dense_array with new image.
+    
+    par_obj.data_store[tpt]['dense_arr'][zslice] = dense_im
+
+def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,threaded=False,b=0):
     """Accesses TIFF file slice or opens png. Calculates features to indices present in par_obj.left_2_calc"""
     print 'version1'    
-    if inline == False:
-        outer_loop = par_obj.left_2_calc
-        inner_loop_arr = par_obj.frames_2_load
-        count = -1
-    else:
-        #par_obj.feat_arr ={}
-        inner_loop_arr ={outer_loop:[inner_loop]}
-        outer_loop = [outer_loop]
+    imStr = str(par_obj.file_array[b])
+    
+    # consider cropping
+    if par_obj.to_crop == False:
+        par_obj.crop_x1 = 0
+        par_obj.crop_x2=par_obj.width
+        par_obj.crop_y1 = 0
+        par_obj.crop_y2=par_obj.height
+    par_obj.height = par_obj.crop_y2-par_obj.crop_y1
+    par_obj.width = par_obj.crop_x2-par_obj.crop_x1
+    
     if threaded == False:
-                        
-        #Goes through the list of files.
-        for b in outer_loop:
-                
-                imStr = str(par_obj.file_array[b])
-                frames = inner_loop_arr[b]
-                #if par_obj.file_ext== 'tif' or par_obj.file_ext == 'tiff':
-                 #   par_obj.tif_file = TifFile(imStr).asarray()[:,:,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
-    
-                for i in frames:
-                    imRGB=return_imRGB_slice(par_obj,i)
-                    '''
-                    if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
-                        
-                        imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
-                        keyframe = (par_obj.max_zslices*par_obj.time_pt)+ i
-                        
-                        
-                        if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
-                            input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
-                            
-                            for c in range(0,par_obj.ch_active.__len__()):
-                                imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
-                        else:
-                            input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
-                            imRGB[:,:,0] = input_im
-    
-    
-    
-                    elif par_obj.file_ext == 'png':
-                        imRGB = pylab.imread(str(imStr))*255
-                    elif par_obj.file_ext == 'oib'or  par_obj.file_ext == 'oif':
-                        
-                        imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
-    
-                        print 'par_obj.ch_active',par_obj.ch_active
-                        for c in range(0,par_obj.ch_active.__len__()):
-                            
-                            f  = par_obj.oib_prefix+'/s_C'+str(par_obj.ch_active[c]+1).zfill(3)+'Z'+str(i+1).zfill(3)
-                            if par_obj.total_time_pt>0:
-                                f = f+'T'+str(par_obj.time_pt+1).zfill(3)
-                            f = f+'.tif'
-                            
-                            imRGB[:,:,par_obj.ch_active[c]] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
-                    '''
-                    #checks if features for this tp have been calculated already
-                    if par_obj.fresh_features == False:
-                        try:
-                                #Try loading features.
-                                
-                                time1 = time.time()
-                                feat=pickle.load(open(imStr[:-4]+'_'+str(i)+'.p', "rb"))
-                                time2 = time.time()
-                                int_obj.report_progress('Loading Features for Image: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
-                        except:
-                            #If don't exist create them.
-                            int_obj.report_progress('Calculating Features for File: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
-                            feat = feature_create(par_obj,imRGB,imStr,i)
-                    else:
-                        #If you want to ignore previous features which have been saved.
-                        int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(i+1) +' Timepoint: '+str(par_obj.time_pt+1))
-                        feat =feature_create(par_obj,imRGB,imStr,i)
+        for tpt in tptList:
+            for zslice in zsliceList:
+                #checks if features already in array
+                if zslice not in par_obj.data_store[tpt]['feat_arr']:
+                    imRGB=return_imRGB_slice_new(par_obj,zslice,tpt)
+                    #If you want to ignore previous features which have been saved.
+                    int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(zslice+1) +' Timepoint: '+str(tpt+1))
+                    feat =feature_create_threadable(par_obj,imStr,imRGB)
                     par_obj.num_of_feat = feat.shape[2]
-                    par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = feat  
+                    par_obj.data_store[tpt]['feat_arr'][zslice] = feat
     else:
         #threaded version
-                        
-        #Goes through the list of files.
-        for b in outer_loop:
-                
-                imStr = str(par_obj.file_array[b])
-                frames = inner_loop_arr[b]
-                #if par_obj.file_ext== 'tif' or par_obj.file_ext == 'tiff':
-                 #   par_obj.tif_file = TifFile(imStr).asarray()[:,:,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
-    
-    
-                
-                imRGBlist=[]
-                for i in frames:
-                    imRGB=return_imRGB_slice(par_obj,i)
-                    '''
-                    if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
-                        imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
-                        keyframe = (par_obj.max_zslices*par_obj.time_pt)+ i
-                        
-                        
-                        if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
-                            input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
-                            
-                            for c in range(0,par_obj.ch_active.__len__()):
-                                imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
-                        else:
-                            input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
-                            imRGB[:,:,0] = input_im
-    
-    
-    
-                    elif par_obj.file_ext == 'png':
-                        imRGB = pylab.imread(str(imStr))*255
-                    elif par_obj.file_ext == 'oib'or  par_obj.file_ext == 'oif':
-                        
-                        imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
-    
-                        print 'par_obj.ch_active',par_obj.ch_active
-                        for c in range(0,par_obj.ch_active.__len__()):
-                            
-                            f  = par_obj.oib_prefix+'/s_C'+str(par_obj.ch_active[c]+1).zfill(3)+'Z'+str(i+1).zfill(3)
-                            if par_obj.total_time_pt>0:
-                                f = f+'T'+str(par_obj.time_pt+1).zfill(3)
-                            f = f+'.tif'
-                            
-                            imRGB[:,:,par_obj.ch_active[c]] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
-                    '''
+
+        imRGBlist=[]
+        for tpt in tptList:
+            for zslice in zsliceList:
+                if zslice not in par_obj.data_store[tpt]['feat_arr']:
+                    imRGB=return_imRGB_slice_new(par_obj,zslice,tpt)
                     imRGBlist.append(imRGB)
-                            
-                # consider cropping
-                if par_obj.to_crop == False:
-                    par_obj.crop_x1 = 0
-                    par_obj.crop_x2=par_obj.width
-                    par_obj.crop_y1 = 0
-                    par_obj.crop_y2=par_obj.height
-                par_obj.height = par_obj.crop_y2-par_obj.crop_y1
-                par_obj.width = par_obj.crop_x2-par_obj.crop_x1
-                #initiate pool and start caclulating features
-                int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Timepoint: '+str(par_obj.time_pt+1) +' All  Frames')
-                featlist=[]
-                tee1=time.time()
-                pool = ThreadPool(8) 
-                featlist=pool.map(functools.partial(feature_create_threaded,par_obj,imStr),imRGBlist)
-                pool.close() 
-                pool.join() 
-                tee2=time.time()
-                #feat =feature_create(par_obj,imRGB,imStr,i)
-                print tee2-tee1
-                lcount=-1
-                for i in frames:
+                        
+            #initiate pool and start caclulating features
+            int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Timepoint: '+str(tpt+1) +' All  Frames')
+            featlist=[]
+            tee1=time.time()
+            pool = ThreadPool(8) 
+            featlist=pool.map(functools.partial(feature_create_threadable,par_obj,imStr),imRGBlist)
+            pool.close() 
+            pool.join() 
+            tee2=time.time()
+            #feat =feature_create(par_obj,imRGB,imStr,i)
+            print tee2-tee1
+            lcount=-1
+
+            for zslice in zsliceList:
+                if zslice not in par_obj.data_store[tpt]['feat_arr']:
                     lcount=lcount+1
                     feat=featlist[lcount]
-                    int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
+                    int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(zslice+1)+' Timepoint: '+str(tpt+1))
                     par_obj.num_of_feat = feat.shape[2]
-                    par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = feat  
+                    par_obj.data_store[tpt]['feat_arr'][zslice] = feat  
         int_obj.report_progress('Features calculated')
     return
     
@@ -668,7 +569,7 @@ def im_pred_inline_fn_eval(par_obj, int_obj,outer_loop=None,inner_loop=None,thre
         int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Timepoint: '+str(par_obj.time_pt+1) +' All  Frames')
         tee1=time.time()
         pool = ThreadPool(8) 
-        featlist=pool.map(functools.partial(feature_create_threaded,par_obj,imStr),imRGBlist)
+        featlist=pool.map(functools.partial(feature_create_threadable,par_obj,imStr),imRGBlist)
         pool.close() 
         pool.join() 
         tee2=time.time()
@@ -731,33 +632,22 @@ def append_pred_features(par_obj, int_obj,outer_loop=None,inner_loop=None,thread
         int_obj.report_progress('Features calculated')
     return
     
-def return_imRGB_slice(par_obj,i):
-    '''Fetches slice i of current timepoint and file'''
+def return_imRGB_slice_new(par_obj,zslice,tpt):
+    '''Fetches slice zslice of timepoint tpt'''
     if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
         
         imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
-        keyframe = (par_obj.max_zslices*par_obj.time_pt)+ i
-
         if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
-            input_im = par_obj.tiffarray[par_obj.time_pt,i,::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
-            
+            input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
+            if par_obj.tiff_reorder: #deal with the different ordering of separate channels vs. RGB
+                input_im =np.swapaxes(np.swapaxes(input_im,0,1),1,2)
             for c in range(0,par_obj.ch_active.__len__()):
                 imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
         else:
-            input_im = par_obj.tiffarray[par_obj.time_pt,i,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
+            input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
             imRGB[:,:,0] = input_im[:,:]
-                
-        '''
-        if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
-            input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
-            
-            for c in range(0,par_obj.ch_active.__len__()):
-                imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
-        else:
-            input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
-            imRGB[:,:,0] = input_im
-        '''
-
+            imRGB[:,:,1] = input_im[:,:]
+            imRGB[:,:,2] = input_im[:,:]
 
     elif par_obj.file_ext == 'png':
         imRGB = pylab.imread(str(imStr))*255
@@ -768,14 +658,15 @@ def return_imRGB_slice(par_obj,i):
         print 'par_obj.ch_active',par_obj.ch_active
         for c in range(0,par_obj.ch_active.__len__()):
             
-            f  = par_obj.oib_prefix+'/s_C'+str(par_obj.ch_active[c]+1).zfill(3)+'Z'+str(i+1).zfill(3)
+            f  = par_obj.oib_prefix+'/s_C'+str(par_obj.ch_active[c]+1).zfill(3)+'Z'+str(zslice+1).zfill(3)
             if par_obj.total_time_pt>0:
-                f = f+'T'+str(par_obj.time_pt+1).zfill(3)
+                f = f+'T'+str(tpt+1).zfill(3)
             f = f+'.tif'
             
             imRGB[:,:,par_obj.ch_active[c]] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
     return imRGB
-def feature_create_threaded(par_obj,imStr,imRGB):
+    
+def feature_create_threadable(par_obj,imStr,imRGB):
     time1 = time.time()
     
     if (par_obj.feature_type == 'basic'):
@@ -786,12 +677,21 @@ def feature_create_threaded(par_obj,imStr,imRGB):
     for b in range(0,par_obj.ch_active.__len__()):
         if (par_obj.feature_type == 'basic'):
             imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
-            feat[:,:,(b*13):((b+1)*13)] = local_shape_features_basic(imG,par_obj.feature_scale)   
+
+            feat[:,:,(b*13):((b+1)*13)] = local_shape_features_basic(imG,par_obj.feature_scale)  
+            
         if (par_obj.feature_type == 'fine'):
             imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
+
             feat[:,:,(b*21):((b+1)*21)] = local_shape_features_fine(imG,par_obj.feature_scale)
 
-
+    if par_obj.numCH==0:
+        imG = imRGB[:,:,0].astype(np.float32)
+        if (par_obj.feature_type == 'basic'):
+            feat = local_shape_features_basic(imRGB[:,:,0].astype(np.float32),par_obj.feature_scale)  
+        if (par_obj.feature_type == 'fine'):
+            feat = local_shape_features_fine(imRGB[:,:,0].astype(np.float32),par_obj.feature_scale)  
+            
     return feat
 def feature_create(par_obj,imRGB,imStr,i):
     time1 = time.time()
@@ -895,6 +795,7 @@ def evaluate_forest(par_obj,int_obj,withGT,model_num,inline=False,inner_loop=Non
 
     #Finds the current frame and file.
     par_obj.maxPred=0 #resets scaling for display between models
+    par_obj.minPred=100
     for b in outer_loop:
         frames =inner_loop_arr[b]
         for i in frames:
@@ -920,7 +821,9 @@ def evaluate_forest(par_obj,int_obj,withGT,model_num,inline=False,inner_loop=Non
             par_obj.data_store[par_obj.time_pt]['pred_arr'][i] = linPred.reshape(par_obj.height, par_obj.width)
 
             maxPred = np.max(linPred)
+            minPred = np.min(linPred)
             par_obj.maxPred=max([par_obj.maxPred,maxPred])
+            par_obj.minPred=min([par_obj.minPred,minPred])
             sum_pred =np.sum(linPred/255)
             par_obj.data_store[par_obj.time_pt]['sum_pred'][i] = sum_pred
             print 'prediction time taken',t1 - t2
@@ -936,12 +839,51 @@ def evaluate_forest(par_obj,int_obj,withGT,model_num,inline=False,inner_loop=Non
                     #Else find the file.
                     gt_im =  pylab.imread(par_obj.data_store[par_obj.time_pt]['gt_array'][i])[:,:,0]
                     par_obj.data_store[par_obj.time_pt]['gt_sum'][i] = np.sum(gt_im)
+        
+
+def evaluate_forest_new(par_obj,int_obj,withGT,model_num,zsliceList,tptList,threaded=False,b=0):
+
+    #Finds the current frame and file.
+    par_obj.maxPred=0 #resets scaling for display between models
+    par_obj.minPred=100
+    for tpt in tptList:
+        for zslice in zsliceList:
+            if(par_obj.p_size >1):
+                
+                mimg_lin,dense_linPatch, pos = extractPatch(par_obj.p_size, par_obj.feat_arr[zslice], None, 'dense')
+                tree_pred = par_obj.RF[model_num].predict(mimg_lin)
+                linPred = v2.regenerateImg(par_obj.p_size, tree_pred, pos)
+                    
+            else:
+                
+                mimg_lin = np.reshape(par_obj.data_store[tpt]['feat_arr'][zslice], (par_obj.height * par_obj.width, par_obj.data_store[tpt]['feat_arr'][zslice].shape[2]))
+                t2 = time.time()
+                linPred = par_obj.RF[model_num].predict(mimg_lin)
+                t1 = time.time()
                 
 
-            
 
+            par_obj.data_store[tpt]['pred_arr'][zslice] = linPred.reshape(par_obj.height, par_obj.width)
 
+            maxPred = np.max(linPred)
+            minPred = np.min(linPred)
+            par_obj.maxPred=max([par_obj.maxPred,maxPred])
+            par_obj.minPred=min([par_obj.minPred,minPred])
+            sum_pred =np.sum(linPred/255)
+            par_obj.data_store[tpt]['sum_pred'][zslice] = sum_pred
+            print 'prediction time taken',t1 - t2
+            print 'Predicted i:',par_obj.data_store[tpt]['sum_pred'][zslice]
+            int_obj.report_progress('Making Prediction for Image: '+str(b+1)+' Frame: ' +str(zslice+1)+' Timepoint: '+str(tpt+1))
+                    
 
+            if withGT == True:
+                try:
+                    #If it has already been opened.
+                    a = par_obj.data_store[tpt]['gt_sum'][zslice]
+                except:
+                    #Else find the file.
+                    gt_im =  pylab.imread(par_obj.data_store[tpt]['gt_array'][zslice])[:,:,0]
+                    par_obj.data_store[tpt]['gt_sum'][zslice] = np.sum(gt_im)
 
 
 def local_shape_features_fine(im,scaleStart):
@@ -1036,137 +978,161 @@ def local_shape_features_basic(im,scaleStart):
     '''
     
     return f
+def channels_for_display(par_obj, int_obj,imRGB):
+    '''deals with displaying different channels'''
+    count = 0
+    CH = [0]*5 #up to 5 channels-get checkbox values
+    for c in range(0,par_obj.numCH):
+        name = 'a = int_obj.CH_cbx'+str(c)+'.checkState()'
+        exec(name)
+        if a ==2: #presumably a==2 if checked
+            count = count + 1
+            CH[c] = 1
 
-def eval_goto_img_fn(im_num, par_obj, int_obj):
-    """Loads up and converts image to correct format"""
+    newImg =np.zeros((par_obj.height,par_obj.width,3))
     
-    #Finds the current frame and file.
-    count = -1
-    for b in par_obj.left_2_calc:
-        frames =par_obj.frames_2_load[b]
-        for i in frames:
-            count = count+1
-            if par_obj.curr_img == count:
-                break;
+    if count == 0 and par_obj.numCH==0: #deals with the none-ticked case
+        newImg = imRGB
+    elif count == 1: #only one channel selected-display in grayscale
+        
+        if imRGB.shape> 2: #has colour channels
+            ch = par_obj.ch_active[np.where(np.array(CH)==1)[0]]
+            newImg[:,:,0]=imRGB[:,:,ch]
+            newImg[:,:,1]=imRGB[:,:,ch]
+            newImg[:,:,2]=imRGB[:,:,ch]
         else:
-            continue 
-        break 
-    par_obj.tiffarray=par_obj.tiff_file.asarray(memmap=True)
-    #check if have accessed image recently and get index, t, use that image rather than reading from disk
-    if (par_obj.curr_img,par_obj.time_pt) in par_obj.prev_img:
-        #print 'using stored image for speed'
-        t=par_obj.prev_img.index((par_obj.curr_img,par_obj.time_pt))
-        newImg=par_obj.oldImg[t]
+            newImg[:,:,0] = imRGB
+            newImg[:,:,1] = imRGB
+            newImg[:,:,2] = imRGB
     else:
-        if ( par_obj.file_ext == 'png'):
-            imStr = str(par_obj.file_array[b])
-            imRGB = pylab.imread(imStr)*255
-        '''
-        if ( par_obj.file_ext == 'tif' or  par_obj.file_ext == 'tiff'):
-            imStr = str(par_obj.file_array[b])
-            temp = TiffFile(imStr)
-            imRGB = np.zeros((int(par_obj.height),int(par_obj.width),par_obj.ch_active.__len__()))
-            keyframe = (par_obj.max_zslices*par_obj.time_pt)+ im_num
-            if par_obj.numCH > 1:
-                input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
-                
-                imRGB = input_im
-            else:
-                input_im = par_obj.tiff_file.asarray(key=keyframe)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
-                imRGB[:,:,0] = input_im[:,:]
-        '''
-        if ( par_obj.file_ext == 'tif' or  par_obj.file_ext == 'tiff'):
-            imStr = str(par_obj.file_array[b])
-            temp = TiffFile(imStr)
-            imRGB = np.zeros((int(par_obj.height),int(par_obj.width),par_obj.ch_active.__len__()))
-            keyframe = (par_obj.max_zslices*par_obj.time_pt)+ im_num
-            if par_obj.numCH > 1:
-                input_im = par_obj.tiffarray[par_obj.time_pt,im_num,::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
-                
-                imRGB = input_im
-            else:
-                input_im = par_obj.tiffarray[par_obj.time_pt,im_num,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
-                imRGB[:,:,0] = input_im[:,:]
-                
-        if ( par_obj.file_ext == 'oib' or par_obj.file_ext == 'oif'):
-            imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
-            for c in range(0,par_obj.numCH):
-                f  = par_obj.oib_prefix+'/s_C'+str(c+1).zfill(3)+'Z'+str(i+1).zfill(3)
-                if par_obj.total_time_pt>0:
-                    f = f+'T'+str(par_obj.time_pt+1).zfill(3)
-                f = f+'.tif'
-    
-                imRGB[:,:,c] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
-                
-        
-    
-        count = 0
-        CH = [0]*5
-        for c in range(0,par_obj.numCH):
-            name = 'a = int_obj.CH_cbx'+str(c)+'.checkState()'
-            exec(name)
-            if a ==2:
-                count = count + 1
-                CH[c] = 1
-    
-        newImg =np.zeros((par_obj.height,par_obj.width,3))
-        
-        if count == 0 and par_obj.numCH==0:
-            newImg = imRGB[:,:,0]
-            
-    
-        elif count == 1:
-            
-            if imRGB.shape> 2:
-                ch = par_obj.ch_active[np.where(np.array(CH)==1)[0]]
-                newImg[:,:,0] = imRGB[:,:,ch]
-                newImg[:,:,1] = imRGB[:,:,ch]
-                newImg[:,:,2] = imRGB[:,:,ch]
-            else:
-                newImg[:,:,0] = imRGB
-                newImg[:,:,1] = imRGB
-                newImg[:,:,2] = imRGB
-        else:
-            if CH[0] == 1:
-                newImg[:,:,0] = imRGB[:,:,0]
-            if CH[1] == 1:
-                newImg[:,:,1] = imRGB[:,:,1]
-            if CH[2] == 1:
-                newImg[:,:,2] = imRGB[:,:,2]
-    
-        
-        par_obj.save_im = imRGB
+        if CH[0] == 1:
+            newImg[:,:,0] = imRGB[:,:,0]
+        if CH[1] == 1:
+            newImg[:,:,1] = imRGB[:,:,1]
+        if CH[2] == 1:
+            newImg[:,:,2] = imRGB[:,:,2]
 
+    return newImg
+    
+def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
+    """Loads up requested image and displays"""
+    b=0
+    #Finds the current frame and file.
+    imRGB=return_imRGB_slice_new(par_obj,zslice,tpt)
+    #deals with displaying different channels
+    newImg=channels_for_display(par_obj, int_obj,imRGB)
+
+    if par_obj.overlay and zslice in par_obj.data_store[tpt]['pred_arr']:
+        newImg[:,:,2]= 1-(par_obj.data_store[tpt]['pred_arr'][zslice])/par_obj.maxPred
+    par_obj.save_im = imRGB
     for i in range(0,int_obj.plt1.lines.__len__()):
         int_obj.plt1.lines.pop(0)
-        
-    if (par_obj.curr_img,par_obj.time_pt) not in par_obj.prev_img: #append set of images to list if not already there
-        par_obj.oldImg.append(newImg)
-        par_obj.prev_img.append((par_obj.curr_img,par_obj.time_pt))
-    if len(par_obj.prev_img)>par_obj.cache_length: #delete cached images if cache full (first in)
-        par_obj.prev_img.pop(0)
-        par_obj.oldImg.pop(0)
-        
+      
     par_obj.newImg = newImg
+    
+    int_obj.plt1.images[0].set_data(256-newImg)
+    int_obj.plt1.set_xlim([0,newImg.shape[0]])
+    int_obj.plt1.set_ylim([newImg.shape[1],0])
+    int_obj.plt1.axis("off")
+    #int_obj.plt1.set_xticklabels([])
+    #int_obj.plt1.set_yticklabels([])
+    int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_img+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
+
+    """Deals with displaying Kernel/Prediction/Counts""" 
+    int_obj.image_num_txt.setText('The Current Image is No. ' + str(zslice+1)+' and the time point is: '+str(tpt+1))
+
+    #if int_obj.count_maxima_plot_on.isChecked() == True:
+    #    par_obj.show_pts = True
+    #else:
+#        par_obj.show_pts = False
+
+
+    im2draw = np.zeros((par_obj.height,par_obj.width))
+    if par_obj.show_pts == 0:
+        if zslice in par_obj.data_store[tpt]['dense_arr']:
+            im2draw = par_obj.data_store[tpt]['dense_arr'][zslice].astype(np.float32)
+        int_obj.plt2.images[0].set_data(im2draw)
+        int_obj.plt2.images[0].autoscale()
+
+        
+        
+    elif par_obj.show_pts == 1:
+        if zslice in par_obj.data_store[tpt]['pred_arr']:
+            im2draw = par_obj.data_store[tpt]['pred_arr'][zslice].astype(np.float32)
+        int_obj.plt2.images[0].set_data(im2draw)
+        int_obj.plt2.images[0].set_clim(None,par_obj.maxPred)
+        
+    elif par_obj.show_pts == 2:
+        #show det(hessian) array, and (I assume) the green circles?
+        pt_x = []
+        pt_y = []
+        pts = par_obj.data_store[tpt]['pts']
+        
+        ind = np.where(np.array(par_obj.frames_2_load[0]) == zslice)
+        #print 'ind',ind
+        for pt2d in pts:
+            if pt2d[2] == ind:
+                    pt_x.append(pt2d[1])
+                    pt_y.append(pt2d[0])
+
+
+        int_obj.plt1.plot(pt_x,pt_y, 'go')
+        int_obj.plt2.plot(pt_x,pt_y, 'go')
+        string_2_show = 'The Predicted Count: ' + str(pts.__len__())
+        if zslice in par_obj.data_store[tpt]['maxi_arr']:
+            im2draw = par_obj.data_store[tpt]['maxi_arr'][zslice].astype(np.float32)
+        int_obj.plt2.images[0].set_data(im2draw)
+        int_obj.plt2.images[0].set_clim(0,255)
+
+    int_obj.plt2.axis("off")
+    int_obj.plt2.set_xlim([0,newImg.shape[0]])
+    int_obj.plt2.set_ylim([newImg.shape[1],0])
+    int_obj.cursor.draw_ROI()
+    int_obj.draw_saved_dots_and_roi()
+    int_obj.canvas1.draw()
+    int_obj.canvas2.draw()
+
+def load_and_initiate_plots(par_obj, int_obj,zslice,tpt):
+    """prepare plots and data for display"""
+    b=0
+    #Finds the current frame and file.
+
+    if ( par_obj.file_ext == 'png'):
+        imStr = str(par_obj.file_array[b])
+        imRGB = pylab.imread(imStr)*255
+
+    if ( par_obj.file_ext == 'tif' or  par_obj.file_ext == 'tiff'):
+        par_obj.tiffarray=par_obj.tiff_file.asarray(memmap=True)
+            
+    if ( par_obj.file_ext == 'oib' or par_obj.file_ext == 'oif'):
+        imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
+        for c in range(0,par_obj.numCH):
+            f  = par_obj.oib_prefix+'/s_C'+str(c+1).zfill(3)+'Z'+str(zslice+1).zfill(3)
+            if par_obj.total_time_pt>0:
+                f = f+'T'+str(tpt+1).zfill(3)
+            f = f+'.tif'
+            imRGB[:,:,c] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
+     
+    newImg=np.zeros((int(par_obj.height),int(par_obj.width),3))
     int_obj.plt1.cla()
     int_obj.plt1.imshow(256-newImg)
     int_obj.plt1.set_xlim([0,newImg.shape[0]])
     int_obj.plt1.set_ylim([newImg.shape[1],0])
-    int_obj.draw_saved_dots_and_roi()
-    int_obj.plt1.set_xticklabels([])
-    int_obj.plt1.set_yticklabels([])
-    
+    int_obj.plt1.axis("off")
     int_obj.cursor.draw_ROI()
-    int_obj.canvas1.draw()
-    
-    int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_img+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
-    eval_pred_show_fn(im_num,par_obj,int_obj)
 
-def eval_pred_show_fn(im_num,par_obj,int_obj):
+    int_obj.plt2.cla()
+    int_obj.plt2.imshow(newImg)
+    int_obj.plt2.axis("off")
+    int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_img+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
+
+    goto_img_fn_new(par_obj, int_obj,zslice,tpt)
+    
+def eval_pred_show_fn(par_obj,int_obj,zslice,tpt):
     """Shows Prediction Image when forest is loaded"""
     if par_obj.eval_load_im_win_eval == True:
         
-        int_obj.image_num_txt.setText('The Current Image is No. ' + str(par_obj.curr_img+1)+' and the time point is: '+str(par_obj.time_pt+1))
+        int_obj.image_num_txt.setText('The Current Image is No. ' + str(zslice+1)+' and the time point is: '+str(tpt+1))
 
         #if int_obj.count_maxima_plot_on.isChecked() == True:
         #    par_obj.show_pts = True
@@ -1176,23 +1142,23 @@ def eval_pred_show_fn(im_num,par_obj,int_obj):
         int_obj.plt2.cla()
         if par_obj.show_pts == 0:
             im2draw = np.zeros((par_obj.height,par_obj.width))
-            for ind in par_obj.data_store[par_obj.time_pt]['dense_arr']:
-                if ind == im_num:
-                    im2draw = par_obj.data_store[par_obj.time_pt]['dense_arr'][im_num].astype(np.float32)
+            for ind in par_obj.data_store[tpt]['dense_arr']:
+                if ind == zslice:
+                    im2draw = par_obj.data_store[tpt]['dense_arr'][zslice].astype(np.float32)
             int_obj.plt2.imshow(im2draw)
         if par_obj.show_pts == 1:
             im2draw = np.zeros((par_obj.height,par_obj.width))
-            for ind in par_obj.data_store[par_obj.time_pt]['pred_arr']:
-                if ind == im_num:
-                    im2draw = par_obj.data_store[par_obj.time_pt]['pred_arr'][im_num].astype(np.float32)
+            for ind in par_obj.data_store[tpt]['pred_arr']:
+                if ind == zslice:
+                    im2draw = par_obj.data_store[tpt]['pred_arr'][zslice].astype(np.float32)
             int_obj.plt2.imshow(im2draw,vmax=par_obj.maxPred)
         if par_obj.show_pts == 2:
             
             pt_x = []
             pt_y = []
-            pts = par_obj.data_store[par_obj.time_pt]['pts']
+            pts = par_obj.data_store[tpt]['pts']
             
-            ind = np.where(np.array(par_obj.frames_2_load[0]) == par_obj.curr_img)
+            ind = np.where(np.array(par_obj.frames_2_load[0]) == zslice)
             print 'ind',ind
             for pt2d in pts:
                 if pt2d[2] == ind:
@@ -1205,18 +1171,11 @@ def eval_pred_show_fn(im_num,par_obj,int_obj):
             string_2_show = 'The Predicted Count: ' + str(pts.__len__())
             int_obj.output_count_txt.setText(string_2_show)
             im2draw = np.zeros((par_obj.height,par_obj.width))
-            for ind in par_obj.data_store[par_obj.time_pt]['maxi_arr']:
-                if ind == im_num:
-                    im2draw = par_obj.data_store[par_obj.time_pt]['maxi_arr'][im_num].astype(np.float32)
+            for ind in par_obj.data_store[tpt]['maxi_arr']:
+                if ind == zslice:
+                    im2draw = par_obj.data_store[tpt]['maxi_arr'][zslice].astype(np.float32)
             d = int_obj.plt2.imshow(im2draw)
             d.set_clim(0,255)
-
-            
-        
-        
-        
-        
-
 
         int_obj.plt2.set_xticklabels([])
         int_obj.plt2.set_yticklabels([])
@@ -1244,12 +1203,8 @@ def import_data_fn(par_obj,file_array):
             if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
                 par_obj.tiff_file = TiffFile(imStr)
                 meta = par_obj.tiff_file.series[0]
-
-                
                 
                 order = meta.axes
-                
-
                 for n,b in enumerate(order):
                     if b == 'T':
                         par_obj.total_time_pt = meta.shape[n]
@@ -1261,28 +1216,24 @@ def import_data_fn(par_obj,file_array):
                         par_obj.ori_width = meta.shape[n]
                     if b == 'S':
                         par_obj.numCH = meta.shape[n]
-
-
+                        par_obj.tiff_reorder=False
+                    if b == 'C':
+                        par_obj.numCH = meta.shape[n]
+                        par_obj.tiff_reorder=True
+                        
                 par_obj.bitDepth = meta.dtype
                 par_obj.test_im_end = par_obj.max_zslices
                 par_obj.tiffarray=par_obj.tiff_file.asarray(memmap=True)
                 imRGB = par_obj.tiffarray[0,0,::par_obj.resize_factor,::par_obj.resize_factor]
-                
-
-
-                
-                
+                if par_obj.tiff_reorder:
+                    imRGB =np.swapaxes(np.swapaxes(imRGB,0,1),1,2)
                 if par_obj.test_im_end > 8:
                     par_obj.uploadLimit = 8
                 else:
                     par_obj.uploadLimit = par_obj.test_im_end
             elif par_obj.file_ext == 'oib'or  par_obj.file_ext == 'oif':
                 par_obj.oib_file = OifFile(imStr)
-                
                 meta = par_obj.oib_file.meta_data(imStr)
-
-                
-               
 
                 order = meta[1]
                 for n,b in enumerate(order):
@@ -1300,10 +1251,6 @@ def import_data_fn(par_obj,file_array):
                     if b == 'X':
                         par_obj.ori_width = meta[3]['shape'][n]
                 
-                
-
-                
-
                 par_obj.bitDepth = meta[3]['dtype']
                 imRGB = np.zeros((par_obj.ori_height/par_obj.resize_factor,par_obj.ori_width/par_obj.resize_factor,3))
                 for c in range(0,par_obj.numCH):
@@ -1333,7 +1280,7 @@ def import_data_fn(par_obj,file_array):
             else:
                  statusText = 'Status: Image format not-recognised. Please choose either png or TIFF files.'
                  return False, statusText
-
+            #pdb.set_trace()
             #Error Checking File Extension
             par_obj.prevExt = par_obj.file_ext
             #Error Checking number of cahnnels.
@@ -1356,12 +1303,16 @@ def import_data_fn(par_obj,file_array):
     par_obj.im_num_range = range(par_obj.test_im_start, par_obj.test_im_end)
     par_obj.num_of_train_im = par_obj.test_im_end - par_obj.test_im_start
     
-    
+    #pdb.set_trace()
     if imRGB.shape.__len__() > 2:
     #If images have more than three channels. 
-        if imRGB.shape[2]>1:
-            #If the shape of the third dimension is greater than 2.
+        if imRGB.shape[2]==3:
+            #three channels.
             par_obj.ex_img = imRGB[:,:,:]
+        elif imRGB.shape[2]==2:
+            #2 channels.
+            par_obj.ex_img=np.zeros((par_obj.ori_height,par_obj.ori_width,3))
+            par_obj.ex_img[:,:,0:2] = imRGB
         else:
             #If the size of the third dimenion is just 1, this is invalid for imshow show we have to adapt.
             par_obj.ex_img = imRGB[:,:,0]
@@ -1375,23 +1326,14 @@ def import_data_fn(par_obj,file_array):
 def save_output_prediction_fn(par_obj,int_obj):
     #funky ordering TZCYX
     image = np.zeros([par_obj.total_time_pt,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'float32')
-    count = -1
-    print 'probably broken'
     for tpt in par_obj.time_pt_list:
 
         #for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
-        for i in range(0,par_obj.max_zslices):
-            '''
-            count=count+1
-            n = str(count)
-            string = par_obj.csvPath+'output' + n.zfill(3)+'.tif'
-            im_to_save= PIL.Image.fromarray(par_obj.data_store[tpt]['pred_arr'][i].astype(np.float32))
-            im_to_save.save(string)
-            '''
-            image[tpt,i,:,:,:]=par_obj.data_store[tpt]['pred_arr'][i].astype(np.float32)
+        for zslice in range(0,par_obj.max_zslices):
+
+            image[tpt,zslice,0,:,:]=par_obj.data_store[tpt]['pred_arr'][zslice].astype(np.float32)
     print 'Prediction written to disk'
-    _imagej_metadata = dict([("ImageJ","1.47a"),("images",np.size(image)),("channels",1),("slices",par_obj.max_zslices),("frames",par_obj.total_time_pt),("hyperstack","true"),("mode","composite"),("loop","false")])
-    imsave('Newput.tif', np.reshape(image,[par_obj.height,par_obj.width,par_obj.max_zslices* par_obj.total_time_pt]))
+    imsave(par_obj.csvPath+'Newput.tif', imagej=True)
 def save_output_data_fn(par_obj,int_obj):
     local_time = time.asctime( time.localtime(time.time()) )
 
