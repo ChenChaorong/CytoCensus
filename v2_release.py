@@ -530,7 +530,7 @@ class Load_win_fn(QtGui.QWidget):
         par_obj.test_im_end= count
 
 
-        par_obj.curr_img = par_obj.frames_2_load[0][0]
+        par_obj.curr_z = par_obj.frames_2_load[0][0]
 
         self.image_status_text.showMessage('Status: Images loaded. Click \'Goto Training\'')
         self.selIntButton.setEnabled(True)
@@ -621,7 +621,7 @@ class Win_fn(QtGui.QWidget):
         self.next_time_btn.setEnabled(True)
 
         #Sets the current text.
-        self.image_num_txt.setText(' Image is: ' + str(par_obj.curr_img +1))
+        self.image_num_txt.setText(' Image is: ' + str(par_obj.curr_z +1))
         self.count_txt = QtGui.QLabel()
 
         #Sets up the button which saves the ROI.
@@ -872,12 +872,12 @@ class Win_fn(QtGui.QWidget):
         if par_obj.saved_ROI !=[]:
             v2.refresh_all_density(par_obj)
             self.train_model_btn.setEnabled(True)
-        self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+        self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
     def overlay_prediction_btn_fn(self):
         par_obj.overlay=not par_obj.overlay
-        self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+        self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
     def replot_fn(self):
-            v2.eval_pred_show_fn(par_obj.curr_img,par_obj,self)
+            v2.eval_pred_show_fn(par_obj.curr_z,par_obj,self)
     def count_maxima_btn_fn(self):
         predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.num_of_train_im))
         for i in range(0,par_obj.frames_2_load[0].__len__()):
@@ -1035,7 +1035,7 @@ class Win_fn(QtGui.QWidget):
                             appendDot = False
 
                 if(appendDot == True):
-                    par_obj.dots.append((par_obj.curr_img,x,y))
+                    par_obj.dots.append((par_obj.curr_z,x,y))
                     i = par_obj.dots[-1]
                     self.plt1.autoscale(False)
                     self.plt1.plot([i[1]-5,i[1]+5],[i[2],i[2]],'-',color='r')
@@ -1043,11 +1043,11 @@ class Win_fn(QtGui.QWidget):
                     self.canvas1.draw()
 
         if(par_obj.remove_dots == True):
-            #par_obj.pixMap = QtGui.QPixmap(q2r.rgb2qimage(par_obj.imgs[par_obj.curr_img]))
+            #par_obj.pixMap = QtGui.QPixmap(q2r.rgb2qimage(par_obj.imgs[par_obj.curr_z]))
             x = event.xdata
             y = event.ydata
             self.draw_saved_dots_and_roi()
-            print 'curr_img',par_obj.curr_img
+            print 'curr_z',par_obj.curr_z
             print 'timepoint',par_obj.time_pt
             #Are we with an existing box.
             if(x > par_obj.rects[1]-par_obj.roi_tolerance and x < (par_obj.rects[1]+ par_obj.rects[3])+par_obj.roi_tolerance and y > par_obj.rects[2]-par_obj.roi_tolerance and y < (par_obj.rects[2]+ par_obj.rects[4])+par_obj.roi_tolerance):
@@ -1192,7 +1192,7 @@ class Win_fn(QtGui.QWidget):
         par_obj.rect_h =0
 
 
-        self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+        self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
         #Now we update a density image of the current Image.
         self.update_density_fn()
 
@@ -1200,11 +1200,11 @@ class Win_fn(QtGui.QWidget):
     def update_density_fn(self):
         #Construct empty array for current image.
         tpt=par_obj.time_pt
-        zslice=par_obj.curr_img
+        zslice=par_obj.curr_z
         
         v2.update_density_fn_new(par_obj,tpt,zslice)
         
-        self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+        self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
         '''
         self.plt2.cla()
         self.plt2.imshow(par_obj.data_store[tpt]['dense_arr'][zslice])
@@ -1214,37 +1214,37 @@ class Win_fn(QtGui.QWidget):
         self.canvas2.draw()
     def draw_saved_dots_and_roi(self):
         for i in range(0,par_obj.subdivide_ROI.__len__()):
-            if(par_obj.subdivide_ROI[i][0] ==par_obj.curr_img and par_obj.subdivide_ROI[i][5] == par_obj.time_pt):
+            if(par_obj.subdivide_ROI[i][0] ==par_obj.curr_z and par_obj.subdivide_ROI[i][5] == par_obj.time_pt):
                 rects =par_obj.subdivide_ROI[i]
                 dots = []
                 self.dots_and_square(dots,rects,'w')
         for i in range(0,par_obj.saved_dots.__len__()):
-            if(par_obj.saved_ROI[i][0] == par_obj.curr_img and par_obj.saved_ROI[i][5] == par_obj.time_pt):
+            if(par_obj.saved_ROI[i][0] == par_obj.curr_z and par_obj.saved_ROI[i][5] == par_obj.time_pt):
                 dots = par_obj.saved_dots[i]
                 rects = par_obj.saved_ROI[i]
                 self.dots_and_square(dots,rects,'w')
 
     def prev_im_btn_fn(self):
         for ind, zim in enumerate(par_obj.frames_2_load[0]):
-            if zim == par_obj.curr_img:
+            if zim == par_obj.curr_z:
                 if ind > 0:
-                    par_obj.curr_img  = par_obj.frames_2_load[0][ind-1]
-                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+                    par_obj.curr_z  = par_obj.frames_2_load[0][ind-1]
+                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
                     break;
 
     def next_im_btn_fn(self):
          for ind, zim in enumerate(par_obj.frames_2_load[0]):
-            if zim == par_obj.curr_img:
+            if zim == par_obj.curr_z:
                 if ind < par_obj.frames_2_load[0].__len__()-1:
-                    par_obj.curr_img  = par_obj.frames_2_load[0][ind+1]
-                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+                    par_obj.curr_z  = par_obj.frames_2_load[0][ind+1]
+                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
                     break;
     def prev_time_btn_fn(self):
         for ind, tim in enumerate(par_obj.time_pt_list):
             if tim == par_obj.time_pt:
                 if ind > 0:
                     par_obj.time_pt  = par_obj.time_pt_list[ind-1]
-                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
                     break;
 
     def next_time_btn_fn(self):
@@ -1253,7 +1253,7 @@ class Win_fn(QtGui.QWidget):
             if tim == par_obj.time_pt:
                 if ind < par_obj.time_pt_list.__len__()-1:
                     par_obj.time_pt  = par_obj.time_pt_list[ind+1]
-                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
 
                     break;
 
@@ -1285,7 +1285,7 @@ class Win_fn(QtGui.QWidget):
             par_obj.draw_dots = False
             par_obj.remove_dots = False
             for i in range(0,par_obj.saved_ROI.__len__()):
-                if(par_obj.saved_ROI[i][0] == par_obj.curr_img and par_obj.saved_ROI[i][5] == par_obj.time_pt):
+                if(par_obj.saved_ROI[i][0] == par_obj.curr_z and par_obj.saved_ROI[i][5] == par_obj.time_pt):
                     par_obj.ROI_index.append(i)
             for b in range(0,par_obj.ROI_index.__len__()):
                 dots = par_obj.saved_dots[par_obj.ROI_index[b]]
@@ -1307,7 +1307,7 @@ class Win_fn(QtGui.QWidget):
         par_obj.saved_dots = []
         par_obj.saved_ROI = []
         par_obj.data_store[range(par_obj.total_time_pt)]['dense_arr'] = {}
-        self.goto_img_fn(par_obj.curr_img)
+        self.goto_img_fn(par_obj.curr_z)
         self.update_density_fn()
         self.train_model_btn.setEnabled(False)
         self.clear_dots_btn.setEnabled(False)
@@ -1358,7 +1358,7 @@ class Win_fn(QtGui.QWidget):
         self.feat_scale_change_btn.setEnabled(True)
         self.image_status_text.showMessage('Model Trained. Continue adding samples, or click \'Save Training Model\'. ')
         self.save_model_btn.setEnabled(True)
-        v2.eval_pred_show_fn(par_obj.curr_img,par_obj,self)
+        v2.eval_pred_show_fn(par_obj.curr_z,par_obj,self)
 
     def kernel_btn_fn(self,set=False):
         """Shows the kernels on the image."""
@@ -1378,14 +1378,14 @@ class Win_fn(QtGui.QWidget):
             self.update_density_fn()
         elif par_obj.show_pts == 1:
             self.kernel_show_btn.setText('Showing Probability')
-            v2.goto_img_fn_new(par_obj,self,par_obj.curr_img,par_obj.time_pt)
+            v2.goto_img_fn_new(par_obj,self,par_obj.curr_z,par_obj.time_pt)
         elif par_obj.show_pts == 2:
             self.kernel_show_btn.setText('Showing Counts')
-            v2.goto_img_fn_new(par_obj,self,par_obj.curr_img,par_obj.time_pt)
+            v2.goto_img_fn_new(par_obj,self,par_obj.curr_z,par_obj.time_pt)
 
     def predShowFn(self):
         #Captures the button event.
-        v2.eval_pred_show_fn(par_obj.curr_img,par_obj,self)
+        v2.eval_pred_show_fn(par_obj.curr_z,par_obj,self)
 
     def saveForestFn(self):
 
@@ -1443,8 +1443,8 @@ class Win_fn(QtGui.QWidget):
         self.report_progress('Model Saved.')
 
     def checkChange(self):
-        #v2.eval_goto_img_fn(par_obj, self,par_obj.curr_img,par_obj.time_pt)
-        v2.load_and_initiate_plots(par_obj, self,par_obj.curr_img,par_obj.time_pt)
+        #v2.eval_goto_img_fn(par_obj, self,par_obj.curr_z,par_obj.time_pt)
+        v2.load_and_initiate_plots(par_obj, self,par_obj.curr_z,par_obj.time_pt)
 
 class checkBoxCH(QtGui.QCheckBox):
     def __init__(self):
@@ -1476,7 +1476,7 @@ class checkBoxCH(QtGui.QCheckBox):
             loadWin.canvas1.draw()
         if self.type == 'visual_ch':
             #print 'visualisation changed channel'
-            win.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+            win.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
 
 
 class parameterClass:
@@ -1505,12 +1505,12 @@ class parameterClass:
         self.crop_x2 = 0
         self.crop_x1 =0
         self.resize_factor = 1
-        self.curr_img = 0
+        self.curr_z = 0
         self.numCH =0;
         self.RF ={}
 
         self.frames_2_load ={}
-        #self.curr_img = None
+        #self.curr_z = None
         #Auto mode.
         self.auto = True
         self.to_crop = False
@@ -1543,6 +1543,13 @@ class parameterClass:
         self.prev_img=[]
         self.oldImg=[]
         self.newImg=[]
+        
+        self.t={}
+        self.z={}
+        self.i={}
+        
+        self.curr_file=0
+        self.max_file=0
 #generate layout
 app = QtGui.QApplication([])
 

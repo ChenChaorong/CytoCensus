@@ -438,7 +438,7 @@ class Eval_load_model_win(QtGui.QWidget):
         par_obj.left_2_calc =[]
         par_obj.saved_ROI =[]
         par_obj.saved_dots=[]
-        par_obj.curr_img = 0
+        par_obj.curr_z = 0
         par_obj.eval_load_im_win_eval = False
         
         
@@ -531,8 +531,8 @@ class Eval_load_model_win(QtGui.QWidget):
         v2.import_data_fn(par_obj,par_obj.file_array)
         
         evalImWin.loadTrainFn()
-        v2.load_and_initiate_plots(par_obj, evalImWin,par_obj.curr_img,par_obj.time_pt)
-        #v2.eval_goto_img_fn(par_obj.curr_img,par_obj,evalImWin)
+        v2.load_and_initiate_plots(par_obj, evalImWin,par_obj.curr_z,par_obj.time_pt)
+        #v2.eval_goto_img_fn(par_obj.curr_z,par_obj,evalImWin)
     def hyphen_range(self,s):
         """ yield each integer from a complex range string like "1-9,12, 15-20,23"
 
@@ -638,7 +638,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         
         
         #Sets the current text.
-        self.image_num_txt.setText('The Current Image is: ' + str(par_obj.curr_img +1)+' and the time point is: '+str(par_obj.time_pt+1))
+        self.image_num_txt.setText('The Current Image is: ' + str(par_obj.curr_z +1)+' and the time point is: '+str(par_obj.time_pt+1))
         self.count_txt = QtGui.QLabel()
         
         
@@ -799,12 +799,12 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.canvas1.mpl_connect('button_release_event', self.cursor.button_release_callback)
     def interpolate_roi_fn(self):
         self.cursor.interpolate_ROI()
-        self.goto_img_fn(par_obj.curr_img,par_obj)
-        #v2.eval_pred_show_fn(par_obj.curr_img, par_obj,self)
+        self.goto_img_fn(par_obj.curr_z,par_obj)
+        #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
     def interpolate_roi_in_time_fn(self):
         self.cursor.interpolate_ROI_in_time()
-        self.goto_img_fn(par_obj.curr_img,par_obj)
-        #v2.eval_pred_show_fn(par_obj.curr_img, par_obj,self)
+        self.goto_img_fn(par_obj.curr_z,par_obj)
+        #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
     def count_all_fn(self):
         for tpt in par_obj.time_pt_list:
             self.count_maxima(tpt)
@@ -819,10 +819,10 @@ class Eval_disp_im_win(QtGui.QWidget):
         
         if par_obj.show_pts == 1:
             self.kernel_show_btn.setText('Showing Probability')
-            v2.eval_goto_img_fn(par_obj.curr_img,par_obj,self)
+            v2.eval_goto_img_fn(par_obj.curr_z,par_obj,self)
         elif par_obj.show_pts == 2:
             self.kernel_show_btn.setText('Showing Counts')
-            v2.eval_goto_img_fn(par_obj.curr_img,par_obj,self)
+            v2.eval_goto_img_fn(par_obj.curr_z,par_obj,self)
     def count_maxima_btn_fn(self):
         par_obj.min_distance[0]= int(self.count_txt_1.text())
         par_obj.min_distance[1]= int(self.count_txt_2.text())
@@ -831,8 +831,8 @@ class Eval_disp_im_win(QtGui.QWidget):
         par_obj.rel_thr =float(self.rel_thr_txt.text())
         self.count_maxima(par_obj.time_pt)
         par_obj.show_pts= 2
-        #v2.eval_pred_show_fn(par_obj.curr_img, par_obj,self)
-        self.goto_img_fn(par_obj.curr_img,par_obj)
+        #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
+        self.goto_img_fn(par_obj.curr_z,par_obj)
     def count_maxima(self,time_pt):
 
         predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.num_of_train_im))
@@ -919,7 +919,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.image_status_text.showMessage('Status: evaluation finished.')
         par_obj.eval_load_im_win_eval = True
         par_obj.time_pt = 0
-        v2.eval_pred_show_fn(par_obj.curr_img, par_obj,self)
+        v2.eval_pred_show_fn(par_obj,self,par_obj.curr_z,par_obj.time_point)
     def save_output_data(self):
         v2.save_output_data_fn(par_obj,self)
     def save_output_prediction(self):
@@ -951,25 +951,25 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.top_left_grid.addWidget(channel_wid,1,0,1,3)
     def prev_im_btn_fn(self):
         for ind, zim in enumerate(par_obj.frames_2_load[0]):
-            if zim == par_obj.curr_img:
+            if zim == par_obj.curr_z:
                 if ind > 0:
-                    par_obj.curr_img  = par_obj.frames_2_load[0][ind-1]
-                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+                    par_obj.curr_z  = par_obj.frames_2_load[0][ind-1]
+                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
                     break;
 
     def next_im_btn_fn(self):
          for ind, zim in enumerate(par_obj.frames_2_load[0]):
-            if zim == par_obj.curr_img:
+            if zim == par_obj.curr_z:
                 if ind < par_obj.frames_2_load[0].__len__()-1:
-                    par_obj.curr_img  = par_obj.frames_2_load[0][ind+1]
-                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+                    par_obj.curr_z  = par_obj.frames_2_load[0][ind+1]
+                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
                     break;
     def prev_time_btn_fn(self):
         for ind, tim in enumerate(par_obj.time_pt_list):
             if tim == par_obj.time_pt:
                 if ind > 0:
                     par_obj.time_pt  = par_obj.time_pt_list[ind-1]
-                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
                     break;
 
     def next_time_btn_fn(self):
@@ -978,7 +978,7 @@ class Eval_disp_im_win(QtGui.QWidget):
             if tim == par_obj.time_pt:
                 if ind < par_obj.time_pt_list.__len__()-1:
                     par_obj.time_pt  = par_obj.time_pt_list[ind+1]
-                    self.goto_img_fn(par_obj.curr_img,par_obj.time_pt)
+                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
 
                     break;
 
@@ -1009,8 +1009,8 @@ class checkBoxCH(QtGui.QCheckBox):
     def stateChange(self):
         
         if self.type == 'visual_ch':
-            #v2.eval_goto_img_fn(par_obj.curr_img,par_obj,evalImWin)
-            Eval_disp_im_win.goto_img_fn(evalImWin,par_obj.curr_img,par_obj.time_pt)
+            #v2.eval_goto_img_fn(par_obj.curr_z,par_obj,evalImWin)
+            Eval_disp_im_win.goto_img_fn(evalImWin,par_obj.curr_z,par_obj.time_pt)
 
             
 class File_Dialog(QtGui.QMainWindow):
@@ -1212,7 +1212,7 @@ class Parameter_class:
         self.crop_y1 = 0
         self.crop_y2 = 0
         self.file_array =[]
-        self.curr_img = 0
+        self.curr_z = 0
         
         self.left2calc = 0
         self.p_size = 1
@@ -1255,16 +1255,16 @@ class widgetSP(QtGui.QWidget):
         self.par_obj =[]
     def keyPressEvent(self, ev):
         if ev.key() == QtCore.Qt.Key_Period:
-            im_num = self.par_obj.curr_img + 1
+            im_num = self.par_obj.curr_z + 1
         if ev.key() == QtCore.Qt.Key_Comma:
-            im_num = self.par_obj.curr_img - 1
+            im_num = self.par_obj.curr_z - 1
         v2.evalGotoImgFn(im_num,self.par_obj, self)
     def wheelEvent(self, event):
         super(widgetSP, self).wheelEvent(event)
         if event.delta() < 0:
-            im_num = self.par_obj.curr_img + 1
+            im_num = self.par_obj.curr_z + 1
         if event.delta() > 0:
-            im_num = self.par_obj.curr_img - 1
+            im_num = self.par_obj.curr_z - 1
         v2.evalGotoImgFn(im_num,self.par_obj, self)
 
 

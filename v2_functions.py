@@ -341,7 +341,7 @@ def save_roi_fn(par_obj):
             s_ori_y = par_obj.ori_y
 
         #Finds the current frame and file.
-        par_obj.rects = (par_obj.curr_img, int(s_ori_x), int(s_ori_y), int(abs(par_obj.rect_w)), int(abs(par_obj.rect_h)),par_obj.time_pt)
+        par_obj.rects = (par_obj.curr_z, int(s_ori_x), int(s_ori_y), int(abs(par_obj.rect_w)), int(abs(par_obj.rect_h)),par_obj.time_pt)
         return True
     
     return False
@@ -512,126 +512,6 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,threaded=False,b=0
     return
     
 
-def im_pred_inline_fn_eval(par_obj, int_obj,outer_loop=None,inner_loop=None,threaded=False):
-    """Accesses TIFF file slice or opens png. Calculates features to indices present in par_obj.left_2_calc"""
-    if outer_loop == None:
-        outer_loop = 0
-        inner_loop_arr = par_obj.frames_2_load
-        inner_loop=inner_loop_arr[outer_loop]
-    #file looping is outside this function when considering inline
-    b =outer_loop 
-    imStr = str(par_obj.file_array[b])
-    frames = inner_loop
-    if threaded == False:                        
-        #Goes through the list of frames
-        for i in frames:
-
-            #checks if features for this tp have been calculated already
-            if par_obj.fresh_features == False:
-                try:
-                        #Try loading features.
-                        time1 = time.time()
-                        feat=pickle.load(open(imStr[:-4]+'_'+str(i)+'.p', "rb"))
-                        time2 = time.time()
-                        int_obj.report_progress('Loading Features for Image: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
-                except:
-                    #If don't exist create them.
-                    int_obj.report_progress('Calculating Features for File: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
-                    imRGB=return_imRGB_slice(par_obj,i)                    
-                    feat = feature_create(par_obj,imRGB,imStr,i)
-            else:
-                #If you want to ignore previous features which have been saved.
-                int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(i+1) +' Timepoint: '+str(par_obj.time_pt+1))
-                imRGB=return_imRGB_slice(par_obj,i)                
-                feat =feature_create(par_obj,imRGB,imStr,i)
-            par_obj.num_of_feat = feat.shape[2]
-            par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = feat  
-    else:
-        #threaded version
-                        
-        #Goes through the list of frames
-        imRGBlist=[] #this will be the list that the threads iterate over
-        for i in frames:
-            imRGB=return_imRGB_slice(par_obj,i)
-            imRGBlist.append(imRGB) #add this on each iteration of the loop
-                    
-        # consider cropping beforehand because it changes par_obj (not good for multithreading)
-        # should be same for all the frames??
-        if par_obj.to_crop == False:
-            par_obj.crop_x1 = 0
-            par_obj.crop_x2=par_obj.width
-            par_obj.crop_y1 = 0
-            par_obj.crop_y2=par_obj.height
-        par_obj.height = par_obj.crop_y2-par_obj.crop_y1
-        par_obj.width = par_obj.crop_x2-par_obj.crop_x1
-        
-        #initiate pool and start caclulating features
-        int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Timepoint: '+str(par_obj.time_pt+1) +' All  Frames')
-        tee1=time.time()
-        pool = ThreadPool(8) 
-        featlist=pool.map(functools.partial(feature_create_threadable,par_obj,imStr),imRGBlist)
-        pool.close() 
-        pool.join() 
-        tee2=time.time()
-        print tee2-tee1
-        lcount=-1
-        for i in frames:
-            lcount=lcount+1 #because using list not arrays, can't guarrantee i corresponds to the right point in the list
-            feat=featlist[lcount]
-            int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
-            par_obj.num_of_feat = feat.shape[2]
-            par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = feat  
-        int_obj.report_progress('Features calculated')
-    return
-
-def append_pred_features(par_obj, int_obj,outer_loop=None,inner_loop=None,threaded=False):
-    """Accesses TIFF file slice or opens png. Calculates features to indices present in par_obj.left_2_calc"""
-    if outer_loop == None:
-        outer_loop = 0
-        inner_loop_arr = par_obj.frames_2_load
-        inner_loop=inner_loop_arr[outer_loop]
-    #file looping is outside this function when considering inline
-    b =outer_loop 
-    imStr = str(par_obj.file_array[b])
-    frames = inner_loop #the use of [] or not is properly hinky and needs some fixing
-    if threaded == False:                        
-        #Goes through the list of frames
-        for i in frames:
-
-            #If you want to ignore previous features which have been saved.
-            int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(i+1) +' Timepoint: '+str(par_obj.time_pt+1))
-            imPred=par_obj.data_store[par_obj.time_pt]['pred_arr'][i]
-            feat=par_obj.data_store[par_obj.time_pt]['feat_arr'][i]
-            newfeat=feature_append(par_obj,imStr,feat,imPred)
-            par_obj.num_of_feat = newfeat.shape[2]
-            par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = newfeat  
-    else:
-        #threaded version
-                        
-        #Goes through the list of frames
-        predlist=[] #this will be the list that the threads iterate over
-        featlist=[]
-        for i in frames:
-            predlist.append(par_obj.data_store[par_obj.time_pt]['pred_arr'][i]) #add this on each iteration of the loop
-            featlist.append(par_obj.data_store[par_obj.time_pt]['feat_arr'][i])
-        #initiate pool and start caclulating features
-        int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Timepoint: '+str(par_obj.time_pt+1) +' All  Frames')
-        tee1=time.time()
-        pool = ThreadPool(8) 
-        newfeatlist=pool.map(functools.partial(feature_append_threaded,par_obj,imStr,featlist,predlist),frames)
-        pool.close() 
-        pool.join() 
-        tee2=time.time()
-        print tee2-tee1
-        lcount=-1
-        for i in frames:
-            lcount=lcount+1 #because using list not arrays, can't guarrantee i corresponds to the right point in the list
-            feat=newfeatlist[lcount]
-            par_obj.num_of_feat = feat.shape[2]
-            par_obj.data_store[par_obj.time_pt]['feat_arr'][i] = feat  
-        int_obj.report_progress('Features calculated')
-    return
-    
 def return_imRGB_slice_new(par_obj,zslice,tpt):
     '''Fetches slice zslice of timepoint tpt'''
     if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
@@ -693,153 +573,6 @@ def feature_create_threadable(par_obj,imStr,imRGB):
             feat = local_shape_features_fine(imRGB[:,:,0].astype(np.float32),par_obj.feature_scale)  
             
     return feat
-def feature_create(par_obj,imRGB,imStr,i):
-    time1 = time.time()
-    if par_obj.to_crop == False:
-            par_obj.crop_x1 = 0
-            par_obj.crop_x2=par_obj.width
-            par_obj.crop_y1 = 0
-            par_obj.crop_y2=par_obj.height
-    par_obj.height = par_obj.crop_y2-par_obj.crop_y1
-    par_obj.width = par_obj.crop_x2-par_obj.crop_x1
-    
-    
-    if (par_obj.feature_type == 'basic'):
-        feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),13*par_obj.ch_active.__len__()))
-    if (par_obj.feature_type == 'fine'):
-        feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),21*par_obj.ch_active.__len__()))
-    if (par_obj.feature_type == 'fineSpatial'):
-        feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),23*par_obj.ch_active.__len__()))
-    
-    for b in range(0,par_obj.ch_active.__len__()):
-        if (par_obj.feature_type == 'basic'):
-            imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
-            feat[:,:,(b*13):((b+1)*13)] = local_shape_features_basic(imG,par_obj.feature_scale)   
-        if (par_obj.feature_type == 'fine'):
-            imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
-            feat[:,:,(b*21):((b+1)*21)] = local_shape_features_fine(imG,par_obj.feature_scale)
-        if (par_obj.feature_type == 'fineSpatial'):
-            imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
-            feat[:,:,(b*23):((b+1)*23)] = local_shape_features_fine_spatial(imG,par_obj.feature_scale,i)
-    #pickle.dump(feat,open(imStr[:-4]+'_'+str(i)+'.p', "wb"),protocol=2)
-    return feat
-    
-def feature_append_threaded(par_obj,imStr,featlist,predlist,i):
-    feat=featlist[i]
-    imPred=predlist[i]
-    time1 = time.time()
-    '''if par_obj.to_crop == False:
-            par_obj.crop_x1 = 0
-            par_obj.crop_x2=par_obj.width
-            par_obj.crop_y1 = 0
-            par_obj.crop_y2=par_obj.height
-    par_obj.height = par_obj.crop_y2-par_obj.crop_y1
-    par_obj.width = par_obj.crop_x2-par_obj.crop_x1'''
-    
-    
-    if (par_obj.feature_type == 'basic'):
-        newfeat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),13*(par_obj.ch_active.__len__()+1)))
-    if (par_obj.feature_type == 'fine'):
-        newfeat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),21*(par_obj.ch_active.__len__()+1)))
-        
-    b = par_obj.ch_active.__len__()
-    if (par_obj.feature_type == 'basic'):
-        imG = imPred.astype(np.float32)
-        newfeat[:,:,(0):((b)*13)]=feat[:,:,(0):((b)*13)]
-        newfeat[:,:,(b*13):((b+1)*13)] = local_shape_features_basic(imG,par_obj.feature_scale)   
-    if (par_obj.feature_type == 'fine'):
-        imG = imPred.astype(np.float32)
-        newfeat[:,:,(0):((b)*21)]=feat[:,:,(0):((b)*13)]
-        newfeat[:,:,(b*21):((b+1)*21)] = local_shape_features_fine(imG,par_obj.feature_scale)
-    return newfeat
-    
-def feature_append(par_obj,imStr,feat,imPred):
-    time1 = time.time()
-    if par_obj.to_crop == False:
-            par_obj.crop_x1 = 0
-            par_obj.crop_x2=par_obj.width
-            par_obj.crop_y1 = 0
-            par_obj.crop_y2=par_obj.height
-    par_obj.height = par_obj.crop_y2-par_obj.crop_y1
-    par_obj.width = par_obj.crop_x2-par_obj.crop_x1
-    
-    
-    if (par_obj.feature_type == 'basic'):
-        newfeat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),13*(par_obj.ch_active.__len__()+1)))
-    if (par_obj.feature_type == 'fine'):
-        newfeat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),21*(par_obj.ch_active.__len__()+1)))
-        
-         
-        
-    b = par_obj.ch_active.__len__()
-    if (par_obj.feature_type == 'basic'):
-        imG = imPred.astype(np.float32)
-        newfeat[:,:,(0):((b)*13)]=feat[:,:,(0):((b)*13)]
-        newfeat[:,:,(b*13):((b+1)*13)] = local_shape_features_basic(imG,par_obj.feature_scale)   
-    if (par_obj.feature_type == 'fine'):
-        imG = imPred.astype(np.float32)
-        newfeat[:,:,(0):((b)*21)]=feat[:,:,(0):((b)*13)]
-        newfeat[:,:,(b*21):((b+1)*21)] = local_shape_features_fine(imG,par_obj.feature_scale)
-
-    return newfeat
-    
-def evaluate_forest(par_obj,int_obj,withGT,model_num,inline=False,inner_loop=None,outer_loop=None,count=None):
-
-    if inline == False:
-        outer_loop = par_obj.left_2_calc
-        inner_loop_arr = par_obj.frames_2_load
-        count = -1
-    else:
-        inner_loop_arr ={outer_loop:[inner_loop]}
-        outer_loop = [outer_loop]
-
-    #Finds the current frame and file.
-    par_obj.maxPred=0 #resets scaling for display between models
-    par_obj.minPred=100
-    for b in outer_loop:
-        frames =inner_loop_arr[b]
-        for i in frames:
-            count = count+1
-            
-            
-
-            if(par_obj.p_size >1):
-                
-                mimg_lin,dense_linPatch, pos = extractPatch(par_obj.p_size, par_obj.feat_arr[i], None, 'dense')
-                tree_pred = par_obj.RF[model_num].predict(mimg_lin)
-                linPred = v2.regenerateImg(par_obj.p_size, tree_pred, pos)
-                    
-            else:
-                
-                mimg_lin = np.reshape(par_obj.data_store[par_obj.time_pt]['feat_arr'][i], (par_obj.height * par_obj.width, par_obj.data_store[par_obj.time_pt]['feat_arr'][i].shape[2]))
-                t2 = time.time()
-                linPred = par_obj.RF[model_num].predict(mimg_lin)
-                t1 = time.time()
-                
-
-
-            par_obj.data_store[par_obj.time_pt]['pred_arr'][i] = linPred.reshape(par_obj.height, par_obj.width)
-
-            maxPred = np.max(linPred)
-            minPred = np.min(linPred)
-            par_obj.maxPred=max([par_obj.maxPred,maxPred])
-            par_obj.minPred=min([par_obj.minPred,minPred])
-            sum_pred =np.sum(linPred/255)
-            par_obj.data_store[par_obj.time_pt]['sum_pred'][i] = sum_pred
-            print 'prediction time taken',t1 - t2
-            print 'Predicted i:',par_obj.data_store[par_obj.time_pt]['sum_pred'][i]
-            int_obj.report_progress('Making Prediction for Image: '+str(b+1)+' Frame: ' +str(i+1)+' Timepoint: '+str(par_obj.time_pt+1))
-                    
-
-            if withGT == True:
-                try:
-                    #If it has already been opened.
-                    a = par_obj.data_store[par_obj.time_pt]['gt_sum'][i]
-                except:
-                    #Else find the file.
-                    gt_im =  pylab.imread(par_obj.data_store[par_obj.time_pt]['gt_array'][i])[:,:,0]
-                    par_obj.data_store[par_obj.time_pt]['gt_sum'][i] = np.sum(gt_im)
-        
 
 def evaluate_forest_new(par_obj,int_obj,withGT,model_num,zsliceList,tptList,threaded=False,b=0):
 
@@ -952,30 +685,7 @@ def local_shape_features_basic(im,scaleStart):
     f[:,:, 11] =  st32[:,:,1]
     f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 )
     
-    '''
-    f[:,:, 10]=vigra.filters.gaussianSmoothing(im,s*16)
-    f[:,:, 11]=vigra.filters.gaussianSharpening2D(im,s*2)
-    ''''''
-    abd=vigra.filters.hessianOfGaussian2D(im,s*2)
-    f[:,:, 7] =  abd[:,:,0] 
-    f[:,:, 10] =  abd[:,:,1]
-    f[:,:, 11] =  abd[:,:,2]   
-    
-    f[:,:, 10] =  vigra.filters.hessianOfGaussianEigenvalues(im,s)[:,:,1]
-    f[:,:, 11] =  vigra.filters.hessianOfGaussianEigenvalues(im,s*2)[:,:,1]    
-    ''''''
-    mode= 'haar'
-    level=2
-    coeffs=pywt.wavedec2(im, mode, level=level)
-    coeffs_H=list(coeffs)  
-    #imArray_H=pywt.waverec2(coeffs_H[0:level], mode);
-    f[:,:, 10] =  np.float32(PIL.Image.fromarray(pywt.waverec2(coeffs_H[0:level], mode)).resize((imSizeR,imSizeC),PIL.Image.BILINEAR))
-    mode= 'haar'
-    level=3
-    coeffs=pywt.wavedec2(im, mode, level=level)
-    coeffs_H=list(coeffs)  
-    f[:,:, 11] =  np.float32(PIL.Image.fromarray(pywt.waverec2(coeffs_H[0:level], mode)).resize((imSizeR,imSizeC),PIL.Image.BILINEAR))
-    '''
+
     
     return f
 def channels_for_display(par_obj, int_obj,imRGB):
@@ -1036,7 +746,7 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
     int_obj.plt1.axis("off")
     #int_obj.plt1.set_xticklabels([])
     #int_obj.plt1.set_yticklabels([])
-    int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_img+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
+    int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_z+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
 
     """Deals with displaying Kernel/Prediction/Counts""" 
     int_obj.image_num_txt.setText('The Current Image is No. ' + str(zslice+1)+' and the time point is: '+str(tpt+1))
@@ -1124,7 +834,7 @@ def load_and_initiate_plots(par_obj, int_obj,zslice,tpt):
     int_obj.plt2.cla()
     int_obj.plt2.imshow(newImg)
     int_obj.plt2.axis("off")
-    int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_img+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
+    int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_z+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
 
     goto_img_fn_new(par_obj, int_obj,zslice,tpt)
     
@@ -1190,7 +900,10 @@ def import_data_fn(par_obj,file_array):
     prevNumCH =[]
     par_obj.numCH = 0
     par_obj.total_time_pt = 0
-    for i in range(0,file_array.__len__()):
+    
+    par_obj.max_file= par_obj.file_array.__len__()    
+    
+    for i in range(0,par_obj.max_file):
             n = str(i)
             imStr = str(file_array[i])
             par_obj.file_ext = imStr.split(".")[-1]
@@ -1398,8 +1111,8 @@ class ROI:
                     self.line[i+1].set_data([self.ppt_x[i], self.ppt_x[i+1]],[self.ppt_y[i], self.ppt_y[i+1]])
                     self.line[i].set_data([self.ppt_x[i], self.ppt_x[i-1]],[self.ppt_y[i], self.ppt_y[i-1]])   
                 self.int_obj.canvas1.draw()
-                self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_x'][self.par_obj.curr_img] = copy.deepcopy(self.ppt_x)
-                self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_y'][self.par_obj.curr_img] = copy.deepcopy(self.ppt_y)
+                self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_x'][self.par_obj.curr_z] = copy.deepcopy(self.ppt_x)
+                self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_y'][self.par_obj.curr_z] = copy.deepcopy(self.ppt_y)
                 #self.flag = False
             
         
@@ -1435,8 +1148,8 @@ class ROI:
                             self.ppt_y.append(y)
                             self.int_obj.plt1.add_line(self.line[-1])
                             self.int_obj.canvas1.draw()
-                        self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_x'][self.par_obj.curr_img] = copy.deepcopy(self.ppt_x)
-                        self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_y'][self.par_obj.curr_img] = copy.deepcopy(self.ppt_y)
+                        self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_x'][self.par_obj.curr_z] = copy.deepcopy(self.ppt_x)
+                        self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_y'][self.par_obj.curr_z] = copy.deepcopy(self.ppt_y)
                         
     def button_release_callback(self, event):
         self.flag = False
@@ -1444,16 +1157,16 @@ class ROI:
         print 'ROI completed.'
         self.complete = True
         self.draw_ROI()
-        self.reparse_ROI(self.par_obj.curr_img)
+        self.reparse_ROI(self.par_obj.curr_z)
         #self.find_the_inside()
     def draw_ROI(self):
         #redraws the regions in the current slice.
         drawn = False
 
         for bt in self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_x']:
-            if bt == self.par_obj.curr_img:
-                cppt_x = self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_x'][self.par_obj.curr_img]  
-                cppt_y = self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_y'][self.par_obj.curr_img]
+            if bt == self.par_obj.curr_z:
+                cppt_x = self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_x'][self.par_obj.curr_z]  
+                cppt_y = self.par_obj.data_store[self.par_obj.time_pt]['roi_stk_y'][self.par_obj.curr_z]
                 self.line = [None]
                 for i in range(0,cppt_x.__len__()):
                     if i ==0:
@@ -1467,9 +1180,9 @@ class ROI:
         if drawn == False:
                            
             for bt in self.par_obj.data_store[self.par_obj.time_pt]['roi_stkint_x']:
-                if bt == self.par_obj.curr_img:
-                    cppt_x = self.par_obj.data_store[self.par_obj.time_pt]['roi_stkint_x'][self.par_obj.curr_img]
-                    cppt_y = self.par_obj.data_store[self.par_obj.time_pt]['roi_stkint_y'][self.par_obj.curr_img]
+                if bt == self.par_obj.curr_z:
+                    cppt_x = self.par_obj.data_store[self.par_obj.time_pt]['roi_stkint_x'][self.par_obj.curr_z]
+                    cppt_y = self.par_obj.data_store[self.par_obj.time_pt]['roi_stkint_y'][self.par_obj.curr_z]
                     
                     self.line = [None]
                     for i in range(0,cppt_x.__len__()):
@@ -1756,9 +1469,9 @@ class ROI:
 
 
     def find_the_inside(self):
-            ppt_x = self.par_obj.data_store[self.par_obj.time_pt]['roi_stkint_x'][self.par_obj.curr_img]
-            ppt_y = self.par_obj.data_store[self.par_obj.time_pt]['roi_stkint_y'][self.par_obj.curr_img]
-            imRGB = np.array(self.par_obj.dv_file.get_frame(par_obj.curr_img))
+            ppt_x = self.par_obj.data_store[self.par_obj.time_pt]['roi_stkint_x'][self.par_obj.curr_z]
+            ppt_y = self.par_obj.data_store[self.par_obj.time_pt]['roi_stkint_y'][self.par_obj.curr_z]
+            imRGB = np.array(self.par_obj.dv_file.get_frame(par_obj.curr_z))
             
             pot = [] 
             for i in range(0,ppt_x.__len__()):
