@@ -1,4 +1,4 @@
-#Experimental interface
+#Script for running evaluation mode
 import pylab
 from PyQt4 import QtGui, QtCore, Qt, QtWebKit
 try:
@@ -799,11 +799,12 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.canvas1.mpl_connect('button_release_event', self.cursor.button_release_callback)
     def interpolate_roi_fn(self):
         self.cursor.interpolate_ROI()
-        self.goto_img_fn(par_obj.curr_z,par_obj)
+        self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
+        
         #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
     def interpolate_roi_in_time_fn(self):
         self.cursor.interpolate_ROI_in_time()
-        self.goto_img_fn(par_obj.curr_z,par_obj)
+        self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
         #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
     def count_all_fn(self):
         for tpt in par_obj.time_pt_list:
@@ -819,10 +820,16 @@ class Eval_disp_im_win(QtGui.QWidget):
         
         if par_obj.show_pts == 1:
             self.kernel_show_btn.setText('Showing Probability')
-            v2.eval_goto_img_fn(par_obj.curr_z,par_obj,self)
+            #self.goto_img_fn(par_obj.curr_z,par_obj)
+            self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
+            #v2.goto_img_fn(par_obj, int_obj,par_obj.curr_z,par_obj.time_pt)
+            #v2.eval_goto_img_fn(par_obj.curr_z,par_obj,self) ###needs correcting??###
         elif par_obj.show_pts == 2:
             self.kernel_show_btn.setText('Showing Counts')
-            v2.eval_goto_img_fn(par_obj.curr_z,par_obj,self)
+            #self.goto_img_fn(par_obj.curr_z,par_obj)
+            self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
+            #v2.goto_img_fn(par_obj, int_obj,par_obj.curr_z,par_obj.time_pt)
+            #v2.eval_goto_img_fn(par_obj.curr_z,par_obj,self)
     def count_maxima_btn_fn(self):
         par_obj.min_distance[0]= int(self.count_txt_1.text())
         par_obj.min_distance[1]= int(self.count_txt_2.text())
@@ -889,7 +896,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         
         
         for tpt in par_obj.time_pt_list:
-            par_obj.time_pt = tpt
+
             count = -1
             for b in par_obj.left_2_calc:
                 frames =par_obj.frames_2_load[b]
@@ -919,7 +926,9 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.image_status_text.showMessage('Status: evaluation finished.')
         par_obj.eval_load_im_win_eval = True
         par_obj.time_pt = 0
-        v2.eval_pred_show_fn(par_obj,self,par_obj.curr_z,par_obj.time_point)
+        v2.goto_img_fn_new(par_obj, self,par_obj.curr_z,par_obj.time_pt)
+        
+        #v2.eval_pred_show_fn(par_obj,self,par_obj.curr_z,par_obj.time_pt)
     def save_output_data(self):
         v2.save_output_data_fn(par_obj,self)
     def save_output_prediction(self):
@@ -991,13 +1000,16 @@ class Eval_disp_im_win(QtGui.QWidget):
         
         self.cursor.complete = False
         self.cursor.flag = False
-        for bt in par_obj.data_store[tpt]['roi_stk_x']:
-            if bt == zslice:
-                self.cursor.complete = True
-                self.cursor.ppt_x = copy.deepcopy(par_obj.data_store[tpt]['roi_stk_x'][bt])
-                self.cursor.ppt_y = copy.deepcopy(par_obj.data_store[tpt]['roi_stk_y'][bt])
-                
-                break;
+        try: #not really sure what went wrong here, fix later
+            for bt in par_obj.data_store[tpt]['roi_stk_x']:
+                if bt == zslice:
+                    self.cursor.complete = True
+                    self.cursor.ppt_x = copy.deepcopy(par_obj.data_store[tpt]['roi_stk_x'][bt])
+                    self.cursor.ppt_y = copy.deepcopy(par_obj.data_store[tpt]['roi_stk_y'][bt])
+                    
+                    break;
+        except KeyError:
+            pass
         #v2.eval_goto_img_fn(im_num,par_obj,self)
         v2.goto_img_fn_new(par_obj, self,zslice,tpt)
                   

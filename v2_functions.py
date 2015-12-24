@@ -1,17 +1,18 @@
 from PyQt4 import QtGui, QtCore, Qt
 import PIL.Image
 import numpy as np
-import pywt
 import os
 import vigra
 import pylab
 import csv
 import time
 from skimage.filters.rank import entropy
+from skimage import feature
 from skimage.morphology import disk
 from sklearn.ensemble import ExtraTreesRegressor
 import cPickle as pickle
 from scipy.ndimage import filters
+from scipy import signal
 from oiffile import OifFile
 from tifffile2 import TiffFile
 from tifffile2 import imsave
@@ -518,13 +519,15 @@ def return_imRGB_slice_new(par_obj,zslice,tpt):
         
         imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
         if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
-            input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
-            if par_obj.tiff_reorder: #deal with the different ordering of separate channels vs. RGB
-                input_im =np.swapaxes(np.swapaxes(input_im,0,1),1,2)
+            #input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
+            input_im = get_tiff_slice(par_obj,[tpt],[zslice],range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor),range(par_obj.numCH))
+
             for c in range(0,par_obj.ch_active.__len__()):
                 imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
         else:
-            input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
+            #input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
+            input_im = get_tiff_slice(par_obj,[tpt],[zslice],range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor))
+
             imRGB[:,:,0] = input_im[:,:]
             imRGB[:,:,1] = input_im[:,:]
             imRGB[:,:,2] = input_im[:,:]
@@ -666,28 +669,31 @@ def local_shape_features_basic(im,scaleStart):
     imSizeC = im.shape[0]
     imSizeR = im.shape[1]
     f = np.zeros((imSizeC,imSizeR,13))
-    
+
     st08 = vigra.filters.structureTensorEigenvalues(im,s*1,s*2)
     st16 = vigra.filters.structureTensorEigenvalues(im,s*2,s*4)
     st32 = vigra.filters.structureTensorEigenvalues(im,s*4,s*8)
-    
+
     f[:,:, 0]  = im
     f[:,:, 1]  = vigra.filters.gaussianGradientMagnitude(im, s)
+
     f[:,:, 2]  = st08[:,:,0]
     f[:,:, 3]  = st08[:,:,1]
     f[:,:, 4]  = vigra.filters.laplacianOfGaussian(im, s )
+
     f[:,:, 5]  = vigra.filters.gaussianGradientMagnitude(im, s*2) 
+
     f[:,:, 6]  =  st16[:,:,0]
     f[:,:, 7]  = st16[:,:,1]
     f[:,:, 8]  = vigra.filters.laplacianOfGaussian(im, s*2 )
+
     f[:,:, 9]  = vigra.filters.gaussianGradientMagnitude(im, s*4) 
+
     f[:,:, 10] =  st32[:,:,0]
     f[:,:, 11] =  st32[:,:,1]
     f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 )
-    
-
-    
     return f
+
 def channels_for_display(par_obj, int_obj,imRGB):
     '''deals with displaying different channels'''
     count = 0
@@ -741,8 +747,8 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
     par_obj.newImg = newImg
     
     int_obj.plt1.images[0].set_data(256-newImg)
-    int_obj.plt1.set_xlim([0,newImg.shape[0]])
-    int_obj.plt1.set_ylim([newImg.shape[1],0])
+    int_obj.plt1.set_ylim([0,newImg.shape[0]])
+    int_obj.plt1.set_xlim([newImg.shape[1],0])
     int_obj.plt1.axis("off")
     #int_obj.plt1.set_xticklabels([])
     #int_obj.plt1.set_yticklabels([])
@@ -795,8 +801,8 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
         int_obj.plt2.images[0].set_clim(0,255)
 
     int_obj.plt2.axis("off")
-    int_obj.plt2.set_xlim([0,newImg.shape[0]])
-    int_obj.plt2.set_ylim([newImg.shape[1],0])
+    int_obj.plt2.set_ylim([0,newImg.shape[0]])
+    int_obj.plt2.set_xlim([newImg.shape[1],0])
     int_obj.cursor.draw_ROI()
     int_obj.draw_saved_dots_and_roi()
     int_obj.canvas1.draw()
@@ -891,8 +897,46 @@ def eval_pred_show_fn(par_obj,int_obj,zslice,tpt):
         int_obj.plt2.set_yticklabels([])
         int_obj.canvas1.draw()
         int_obj.canvas2.draw()
-        
- 
+def get_tiff_slice(par_obj,tpt=[0],zslice=[0],x=[0],y=[0],c=[0]):
+    #deal with different TXYZC orderings. Always return TZYXC
+    t0=time.time()
+    alist=[]
+    blist=[]
+    for n,b in enumerate(par_obj.order):
+        if b=='T':
+            alist.append(tpt)
+            blist.append(n)
+    for n,b in enumerate(par_obj.order):
+        if b=='Z':
+            alist.append(zslice)
+            blist.append(n)
+    for n,b in enumerate(par_obj.order):
+        if b=='Y':
+            alist.append(y)
+            blist.append(n)
+    for n,b in enumerate(par_obj.order):
+        if b=='X':
+            alist.append(x)
+            blist.append(n)
+
+    for n,b in enumerate(par_obj.order):
+        if b=='C' or b=='S':
+            alist.append(c)
+            blist.append(n)
+    
+    tiff2=par_obj.tiffarray.transpose(blist)
+    if par_obj.order.__len__()==5:
+        tiff=np.squeeze(tiff2[alist[0],:,:,:,:][:,alist[1],:,:,:][:,:,alist[2],:,:][:,:,:,alist[3],:][:,:,:,:,alist[4]])
+    elif par_obj.order.__len__()==4:
+        tiff=np.squeeze(tiff2[alist[0],:,:,:][:,alist[1],:,:][:,:,alist[2],:][:,:,:,alist[3]])
+    elif par_obj.order.__len__()==3:
+        tiff=np.squeeze(tiff2[alist[0],:,:][:,alist[1],:][:,:,alist[2]])
+    elif par_obj.order.__len__()==2:
+        tiff=np.squeeze(tiff2[alist[0],:][:,alist[1]])
+    print time.time()-t0
+
+    return tiff
+    
 def import_data_fn(par_obj,file_array):
     """Function which loads in Tiff stack or single png file to assess type."""
     prevExt = [] 
@@ -918,6 +962,7 @@ def import_data_fn(par_obj,file_array):
                 meta = par_obj.tiff_file.series[0]
                 
                 order = meta.axes
+                par_obj.order =order
                 for n,b in enumerate(order):
                     if b == 'T':
                         par_obj.total_time_pt = meta.shape[n]
@@ -929,17 +974,19 @@ def import_data_fn(par_obj,file_array):
                         par_obj.ori_width = meta.shape[n]
                     if b == 'S':
                         par_obj.numCH = meta.shape[n]
-                        par_obj.tiff_reorder=False
+                        #par_obj.tiff_reorder=False
                     if b == 'C':
                         par_obj.numCH = meta.shape[n]
-                        par_obj.tiff_reorder=True
+                        #par_obj.tiff_reorder=True
                         
                 par_obj.bitDepth = meta.dtype
                 par_obj.test_im_end = par_obj.max_zslices
                 par_obj.tiffarray=par_obj.tiff_file.asarray(memmap=True)
-                imRGB = par_obj.tiffarray[0,0,::par_obj.resize_factor,::par_obj.resize_factor]
-                if par_obj.tiff_reorder:
-                    imRGB =np.swapaxes(np.swapaxes(imRGB,0,1),1,2)
+
+                imRGB = get_tiff_slice(par_obj,[0],[0],range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor),range(par_obj.numCH))
+                #imRGB = par_obj.tiffarray[0,0,::par_obj.resize_factor,::par_obj.resize_factor]
+#                if par_obj.tiff_reorder:
+#                    imRGB =np.swapaxes(np.swapaxes(imRGB,0,1),1,2)
                 if par_obj.test_im_end > 8:
                     par_obj.uploadLimit = 8
                 else:
@@ -1007,7 +1054,6 @@ def import_data_fn(par_obj,file_array):
                 return False, statusText
             prevBitDepth = par_obj.bitDepth
             
-            
     #Creates empty array to record density estimation.
     
     par_obj.test_im_start = 0
@@ -1016,7 +1062,6 @@ def import_data_fn(par_obj,file_array):
     par_obj.im_num_range = range(par_obj.test_im_start, par_obj.test_im_end)
     par_obj.num_of_train_im = par_obj.test_im_end - par_obj.test_im_start
     
-    #pdb.set_trace()
     if imRGB.shape.__len__() > 2:
     #If images have more than three channels. 
         if imRGB.shape[2]==3:

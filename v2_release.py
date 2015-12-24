@@ -9,8 +9,7 @@ import re
 import cPickle as pickle
 import sys
 
-
-from scipy.special import _ufuncs_cxx
+#from scipy.special import _ufuncs_cxx
 import sklearn.utils.lgamma
 from gnu import return_license
 import matplotlib.lines as lines
@@ -1110,8 +1109,9 @@ class Win_fn(QtGui.QWidget):
         self.plt1.autoscale(False)
         self.plt1.plot([rects[1], rects[1]+rects[3]], [rects[2],rects[2]], '-',color=colour)
         self.plt1.plot([rects[1]+rects[3], rects[1]+rects[3]], [rects[2],rects[2]+rects[4]], '-',color=colour)
-        self.plt1.plot([rects[1]+rects[3], rects[1]], [rects[2]+rects[4],rects[2]+rects[4]], '-',  figure=self.plt1,color=colour)
-        self.plt1.plot([rects[1], rects[1]], [rects[2]+rects[4],rects[2]], '-',  figure=self.plt1,color=colour)
+        self.plt1.plot([rects[1]+rects[3], rects[1]], [rects[2]+rects[4],rects[2]+rects[4]], '-', color=colour)
+        #self.plt1.plot([rects[1]+rects[3], rects[1]], [rects[2]+rects[4],rects[2]+rects[4]], '-',  figure=self.plt1,color=colour)
+        self.plt1.plot([rects[1], rects[1]], [rects[2]+rects[4],rects[2]], '-',color=colour)
 
 
             #Draws dots in list
@@ -1349,7 +1349,6 @@ class Win_fn(QtGui.QWidget):
             par_obj.sigma_data = float(text)
             v2.refresh_all_density(par_obj)
             self.update_density_fn()
-            
     def feat_scale_change_btn_fn(self):
         self.feat_scale_change_btn.setEnabled(False)
         print('Training Features')
@@ -1535,7 +1534,7 @@ class parameterClass:
         self.data_store[self.time_pt] ={}
         self.data_store[self.time_pt]['dense_arr'] ={}
 
-        self.tiff_reorder=False        
+    
         self.overlay=False
         self.maxPred=0
         self.minPred=100
@@ -1547,6 +1546,7 @@ class parameterClass:
         self.t={}
         self.z={}
         self.i={}
+        self.order={}
         
         self.curr_file=0
         self.max_file=0
