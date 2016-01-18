@@ -735,6 +735,8 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
     b=0
     #Finds the current frame and file.
     imRGB=return_imRGB_slice_new(par_obj,zslice,tpt)
+
+    imRGB = imRGB
     #deals with displaying different channels
     newImg=channels_for_display(par_obj, int_obj,imRGB)
 
@@ -743,10 +745,9 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
     par_obj.save_im = imRGB
     for i in range(0,int_obj.plt1.lines.__len__()):
         int_obj.plt1.lines.pop(0)
-      
-    par_obj.newImg = newImg
+
     
-    int_obj.plt1.images[0].set_data(256-newImg)
+    int_obj.plt1.images[0].set_data(newImg/par_obj.tiffarraymax)
     int_obj.plt1.set_ylim([0,newImg.shape[0]])
     int_obj.plt1.set_xlim([newImg.shape[1],0])
     int_obj.plt1.axis("off")
@@ -819,6 +820,7 @@ def load_and_initiate_plots(par_obj, int_obj,zslice,tpt):
 
     if ( par_obj.file_ext == 'tif' or  par_obj.file_ext == 'tiff'):
         par_obj.tiffarray=par_obj.tiff_file.asarray(memmap=True)
+        par_obj.tiffarraymax = par_obj.tiffarray.max()
             
     if ( par_obj.file_ext == 'oib' or par_obj.file_ext == 'oif'):
         imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
@@ -831,7 +833,7 @@ def load_and_initiate_plots(par_obj, int_obj,zslice,tpt):
      
     newImg=np.zeros((int(par_obj.height),int(par_obj.width),3))
     int_obj.plt1.cla()
-    int_obj.plt1.imshow(256-newImg)
+    int_obj.plt1.imshow(newImg/par_obj.tiffarraymax)
     int_obj.plt1.set_xlim([0,newImg.shape[0]])
     int_obj.plt1.set_ylim([newImg.shape[1],0])
     int_obj.plt1.axis("off")
@@ -934,7 +936,6 @@ def get_tiff_slice(par_obj,tpt=[0],zslice=[0],x=[0],y=[0],c=[0]):
     elif par_obj.order.__len__()==2:
         tiff=np.squeeze(tiff2[alist[0],:][:,alist[1]])
     print time.time()-t0
-
     return tiff
     
 def import_data_fn(par_obj,file_array):
@@ -961,6 +962,7 @@ def import_data_fn(par_obj,file_array):
                 par_obj.tiff_file = TiffFile(imStr)
                 meta = par_obj.tiff_file.series[0]
                 
+                
                 order = meta.axes
                 par_obj.order =order
                 for n,b in enumerate(order):
@@ -982,6 +984,7 @@ def import_data_fn(par_obj,file_array):
                 par_obj.bitDepth = meta.dtype
                 par_obj.test_im_end = par_obj.max_zslices
                 par_obj.tiffarray=par_obj.tiff_file.asarray(memmap=True)
+                par_obj.tiffarraymax = par_obj.tiffarray.max()
 
                 imRGB = get_tiff_slice(par_obj,[0],[0],range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor),range(par_obj.numCH))
                 #imRGB = par_obj.tiffarray[0,0,::par_obj.resize_factor,::par_obj.resize_factor]
@@ -1083,15 +1086,16 @@ def import_data_fn(par_obj,file_array):
     return True, statusText
 def save_output_prediction_fn(par_obj,int_obj):
     #funky ordering TZCYX
-    image = np.zeros([par_obj.total_time_pt,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'float32')
+
+    image = np.zeros([par_obj.total_time_pt+1,par_obj.max_zslices+1,1,par_obj.height,par_obj.width], 'float32')
     for tpt in par_obj.time_pt_list:
 
         #for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
         for zslice in range(0,par_obj.max_zslices):
-
-            image[tpt,zslice,0,:,:]=par_obj.data_store[tpt]['pred_arr'][zslice].astype(np.float32)
+                image[tpt,zslice,0,:,:]=par_obj.data_store[tpt]['pred_arr'][zslice].astype(np.float32)
     print 'Prediction written to disk'
-    imsave(par_obj.csvPath+'Newput.tif', imagej=True)
+    imsave(par_obj.csvPath+par_obj.modelName+'_Prediction.tif',image, imagej=True)
+    int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
 def save_output_data_fn(par_obj,int_obj):
     local_time = time.asctime( time.localtime(time.time()) )
 
@@ -1529,7 +1533,7 @@ class ROI:
                         imRGB[y,x] = 255
                         
                     
-            self.int_obj.plt1.imshow(imRGB)
+            self.int_obj.plt1.imshow(newImg/par_obj.tiffarraymax)
             self.int_obj.canvas1.draw()
 
 #from __future__ import division # Sets division to be float division

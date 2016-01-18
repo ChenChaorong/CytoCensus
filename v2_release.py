@@ -1260,7 +1260,7 @@ class Win_fn(QtGui.QWidget):
     def goto_img_fn(self,zslice,tpt):
         #Goto and evaluate image function.
         v2.goto_img_fn_new(par_obj,self,zslice,tpt)
-        v2.return_imRGB_slice_new(par_obj,zslice,tpt)
+        #v2.return_imRGB_slice_new(par_obj,zslice,tpt)
         self.draw_saved_dots_and_roi()
         par_obj.dots = []
         par_obj.rects = np.zeros((1,4))
@@ -1468,7 +1468,7 @@ class checkBoxCH(QtGui.QCheckBox):
             elif par_obj.ch_active.__len__() ==1:
                 newImg = par_obj.ex_img[:, :, par_obj.ch_active[0]]
             loadWin.plt1.cla()
-            loadWin.plt1.imshow(255-newImg)
+            loadWin.plt1.imshow(newImg/par_obj.tiffarraymax)
             #loadWin.draw_saved_dots_and_roi()
             loadWin.plt1.set_xticklabels([])
             loadWin.plt1.set_yticklabels([])
