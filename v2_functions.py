@@ -28,9 +28,9 @@ from multiprocessing.dummy import Pool as ThreadPool
 
 
 import pdb
-"""QuantiFly3d Software v0.0
+"""QuantiFly3d Software v0.1
 
-    Copyright (C) 2015  Dominic Waithe
+    Copyright (C) 2016  Dominic Waithe Martin Hailstone
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -733,23 +733,25 @@ def channels_for_display(par_obj, int_obj,imRGB):
 def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
     """Loads up requested image and displays"""
     b=0
+    t0=time.time()
     #Finds the current frame and file.
     imRGB=return_imRGB_slice_new(par_obj,zslice,tpt)
-
+    print time.time() -t0
     imRGB = imRGB
     #deals with displaying different channels
     newImg=channels_for_display(par_obj, int_obj,imRGB)
-
+    newImg=newImg/par_obj.tiffarraymax
+    print time.time() -t0
     if par_obj.overlay and zslice in par_obj.data_store[tpt]['pred_arr']:
-        newImg[:,:,2]= 1-(par_obj.data_store[tpt]['pred_arr'][zslice])/par_obj.maxPred
+        newImg[:,:,2]= (par_obj.data_store[tpt]['pred_arr'][zslice])/par_obj.maxPred
     par_obj.save_im = imRGB
     for i in range(0,int_obj.plt1.lines.__len__()):
         int_obj.plt1.lines.pop(0)
 
-    
-    int_obj.plt1.images[0].set_data(newImg/par_obj.tiffarraymax)
-    int_obj.plt1.set_ylim([0,newImg.shape[0]])
-    int_obj.plt1.set_xlim([newImg.shape[1],0])
+    print time.time() -t0
+    int_obj.plt1.images[0].set_data(newImg)
+    #int_obj.plt1.set_ylim([0,newImg.shape[0]])
+    #int_obj.plt1.set_xlim([newImg.shape[1],0])
     int_obj.plt1.axis("off")
     #int_obj.plt1.set_xticklabels([])
     #int_obj.plt1.set_yticklabels([])
@@ -767,7 +769,7 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
     im2draw = np.zeros((par_obj.height,par_obj.width))
     if par_obj.show_pts == 0:
         if zslice in par_obj.data_store[tpt]['dense_arr']:
-            im2draw = par_obj.data_store[tpt]['dense_arr'][zslice].astype(np.float32)
+            im2draw = par_obj.data_store[tpt]['dense_arr'][zslice]#.astype(np.float32)
         int_obj.plt2.images[0].set_data(im2draw)
         int_obj.plt2.images[0].autoscale()
 
@@ -792,22 +794,30 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
                     pt_x.append(pt2d[1])
                     pt_y.append(pt2d[0])
 
-
+        int_obj.plt2.cla()
         int_obj.plt1.plot(pt_x,pt_y, 'go')
         int_obj.plt2.plot(pt_x,pt_y, 'go')
+        
         string_2_show = 'The Predicted Count: ' + str(pts.__len__())
         if zslice in par_obj.data_store[tpt]['maxi_arr']:
             im2draw = par_obj.data_store[tpt]['maxi_arr'][zslice].astype(np.float32)
-        int_obj.plt2.images[0].set_data(im2draw)
+        int_obj.plt2.imshow(im2draw)
+        int_obj.canvas1.draw()
         int_obj.plt2.images[0].set_clim(0,255)
-
     int_obj.plt2.axis("off")
-    int_obj.plt2.set_ylim([0,newImg.shape[0]])
-    int_obj.plt2.set_xlim([newImg.shape[1],0])
-    int_obj.cursor.draw_ROI()
+    #int_obj.plt2.set_ylim([0,newImg.shape[0]])
+    #int_obj.plt2.set_xlim([newImg.shape[1],0])
     int_obj.draw_saved_dots_and_roi()
-    int_obj.canvas1.draw()
+    int_obj.cursor.draw_ROI()
+    
+    #ax=int_obj.plt2.axes.images[0]
+    #int_obj.plt2.axes.draw_artist(ax)
+
     int_obj.canvas2.draw()
+    #pdb.set_trace()
+    #int_obj.canvas1.draw()
+    #int_obj.canvas2.draw()
+
 
 def load_and_initiate_plots(par_obj, int_obj,zslice,tpt):
     """prepare plots and data for display"""
@@ -830,20 +840,18 @@ def load_and_initiate_plots(par_obj, int_obj,zslice,tpt):
                 f = f+'T'+str(tpt+1).zfill(3)
             f = f+'.tif'
             imRGB[:,:,c] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
-     
+    
     newImg=np.zeros((int(par_obj.height),int(par_obj.width),3))
     int_obj.plt1.cla()
     int_obj.plt1.imshow(newImg/par_obj.tiffarraymax)
-    int_obj.plt1.set_xlim([0,newImg.shape[0]])
-    int_obj.plt1.set_ylim([newImg.shape[1],0])
-    int_obj.plt1.axis("off")
-    int_obj.cursor.draw_ROI()
+    
 
     int_obj.plt2.cla()
     int_obj.plt2.imshow(newImg)
-    int_obj.plt2.axis("off")
+    
+    int_obj.cursor.draw_ROI()
     int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_z+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
-
+    
     goto_img_fn_new(par_obj, int_obj,zslice,tpt)
     
 def eval_pred_show_fn(par_obj,int_obj,zslice,tpt):
@@ -952,7 +960,7 @@ def import_data_fn(par_obj,file_array):
             n = str(i)
             imStr = str(file_array[i])
             par_obj.file_ext = imStr.split(".")[-1]
-            
+            par_obj.file_name = imStr.split(".")[0].split("/")[-1]
             if prevExt != [] and prevExt !=par_obj.file_ext:
                 statusText = 'More than one file format present. Different number of image channels in the selected images'
                 return False, statusText
@@ -1087,14 +1095,14 @@ def import_data_fn(par_obj,file_array):
 def save_output_prediction_fn(par_obj,int_obj):
     #funky ordering TZCYX
 
-    image = np.zeros([par_obj.total_time_pt+1,par_obj.max_zslices+1,1,par_obj.height,par_obj.width], 'float32')
+    image = np.zeros([par_obj.total_time_pt+1,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'float32')
     for tpt in par_obj.time_pt_list:
 
         #for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
         for zslice in range(0,par_obj.max_zslices):
                 image[tpt,zslice,0,:,:]=par_obj.data_store[tpt]['pred_arr'][zslice].astype(np.float32)
     print 'Prediction written to disk'
-    imsave(par_obj.csvPath+par_obj.modelName+'_Prediction.tif',image, imagej=True)
+    imsave(par_obj.csvPath+par_obj.file_name+'_'+par_obj.modelName+'_Prediction.tif',image, imagej=True)
     int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
 def save_output_data_fn(par_obj,int_obj):
     local_time = time.asctime( time.localtime(time.time()) )

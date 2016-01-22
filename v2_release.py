@@ -24,9 +24,9 @@ import pdb
 
 
 
-"""QuantiFly3d Software v0.0
+"""QuantiFly3d Software v0.1
 
-    Copyright (C) 2015  Dominic Waithe
+    Copyright (C) 2016  Dominic Waithe Martin Hailstone
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -137,25 +137,64 @@ class Load_win_fn(QtGui.QWidget):
 
         #SigmaData input field.
         self.feature_scale_input = QtGui.QLineEdit(str(par_obj.feature_scale))
+        
         #SigmaData input Text.
         self.feature_scaleText = QtGui.QLabel()
-
+        
+        self.sampling_input = QtGui.QLineEdit(str(par_obj.limit_ratio_size))
+        self.samplingText = QtGui.QLabel()
+        
+        self.features_input = QtGui.QLineEdit(str(par_obj.max_features))
+        self.featuresText = QtGui.QLabel()
+        
+        
         hbox1 = QtGui.QHBoxLayout()
+        hbox2 = QtGui.QHBoxLayout()
+        hbox3= QtGui.QHBoxLayout()
+        
+        hbox2.addWidget(self.samplingText)
+        hbox3.addWidget(self.featuresText)
+        
         vbox.addWidget(self.feature_scaleText)
         vbox.addLayout(hbox1)
+        vbox.addLayout(hbox2)
+        vbox.addLayout(hbox3)
 
 
         self.feature_scaleText.resize(40,20)
         self.feature_scaleText.setText('Input sigma for features (default 0.8):')
         self.feature_scaleText.hide()
-
-        hbox1.addWidget(self.feature_scale_input)
+        
+        hbox1.addWidget(self.feature_scale_input,1)
         hbox1.addStretch()
+
+        self.featuresText.resize(40,20)
+        self.featuresText.setText('Max size Random Feature subset')
+        self.featuresText.hide()
+        
+        hbox3.addWidget(self.features_input)
+        hbox3.addStretch()
+        
+        self.samplingText.resize(40,20)
+        self.samplingText.setText('Sampling')
+        self.samplingText.hide()
+        
+        hbox2.addWidget(self.sampling_input)
+        hbox2.addStretch()    
+        
+
+        self.sampling_input.resize(10,10)
+        self.sampling_input.textChanged[str].connect(self.sampling_change)
+        self.sampling_input.hide()
+
+        self.features_input.resize(10,10)
+        self.features_input.textChanged[str].connect(self.features_change)
+        self.features_input.hide()
 
         self.feature_scale_input.resize(10,10)
         self.feature_scale_input.textChanged[str].connect(self.feature_scale_change)
         self.feature_scale_input.hide()
-
+        
         self.resize_factor_text = QtGui.QLabel('Resize Factor:')
 
         self.resize_factor_input = QtGui.QLineEdit(str(par_obj.resize_factor))
@@ -286,8 +325,10 @@ class Load_win_fn(QtGui.QWidget):
         #Green status text.
 
         #Load images button
+        hbox2 = QtGui.QHBoxLayout()
         hbox1 = QtGui.QHBoxLayout()
         vbox.addLayout(hbox1)
+        vbox.addLayout(hbox2)
         self.confirmImages_button = QtGui.QPushButton("Confirm Images")
         hbox1.addWidget(self.confirmImages_button)
         self.confirmImages_button.clicked.connect(self.processImgs)
@@ -305,7 +346,7 @@ class Load_win_fn(QtGui.QWidget):
 
 
         hbox1.addStretch()
-
+        hbox2.addStretch()
 
         #File browsing functions
         layout = QtGui.QVBoxLayout()
@@ -346,7 +387,14 @@ class Load_win_fn(QtGui.QWidget):
         """Updates on change of feature scale"""
         if text != "":
             par_obj.resize_factor = float(text)
-
+    def sampling_change(self,text):
+        """Updates on change of feature scale"""
+        if (text != ""):
+            par_obj.limit_ratio_size = float(text)
+    def features_change(self,text):
+        """Updates on change of feature scale"""
+        if (text != ""):
+            par_obj.max_features = int(text)  
     def feature_scale_change(self,text):
         """Updates on change of feature scale"""
         if (text != ""):
@@ -408,6 +456,10 @@ class Load_win_fn(QtGui.QWidget):
         self.CH_cbx1.stateChange()
         self.feature_scale_input.show()
         self.feature_scaleText.show()
+        self.sampling_input.show()
+        self.samplingText.show()
+        self.features_input.show()
+        self.featuresText.show()
         self.r0.show()
         self.r1.show()
         self.Text_Radio.show()
@@ -685,6 +737,7 @@ class Win_fn(QtGui.QWidget):
         self.sigma_data_input.setFixedWidth(40)
         self.sigma_data_input.textChanged[str].connect(self.sigmaOnChange)
         self.top_right_grid.addWidget(self.sigma_data_input, 0, 1)
+
 
         #Feature scale input Label.
         #self.sigma_data_text = QtGui.QLabel()
@@ -999,7 +1052,9 @@ class Win_fn(QtGui.QWidget):
     def on_unclick(self, event):
         """When the mouse is released"""
         par_obj.mouse_down = False
-
+        self.plt2.set_ylim(self.plt1.get_ylim())
+        self.plt2.set_xlim(self.plt1.get_xlim())
+        self.canvas2.draw()
         #If we are in the roi drawing phase
         if(par_obj.draw_ROI == True):
             t2 = time.time()
@@ -1261,7 +1316,7 @@ class Win_fn(QtGui.QWidget):
         #Goto and evaluate image function.
         v2.goto_img_fn_new(par_obj,self,zslice,tpt)
         #v2.return_imRGB_slice_new(par_obj,zslice,tpt)
-        self.draw_saved_dots_and_roi()
+        #self.draw_saved_dots_and_roi()
         par_obj.dots = []
         par_obj.rects = np.zeros((1,4))
         par_obj.select_ROI= False
@@ -1467,14 +1522,13 @@ class checkBoxCH(QtGui.QCheckBox):
 
             elif par_obj.ch_active.__len__() ==1:
                 newImg = par_obj.ex_img[:, :, par_obj.ch_active[0]]
-            loadWin.plt1.cla()
-            loadWin.plt1.imshow(newImg/par_obj.tiffarraymax)
+            loadWin.plt1.images[0].set_data(newImg/par_obj.tiffarraymax)
             #loadWin.draw_saved_dots_and_roi()
-            loadWin.plt1.set_xticklabels([])
-            loadWin.plt1.set_yticklabels([])
+            #loadWin.cursor.draw_ROI()
             loadWin.canvas1.draw()
         if self.type == 'visual_ch':
             #print 'visualisation changed channel'
+            #v2.goto_img_fn_new(par_obj,self,par_obj.curr_z,par_obj.time_pt)
             win.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
 
 
@@ -1493,8 +1547,8 @@ class parameterClass:
         self.max_depth=10
         self.min_samples_split=20
         self.min_samples_leaf=10
-        self.max_features = 20#14#7
-        self.num_of_tree = 75#50#30
+        self.max_features = 14#7
+        self.num_of_tree = 50#30
         self.feature_scale = 1.2
         self.x_limit = 5024
         self.y_limit = 5024
@@ -1533,7 +1587,7 @@ class parameterClass:
         self.data_store ={}
         self.data_store[self.time_pt] ={}
         self.data_store[self.time_pt]['dense_arr'] ={}
-
+        self.data_store[self.time_pt]['zfilt_arr']={} 
     
         self.overlay=False
         self.maxPred=0

@@ -46,9 +46,9 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import v2_functions as v2
 
-"""QuantiFly Software v2.0
+"""QuantiFly3d Software v0.1
 
-    Copyright (C) 2015  Dominic Waithe
+    Copyright (C) 2016  Dominic Waithe Martin Hailstone
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
