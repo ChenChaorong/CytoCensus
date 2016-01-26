@@ -605,8 +605,8 @@ class Win_fn(QtGui.QWidget):
         #Makes sure it spans the whole figure.
         self.figure1.subplots_adjust(left=0.001, right=0.999, top=0.999, bottom=0.001)
 
-        toolbar = NavigationToolbar(self.canvas1,self)
-
+        self.toolbar = NavigationToolbar(self.canvas1,self)
+        self.toolbar.actionTriggered.connect(self.on_resize)
 
         self.plt1.imshow(im_RGB)
 
@@ -859,7 +859,7 @@ class Win_fn(QtGui.QWidget):
 
         #Status bar which is located beneath images.
         self.image_status_text = QtGui.QStatusBar()
-        box.addWidget(toolbar)
+        box.addWidget(self.toolbar)
         box.addWidget(self.image_status_text)
         self.image_status_text.showMessage('Status: Please Select a Region and Click \'Save ROI\'. ')
 
@@ -1012,9 +1012,12 @@ class Win_fn(QtGui.QWidget):
             self.y1 = event.ydata
             par_obj.ori_x = event.xdata
             par_obj.ori_y = event.ydata
-
-
-
+            
+    def on_resize(self,event):
+        """When the toolbar is activated, resize plot 2"""
+        self.plt2.set_ylim(self.plt1.get_ylim())
+        self.plt2.set_xlim(self.plt1.get_xlim())
+        self.canvas2.draw()
 
     def on_motion(self,event):
         """When the mouse is being dragged"""
@@ -1052,9 +1055,7 @@ class Win_fn(QtGui.QWidget):
     def on_unclick(self, event):
         """When the mouse is released"""
         par_obj.mouse_down = False
-        self.plt2.set_ylim(self.plt1.get_ylim())
-        self.plt2.set_xlim(self.plt1.get_xlim())
-        self.canvas2.draw()
+
         #If we are in the roi drawing phase
         if(par_obj.draw_ROI == True):
             t2 = time.time()
@@ -1111,9 +1112,7 @@ class Win_fn(QtGui.QWidget):
                             par_obj.dots.pop(i)
                             par_obj.saved_dots.append(par_obj.dots)
                             par_obj.saved_ROI.append(par_obj.rects)
-                            #self.update_density_fn()
                             #Reloads the roi so can edited again. It is now at the end of the array.
-
                             par_obj.dots = par_obj.saved_dots[-1]
                             par_obj.rects =  par_obj.saved_ROI[-1]
                             par_obj.saved_dots.pop(-1)
