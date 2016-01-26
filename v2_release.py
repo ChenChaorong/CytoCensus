@@ -1075,7 +1075,7 @@ class Win_fn(QtGui.QWidget):
             t1 = time.time()
             print t1-t2
         #If we are in the dot drawing phase
-        if(par_obj.draw_dots == True):
+        elif(par_obj.draw_dots == True):
             x = int(np.round(event.xdata,0))
             y = int(np.round(event.ydata,0))
 
@@ -1095,8 +1095,7 @@ class Win_fn(QtGui.QWidget):
                     self.plt1.plot([i[1]-5,i[1]+5],[i[2],i[2]],'-',color='r')
                     self.plt1.plot([i[1],i[1]],[i[2]-5,i[2]+5],'-',color='r')
                     self.canvas1.draw()
-
-        if(par_obj.remove_dots == True):
+        elif(par_obj.remove_dots == True):
             #par_obj.pixMap = QtGui.QPixmap(q2r.rgb2qimage(par_obj.imgs[par_obj.curr_z]))
             x = event.xdata
             y = event.ydata
@@ -1112,23 +1111,21 @@ class Win_fn(QtGui.QWidget):
                             par_obj.dots.pop(i)
                             par_obj.saved_dots.append(par_obj.dots)
                             par_obj.saved_ROI.append(par_obj.rects)
-                            self.update_density_fn()
+                            #self.update_density_fn()
                             #Reloads the roi so can edited again. It is now at the end of the array.
+
                             par_obj.dots = par_obj.saved_dots[-1]
                             par_obj.rects =  par_obj.saved_ROI[-1]
                             par_obj.saved_dots.pop(-1)
                             par_obj.saved_ROI.pop(-1)
                             break
 
-
             for i in range(0,self.plt1.lines.__len__()):
                 self.plt1.lines.pop(0)
-
-
             self.dots_and_square(par_obj.dots,par_obj.rects,'y')
             self.canvas1.draw()
 
-        if(par_obj.select_ROI== True):
+        elif(par_obj.select_ROI== True):
             x = event.xdata
             y = event.ydata
             for b in range(0,par_obj.ROI_index.__len__()):
@@ -1153,6 +1150,7 @@ class Win_fn(QtGui.QWidget):
                     par_obj.select_ROI= False
                     par_obj.draw_ROI = False
                     par_obj.draw_dots = True
+
     def dots_and_square(self, dots,rects,colour):
 
 
@@ -1630,7 +1628,7 @@ win_tab.resize(1000,600)
 time.sleep(2.0)
 splash.finish(win_tab)
 win_tab.showMaximized()
-
+win_tab.activateWindow()
 #Automates the loading for testing.
 
 
