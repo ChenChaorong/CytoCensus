@@ -1,8 +1,10 @@
+
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # oiffile.py
 
-# Copyright (c) 2012-2014, Christoph Gohlke
-# Copyright (c) 2012-2014, The Regents of the University of California
+# Copyright (c) 2012-2015, Christoph Gohlke
+# Copyright (c) 2012-2015, The Regents of the University of California
 # Produced at the Laboratory for Fluorescence Dynamics.
 # All rights reserved.
 #
@@ -46,13 +48,13 @@ associated files within a single file.
 :Organization:
   Laboratory for Fluorescence Dynamics, University of California, Irvine
 
-:Version: 2014.08.19
+:Version: 2015.08.17
 
 Requirements
 ------------
-* `CPython 2.7 or 3.3 <http://www.python.org>`_
-* `Numpy 1.8.2 <http://www.numpy.org>`_
-* `Tifffile.py 2014.08.19 <http://www.lfd.uci.edu/~gohlke/>`_
+* `CPython 2.7 or 3.4 <http://www.python.org>`_
+* `Numpy 1.9.2 <http://www.numpy.org>`_
+* `Tifffile.py 2015.08.17 <http://www.lfd.uci.edu/~gohlke/>`_
 
 Notes
 -----
@@ -85,9 +87,9 @@ from datetime import datetime
 
 import numpy
 
-from tifffile import TiffFile, TiffSequence, lazyattr, natural_sorted
+from tifffile2 import TiffFile, TiffSequence, lazyattr, natural_sorted
 
-__version__ = '2014.08.19'
+__version__ = '2015.08.17'
 __docformat__ = 'restructuredtext en'
 __all__ = 'imread', 'oib2oif', 'OifFile', 'SettingsFile'
 
@@ -573,6 +575,10 @@ class CompoundFile(object):
         """Return sequence of file names."""
         return self._files.keys()
 
+    def direntry(self, name):
+        """Return DirectoryEntry of filename."""
+        return self._files[name]
+
     def open_file(self, filename):
         """Return stream as file like object."""
         return BytesIO(self._read_stream(self._files[filename]))
@@ -683,3 +689,4 @@ if __name__ == "__main__":
     import doctest
     numpy.set_printoptions(suppress=True, precision=5)
     doctest.testmod()
+

@@ -8,11 +8,12 @@ import csv
 import time
 from skimage.filters.rank import entropy
 from skimage import feature
-from skimage.morphology import disk
+from skimage import morphology
 from sklearn.ensemble import ExtraTreesRegressor
 import cPickle as pickle
 from scipy.ndimage import filters
 from scipy import signal
+from scipy import ndarray
 from oiffile import OifFile
 from tifffile2 import TiffFile
 from tifffile2 import imsave
@@ -477,6 +478,7 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,threaded=False,b=0
                     #If you want to ignore previous features which have been saved.
                     int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(zslice+1) +' Timepoint: '+str(tpt+1))
                     feat =feature_create_threadable(par_obj,imStr,imRGB)
+                    
                     par_obj.num_of_feat = feat.shape[2]
                     par_obj.data_store[tpt]['feat_arr'][zslice] = feat
     else:
@@ -549,9 +551,8 @@ def return_imRGB_slice_new(par_obj,zslice,tpt):
             imRGB[:,:,par_obj.ch_active[c]] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
     return imRGB
     
-def feature_create_threadable(par_obj,imStr,imRGB):
+def feature_create_threadable(par_obj,imStr,imRGB,imZ=None):
     time1 = time.time()
-    
     if (par_obj.feature_type == 'basic'):
         feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),13*par_obj.ch_active.__len__()))
     if (par_obj.feature_type == 'fine'):
@@ -567,6 +568,11 @@ def feature_create_threadable(par_obj,imStr,imRGB):
             imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
 
             feat[:,:,(b*21):((b+1)*21)] = local_shape_features_fine(imG,par_obj.feature_scale)
+        if (par_obj.feature_type == 'basicz'):
+            imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
+            imG = imZ[:,:,par_obj.ch_active[b]].astype(np.float32)
+
+            feat[:,:,(b*21):((b+1)*21)] = local_shape_features_basicz(imG,par_obj.feature_scale,)
 
     if par_obj.numCH==0:
         imG = imRGB[:,:,0].astype(np.float32)
@@ -693,7 +699,36 @@ def local_shape_features_basic(im,scaleStart):
     f[:,:, 11] =  st32[:,:,1]
     f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 )
     return f
+def local_shape_features_basicz(im0,scaleStart):
+    #Exactly as in the Luca Fiaschi paper.
+    im=im0[:,:,1]
+    s = scaleStart
+    
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,13))
 
+    st08 = vigra.filters.structureTensorEigenvalues(im,s*1,s*2)
+    st16 = vigra.filters.structureTensorEigenvalues(im,s*2,s*4)
+    st32 = vigra.filters.structureTensorEigenvalues(im,s*4,s*8)
+
+    f[:,:, 0]  = im
+    f[:,:, 1]  = vigra.filters.gaussianGradientMagnitude(im, s)
+    f[:,:, 2]  = st08[:,:,0]
+    f[:,:, 3]  = st08[:,:,1]
+    f[:,:, 4]  = vigra.filters.laplacianOfGaussian(im, s )
+    f[:,:, 5]  = vigra.filters.gaussianGradientMagnitude(im, s*2) 
+    f[:,:, 6]  =  st16[:,:,0]
+    f[:,:, 7]  = st16[:,:,1]
+    f[:,:, 8]  = vigra.filters.laplacianOfGaussian(im, s*2 )
+    f[:,:, 9]  = vigra.filters.gaussianGradientMagnitude(im, s*4) 
+    f[:,:, 10] =  st32[:,:,0]
+    f[:,:, 11] =  st32[:,:,1]
+    f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 )
+    f[:,:, 13] = im0[:,:,1]
+    f[:,:, 14] = im0[:,:,2]
+    
+    return f
 def channels_for_display(par_obj, int_obj,imRGB):
     '''deals with displaying different channels'''
     count = 0
@@ -736,50 +771,48 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
     t0=time.time()
     #Finds the current frame and file.
     imRGB=return_imRGB_slice_new(par_obj,zslice,tpt)
-    print time.time() -t0
-    imRGB = imRGB
     #deals with displaying different channels
     newImg=channels_for_display(par_obj, int_obj,imRGB)
     newImg=newImg/par_obj.tiffarraymax
-    print time.time() -t0
     if par_obj.overlay and zslice in par_obj.data_store[tpt]['pred_arr']:
         newImg[:,:,2]= (par_obj.data_store[tpt]['pred_arr'][zslice])/par_obj.maxPred
     par_obj.save_im = imRGB
     for i in range(0,int_obj.plt1.lines.__len__()):
         int_obj.plt1.lines.pop(0)
 
-    print time.time() -t0
+    
     int_obj.plt1.images[0].set_data(newImg)
     #int_obj.plt1.set_ylim([0,newImg.shape[0]])
     #int_obj.plt1.set_xlim([newImg.shape[1],0])
-    int_obj.plt1.axis("off")
+    #int_obj.plt1.axis("off")
     #int_obj.plt1.set_xticklabels([])
     #int_obj.plt1.set_yticklabels([])
     int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_z+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
 
     """Deals with displaying Kernel/Prediction/Counts""" 
-    int_obj.image_num_txt.setText('The Current Image is No. ' + str(zslice+1)+' and the time point is: '+str(tpt+1))
-
-    #if int_obj.count_maxima_plot_on.isChecked() == True:
-    #    par_obj.show_pts = True
-    #else:
-#        par_obj.show_pts = False
-
-
-    im2draw = np.zeros((par_obj.height,par_obj.width))
+#    int_obj.image_num_txt.setText('The Current Image is No. ' + str(zslice+1)+' and the time point is: '+str(tpt+1))
+    
+    im2draw=None
     if par_obj.show_pts == 0:
         if zslice in par_obj.data_store[tpt]['dense_arr']:
-            im2draw = par_obj.data_store[tpt]['dense_arr'][zslice]#.astype(np.float32)
-        int_obj.plt2.images[0].set_data(im2draw)
-        int_obj.plt2.images[0].autoscale()
+            im2draw = par_obj.data_store[tpt]['dense_arr'][zslice]
+            int_obj.plt2.images[0].set_data(im2draw)
+            int_obj.plt2.images[0].autoscale()
+            int_obj.canvas2.draw()
 
-        
-        
+        elif np.sum(int_obj.plt2.images[0].get_array()) != 0: #don't update if just zeros 
+            im2draw = np.zeros((par_obj.height,par_obj.width))
+            int_obj.plt2.images[0].set_data(im2draw)
+            int_obj.canvas2.draw()
+
     elif par_obj.show_pts == 1:
         if zslice in par_obj.data_store[tpt]['pred_arr']:
             im2draw = par_obj.data_store[tpt]['pred_arr'][zslice].astype(np.float32)
+        else:
+            im2draw = np.zeros((par_obj.height,par_obj.width))
         int_obj.plt2.images[0].set_data(im2draw)
         int_obj.plt2.images[0].set_clim(None,par_obj.maxPred)
+        int_obj.canvas2.draw()
         
     elif par_obj.show_pts == 2:
         #show det(hessian) array, and (I assume) the green circles?
@@ -793,18 +826,27 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
             if pt2d[2] == ind:
                     pt_x.append(pt2d[1])
                     pt_y.append(pt2d[0])
+        #int_obj.plt2.clear()
+        int_obj.plt2.lines = []
 
-        int_obj.plt2.cla()
-        int_obj.plt1.plot(pt_x,pt_y, 'go')
-        int_obj.plt2.plot(pt_x,pt_y, 'go')
+        int_obj.plt2.axes.plot(pt_x,pt_y, 'go')
+        int_obj.plt2.autoscale_view(tight=True)
+        
+        int_obj.plt1.axes.plot(pt_x,pt_y, 'go')
+        int_obj.plt1.autoscale_view(tight=True)
         
         string_2_show = 'The Predicted Count: ' + str(pts.__len__())
         if zslice in par_obj.data_store[tpt]['maxi_arr']:
             im2draw = par_obj.data_store[tpt]['maxi_arr'][zslice].astype(np.float32)
-        int_obj.plt2.imshow(im2draw)
-        int_obj.canvas1.draw()
-        int_obj.plt2.images[0].set_clim(0,255)
-    int_obj.plt2.axis("off")
+            int_obj.plt2.images[0].set_data(im2draw)
+            int_obj.plt2.images[0].set_clim(0,255)
+            
+            
+        
+        int_obj.canvas2.draw()
+
+
+
     #int_obj.plt2.set_ylim([0,newImg.shape[0]])
     #int_obj.plt2.set_xlim([newImg.shape[1],0])
     int_obj.draw_saved_dots_and_roi()
@@ -812,8 +854,8 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
     
     #ax=int_obj.plt2.axes.images[0]
     #int_obj.plt2.axes.draw_artist(ax)
-
-    int_obj.canvas2.draw()
+    print time.time() -t0
+    
     #pdb.set_trace()
     #int_obj.canvas1.draw()
     #int_obj.canvas2.draw()
@@ -843,12 +885,13 @@ def load_and_initiate_plots(par_obj, int_obj,zslice,tpt):
     
     newImg=np.zeros((int(par_obj.height),int(par_obj.width),3))
     int_obj.plt1.cla()
-    int_obj.plt1.imshow(newImg/par_obj.tiffarraymax)
-    
+    int_obj.plt1.imshow(newImg)
+    int_obj.plt1.axis("off")
 
     int_obj.plt2.cla()
     int_obj.plt2.imshow(newImg)
-    
+    int_obj.plt2.axis("off")
+    int_obj.plt2.autoscale()
     int_obj.cursor.draw_ROI()
     int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_z+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
     
@@ -943,7 +986,6 @@ def get_tiff_slice(par_obj,tpt=[0],zslice=[0],x=[0],y=[0],c=[0]):
         tiff=np.squeeze(tiff2[alist[0],:,:][:,alist[1],:][:,:,alist[2]])
     elif par_obj.order.__len__()==2:
         tiff=np.squeeze(tiff2[alist[0],:][:,alist[1]])
-    print time.time()-t0
     return tiff
     
 def import_data_fn(par_obj,file_array):
@@ -1004,17 +1046,17 @@ def import_data_fn(par_obj,file_array):
                     par_obj.uploadLimit = par_obj.test_im_end
             elif par_obj.file_ext == 'oib'or  par_obj.file_ext == 'oif':
                 par_obj.oib_file = OifFile(imStr)
-                meta = par_obj.oib_file.meta_data(imStr)
 
-                order = meta[1]
+                order = par_obj.oib_file.tiffs.axes
                 for n,b in enumerate(order):
                     if b == 'T':
-                        par_obj.total_time_pt = meta[0][n]-1
+                        par_obj.total_time_pt = par_obj.oib_file.tiffs.shape[n]
                     if b == 'Z':
-                        par_obj.max_zslices = meta[0][n]
+                        par_obj.max_zslices = par_obj.oib_file.tiffs.shape[n]
                     if b == 'C':
-                        par_obj.numCH = meta[0][n]
-                par_obj.oib_prefix = meta[2][0].split('/')[0]
+                        par_obj.numCH = par_obj.oib_file.tiffs.shape[n]
+                #par_obj.oib_prefix = meta[2][0].split('/')[0]
+                par_obj.oib_prefix = par_obj.oib_file.mainfile.name.split('.')[0]
                 order  = meta[3]['axes']
                 for n,b in enumerate(order):
                     if b == 'Y':
@@ -1103,6 +1145,17 @@ def save_output_prediction_fn(par_obj,int_obj):
                 image[tpt,zslice,0,:,:]=par_obj.data_store[tpt]['pred_arr'][zslice].astype(np.float32)
     print 'Prediction written to disk'
     imsave(par_obj.csvPath+par_obj.file_name+'_'+par_obj.modelName+'_Prediction.tif',image, imagej=True)
+    int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
+def save_output_mask_fn(par_obj,int_obj):
+    #funky ordering TZCYX
+
+    image = np.zeros([par_obj.total_time_pt+1,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'uint8')
+    for tpt in par_obj.time_pt_list:
+
+        for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
+            [x,y,z]=par_obj.data_store[tpt]['pts'][i]
+            image[tpt,z,0,y,x]=1
+    imsave(par_obj.csvPath+par_obj.file_name+'_'+par_obj.modelName+'Mask.tif',image, imagej=True)
     int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
 def save_output_data_fn(par_obj,int_obj):
     local_time = time.asctime( time.localtime(time.time()) )

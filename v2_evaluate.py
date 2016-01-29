@@ -27,7 +27,7 @@ import sklearn.utils.lgamma
 from gnu import return_license
 from matplotlib.path import Path
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
-
+import pdb
 #Apparently matplotlib slows the loading drammatically due to a font cache issue. This resolves it.
 try:
     #mac location.
@@ -45,7 +45,6 @@ except:
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import v2_functions as v2
-
 """QuantiFly3d Software v0.1
 
     Copyright (C) 2016  Dominic Waithe Martin Hailstone
@@ -391,7 +390,7 @@ class Eval_load_model_win(QtGui.QWidget):
 
             #par_obj.gt_vec = save_file["gt_vec"]
             #par_obj.error_vec = save_file["error_vec"]
-            save_im = 255-save_file["imFile"]
+            save_im = save_file["imFile"]
             self.image_status_text.showMessage('Status: Model loaded. ')
             success = True
 
@@ -420,7 +419,7 @@ class Eval_load_model_win(QtGui.QWidget):
             self.modelImTxt4.setText('Feature Scale: '+str(par_obj.feature_scale))
             self.modelImTxt5.setText('Feature Type: '+str(par_obj.feature_type))
             self.modelImTxt6.setText('Channels: '+str(par_obj.ch_active))
-            self.plt1.imshow(save_im)
+            self.plt1.imshow(save_im/np.max(save_im))
             self.canvas1.draw()
             self.gotoEvalButton.setEnabled(True)
             evalImWin.eval_im_btn.setEnabled(True)
@@ -673,6 +672,9 @@ class Eval_disp_im_win(QtGui.QWidget):
 
         self.save_output_prediction_btn = QtGui.QPushButton('Save Prediction')
         self.save_output_prediction_btn.clicked.connect(self.save_output_prediction)
+        
+        self.save_output_mask_btn = QtGui.QPushButton('Save Point Mask')
+        self.save_output_mask_btn.clicked.connect(self.save_output_mask)  
   
         self.save_output_link = QtGui.QLabel()
         self.save_output_link.setText('''<p><a href="'''+str(par_obj.csvPath)+'''">Goto output folder</a></p>
@@ -688,6 +690,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.top_right_grid.addWidget(self.eval_im_btn, 0, 0)
         self.top_right_grid.addWidget(self.save_output_data_btn, 1, 0)
         self.top_right_grid.addWidget(self.save_output_prediction_btn,1,1)
+        self.top_right_grid.addWidget(self.save_output_mask_btn,0,1)
         self.top_right_grid.addWidget(self.count_all_btn, 2,0)
         self.top_right_grid.addWidget(self.output_count_txt,2,1,1,4)
         #self.top_right_grid.addWidget(self.save_output_link, 2, 0)
@@ -836,10 +839,14 @@ class Eval_disp_im_win(QtGui.QWidget):
         par_obj.min_distance[2]= int(self.count_txt_3.text())
         par_obj.abs_thr =float(self.abs_thr_txt.text())
         par_obj.rel_thr =float(self.rel_thr_txt.text())
+        
         self.count_maxima(par_obj.time_pt)
-        par_obj.show_pts= 2
+        par_obj.show_pts= 1
+        self.kernel_btn_fn()
         #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
-        self.goto_img_fn(par_obj.curr_z,par_obj)
+        #self.goto_img_fn(par_obj.curr_z,par_obj)
+        #self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
+        return
     def count_maxima(self,time_pt):
 
         predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.num_of_train_im))
@@ -923,6 +930,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.count_all_btn.setEnabled(True)
         self.save_output_data_btn.setEnabled(True)
         self.save_output_prediction_btn.setEnabled(True)
+        self.save_output_mask_btn.setEnabled(True)
         self.image_status_text.showMessage('Status: evaluation finished.')
         par_obj.eval_load_im_win_eval = True
         par_obj.time_pt = 0
@@ -933,6 +941,8 @@ class Eval_disp_im_win(QtGui.QWidget):
         v2.save_output_data_fn(par_obj,self)
     def save_output_prediction(self):
         v2.save_output_prediction_fn(par_obj,self)
+    def save_output_mask(self):
+        v2.save_output_mask_fn(par_obj,self)
     def report_progress(self,message):
         self.image_status_text.showMessage('Status: ' + message)
         app.processEvents()

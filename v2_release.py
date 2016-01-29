@@ -384,22 +384,22 @@ class Load_win_fn(QtGui.QWidget):
         self.about_win.show()
         self.about_win.raise_()
     def resize_factor_change(self,text):
-        """Updates on change of feature scale"""
+        """Updates on change of image resize parameter"""
         if text != "":
             par_obj.resize_factor = float(text)
     def sampling_change(self,text):
-        """Updates on change of feature scale"""
+        """Updates on change of sampling"""
         if (text != ""):
             par_obj.limit_ratio_size = float(text)
     def features_change(self,text):
-        """Updates on change of feature scale"""
+        """Updates on change of feature number"""
         if (text != ""):
             par_obj.max_features = int(text)  
     def feature_scale_change(self,text):
         """Updates on change of feature scale"""
         if (text != ""):
             par_obj.feature_scale = float(text)
-            for tp in range(0,par_obj.total_time_pt):
+            for tp in range(0,par_obj.total_time_pt+1):
                 par_obj.data_store[tp]['feat_arr'] = {}   
     def updateAfterImport(self):
         """Specific to ui updates"""
@@ -1000,6 +1000,7 @@ class Win_fn(QtGui.QWidget):
         win_tab.setCurrentWidget(win)
         app.processEvents()
         self.checkChange()
+        
 
     def on_click(self,event):
         """When the image is clicked"""
@@ -1400,6 +1401,13 @@ class Win_fn(QtGui.QWidget):
         if (text != ""):
             par_obj.sigma_data = float(text)
             v2.refresh_all_density(par_obj)
+            par_obj.min_distance[0]= int(round(par_obj.sigma_data))
+            par_obj.min_distance[1]= int(round(par_obj.sigma_data))
+            par_obj.min_distance[2]= int(round(par_obj.sigma_data))
+            self.count_txt_1.setText(str(par_obj.min_distance[0]))
+            self.count_txt_2.setText(str(par_obj.min_distance[1]))
+            self.count_txt_3.setText(str(par_obj.min_distance[2]))
+            
             self.update_density_fn()
     def feat_scale_change_btn_fn(self):
         self.feat_scale_change_btn.setEnabled(False)
