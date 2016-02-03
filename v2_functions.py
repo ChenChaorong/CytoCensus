@@ -643,31 +643,54 @@ def local_shape_features_fine(im,scaleStart):
     st128 = vigra.filters.structureTensorEigenvalues(im,s*16,s*32)
     
     f[:,:, 0]  = im
-    f[:,:, 1]  = vigra.filters.gaussianGradientMagnitude(im, s)
+    f[:,:, 1]  = vigra.filters.gaussianGradientMagnitude(im, s,window_size=2.5)
     f[:,:, 2]  = st08[:,:,0]
     f[:,:, 3]  = st08[:,:,1]
-    f[:,:, 4]  = vigra.filters.laplacianOfGaussian(im, s )
-    f[:,:, 5]  = vigra.filters.gaussianGradientMagnitude(im, s*2) 
+    f[:,:, 4]  = vigra.filters.laplacianOfGaussian(im, s ,window_size=2.5)
+    f[:,:, 5]  = vigra.filters.gaussianGradientMagnitude(im, s*2,window_size=2.5) 
     f[:,:, 6]  =  st16[:,:,0]
     f[:,:, 7]  = st16[:,:,1]
-    f[:,:, 8]  = vigra.filters.laplacianOfGaussian(im, s*2 )
-    f[:,:, 9]  = vigra.filters.gaussianGradientMagnitude(im, s*4) 
+    f[:,:, 8]  = vigra.filters.laplacianOfGaussian(im, s*2 ,window_size=2.5)
+    f[:,:, 9]  = vigra.filters.gaussianGradientMagnitude(im, s*4,window_size=2.5) 
     f[:,:, 10] =  st32[:,:,0]
     f[:,:, 11] =  st32[:,:,1]
-    f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 )
-    f[:,:, 13] = vigra.filters.gaussianGradientMagnitude(im, s*8) 
+    f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 ,window_size=2.5)
+    f[:,:, 13] = vigra.filters.gaussianGradientMagnitude(im, s*8,window=2.5) 
     f[:,:, 14] =  st64[:,:,0]
     f[:,:, 15] =  st64[:,:,1]
-    f[:,:, 16] = vigra.filters.laplacianOfGaussian(im, s*8 )
-    f[:,:, 17] = vigra.filters.gaussianGradientMagnitude(im, s*16) 
+    f[:,:, 16] = vigra.filters.laplacianOfGaussian(im, s*8 ,window_size=2.5)
+    f[:,:, 17] = vigra.filters.gaussianGradientMagnitude(im, s*16,window_size=2.5) 
     f[:,:, 18] =  st128[:,:,0]
     f[:,:, 19] =  st128[:,:,1]
-    f[:,:, 20] = vigra.filters.laplacianOfGaussian(im, s*16 )
+    f[:,:, 20] = vigra.filters.laplacianOfGaussian(im, s*16 ,window_size=2.5)
    
     
     
     return f
 
+def local_shape_features_basic_gauss(im,scaleStart):
+    #Exactly as in the Luca Fiaschi paper.
+    s = scaleStart
+    
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,13))
+
+    f[:,:, 0]  = im
+    f[:,:, 1]  = vigra.filters.gaussianGradientMagnitude(im, s)
+    f[:,:, 2]  = vigra.filters.laplacianOfGaussian(im, s )
+    f[:,:, 3]  = vigra.filters.gaussianGradientMagnitude(im, s*2) 
+    f[:,:, 4]  = vigra.filters.laplacianOfGaussian(im, s*2 )
+    f[:,:, 5]  = vigra.filters.gaussianGradientMagnitude(im, s*4) 
+    f[:,:, 6] = vigra.filters.laplacianOfGaussian(im, s*4 )
+    f[:,:, 7]  = vigra.filters.gaussianGradientMagnitude(im, s*8) 
+    f[:,:, 8]  = vigra.filters.laplacianOfGaussian(im, s*8 )
+    f[:,:, 9]  = vigra.filters.gaussianGradientMagnitude(im, s*16) 
+    f[:,:, 10] = vigra.filters.laplacianOfGaussian(im, s*16 )
+    f[:,:, 11]  = vigra.filters.gaussianGradientMagnitude(im, s*32) 
+    f[:,:, 12]  = vigra.filters.laplacianOfGaussian(im, s*32 )
+
+    return f
 def local_shape_features_basic(im,scaleStart):
     #Exactly as in the Luca Fiaschi paper.
     s = scaleStart
@@ -681,53 +704,23 @@ def local_shape_features_basic(im,scaleStart):
     st32 = vigra.filters.structureTensorEigenvalues(im,s*4,s*8)
 
     f[:,:, 0]  = im
-    f[:,:, 1]  = vigra.filters.gaussianGradientMagnitude(im, s)
+    f[:,:, 1]  = vigra.filters.gaussianGradientMagnitude(im, s,window_size=2.5)
 
     f[:,:, 2]  = st08[:,:,0]
     f[:,:, 3]  = st08[:,:,1]
-    f[:,:, 4]  = vigra.filters.laplacianOfGaussian(im, s )
+    f[:,:, 4]  = vigra.filters.laplacianOfGaussian(im, s ,window_size=2.5)
 
-    f[:,:, 5]  = vigra.filters.gaussianGradientMagnitude(im, s*2) 
+    f[:,:, 5]  = vigra.filters.gaussianGradientMagnitude(im, s*2,window_size=2.5) 
 
     f[:,:, 6]  =  st16[:,:,0]
     f[:,:, 7]  = st16[:,:,1]
-    f[:,:, 8]  = vigra.filters.laplacianOfGaussian(im, s*2 )
+    f[:,:, 8]  = vigra.filters.laplacianOfGaussian(im, s*2 ,window_size=2.5)
 
-    f[:,:, 9]  = vigra.filters.gaussianGradientMagnitude(im, s*4) 
+    f[:,:, 9]  = vigra.filters.gaussianGradientMagnitude(im, s*4,window_size=2.5) 
 
     f[:,:, 10] =  st32[:,:,0]
     f[:,:, 11] =  st32[:,:,1]
-    f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 )
-    return f
-def local_shape_features_basicz(im0,scaleStart):
-    #Exactly as in the Luca Fiaschi paper.
-    im=im0[:,:,1]
-    s = scaleStart
-    
-    imSizeC = im.shape[0]
-    imSizeR = im.shape[1]
-    f = np.zeros((imSizeC,imSizeR,13))
-
-    st08 = vigra.filters.structureTensorEigenvalues(im,s*1,s*2)
-    st16 = vigra.filters.structureTensorEigenvalues(im,s*2,s*4)
-    st32 = vigra.filters.structureTensorEigenvalues(im,s*4,s*8)
-
-    f[:,:, 0]  = im
-    f[:,:, 1]  = vigra.filters.gaussianGradientMagnitude(im, s)
-    f[:,:, 2]  = st08[:,:,0]
-    f[:,:, 3]  = st08[:,:,1]
-    f[:,:, 4]  = vigra.filters.laplacianOfGaussian(im, s )
-    f[:,:, 5]  = vigra.filters.gaussianGradientMagnitude(im, s*2) 
-    f[:,:, 6]  =  st16[:,:,0]
-    f[:,:, 7]  = st16[:,:,1]
-    f[:,:, 8]  = vigra.filters.laplacianOfGaussian(im, s*2 )
-    f[:,:, 9]  = vigra.filters.gaussianGradientMagnitude(im, s*4) 
-    f[:,:, 10] =  st32[:,:,0]
-    f[:,:, 11] =  st32[:,:,1]
-    f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 )
-    f[:,:, 13] = im0[:,:,1]
-    f[:,:, 14] = im0[:,:,2]
-    
+    f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 ,window_size=2.5)
     return f
 def channels_for_display(par_obj, int_obj,imRGB):
     '''deals with displaying different channels'''
