@@ -468,7 +468,6 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,threaded=False,b=0
         par_obj.crop_y2=par_obj.height
     par_obj.height = par_obj.crop_y2-par_obj.crop_y1
     par_obj.width = par_obj.crop_x2-par_obj.crop_x1
-    
     if threaded == False:
         for tpt in tptList:
             for zslice in zsliceList:
@@ -486,6 +485,7 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,threaded=False,b=0
 
         imRGBlist=[]
         for tpt in tptList:
+
             for zslice in zsliceList:
                 if zslice not in par_obj.data_store[tpt]['feat_arr']:
                     imRGB=return_imRGB_slice_new(par_obj,zslice,tpt)
@@ -509,7 +509,9 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,threaded=False,b=0
                     lcount=lcount+1
                     feat=featlist[lcount]
                     int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(zslice+1)+' Timepoint: '+str(tpt+1))
+
                     par_obj.num_of_feat = feat.shape[2]
+
                     par_obj.data_store[tpt]['feat_arr'][zslice] = feat  
         int_obj.report_progress('Features calculated')
     return
@@ -517,18 +519,19 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,threaded=False,b=0
 
 def return_imRGB_slice_new(par_obj,zslice,tpt):
     '''Fetches slice zslice of timepoint tpt'''
+    if type(zslice) is not list: zslice = [zslice]
     if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
         
         imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
         if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
             #input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
-            input_im = get_tiff_slice(par_obj,[tpt],[zslice],range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor),range(par_obj.numCH))
+            input_im = get_tiff_slice(par_obj,[tpt],zslice,range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor),range(par_obj.numCH))
 
             for c in range(0,par_obj.ch_active.__len__()):
                 imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
         else:
             #input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
-            input_im = get_tiff_slice(par_obj,[tpt],[zslice],range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor))
+            input_im = get_tiff_slice(par_obj,[tpt],zslice,range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor))
 
             imRGB[:,:,0] = input_im[:,:]
             imRGB[:,:,1] = input_im[:,:]
@@ -550,9 +553,10 @@ def return_imRGB_slice_new(par_obj,zslice,tpt):
             
             imRGB[:,:,par_obj.ch_active[c]] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
     return imRGB
-    
-def feature_create_threadable(par_obj,imStr,imRGB,imZ=None):
+
+def feature_create_threadable(par_obj,imStr,imRGB):
     time1 = time.time()
+    
     if (par_obj.feature_type == 'basic'):
         feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),13*par_obj.ch_active.__len__()))
     if (par_obj.feature_type == 'fine'):
@@ -568,11 +572,6 @@ def feature_create_threadable(par_obj,imStr,imRGB,imZ=None):
             imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
 
             feat[:,:,(b*21):((b+1)*21)] = local_shape_features_fine(imG,par_obj.feature_scale)
-        if (par_obj.feature_type == 'basicz'):
-            imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
-            imG = imZ[:,:,par_obj.ch_active[b]].astype(np.float32)
-
-            feat[:,:,(b*21):((b+1)*21)] = local_shape_features_basicz(imG,par_obj.feature_scale,)
 
     if par_obj.numCH==0:
         imG = imRGB[:,:,0].astype(np.float32)
