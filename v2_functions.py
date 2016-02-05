@@ -27,7 +27,6 @@ import scipy
 from multiprocessing import Pool
 from multiprocessing.dummy import Pool as ThreadPool 
 
-
 import pdb
 """QuantiFly3d Software v0.1
 
@@ -525,7 +524,7 @@ def return_imRGB_slice_new(par_obj,zslice,tpt):
         imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
         if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
             #input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
-            input_im = get_tiff_slice(par_obj,[tpt],zslice,range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor),range(par_obj.numCH))
+            input_im = get_tiff_slice(par_obj,[tpt],zslice,range(0,par_obj.ori_width,int(par_obj.resize_factor)),range(0,par_obj.ori_height,int(par_obj.resize_factor)),range(par_obj.numCH))
 
             for c in range(0,par_obj.ch_active.__len__()):
                 imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
@@ -654,7 +653,7 @@ def local_shape_features_fine(im,scaleStart):
     f[:,:, 10] =  st32[:,:,0]
     f[:,:, 11] =  st32[:,:,1]
     f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 ,window_size=2.5)
-    f[:,:, 13] = vigra.filters.gaussianGradientMagnitude(im, s*8,window=2.5) 
+    f[:,:, 13] = vigra.filters.gaussianGradientMagnitude(im, s*8,window_size=2.5) 
     f[:,:, 14] =  st64[:,:,0]
     f[:,:, 15] =  st64[:,:,1]
     f[:,:, 16] = vigra.filters.laplacianOfGaussian(im, s*8 ,window_size=2.5)
@@ -667,29 +666,6 @@ def local_shape_features_fine(im,scaleStart):
     
     return f
 
-def local_shape_features_basic_gauss(im,scaleStart):
-    #Exactly as in the Luca Fiaschi paper.
-    s = scaleStart
-    
-    imSizeC = im.shape[0]
-    imSizeR = im.shape[1]
-    f = np.zeros((imSizeC,imSizeR,13))
-
-    f[:,:, 0]  = im
-    f[:,:, 1]  = vigra.filters.gaussianGradientMagnitude(im, s)
-    f[:,:, 2]  = vigra.filters.laplacianOfGaussian(im, s )
-    f[:,:, 3]  = vigra.filters.gaussianGradientMagnitude(im, s*2) 
-    f[:,:, 4]  = vigra.filters.laplacianOfGaussian(im, s*2 )
-    f[:,:, 5]  = vigra.filters.gaussianGradientMagnitude(im, s*4) 
-    f[:,:, 6] = vigra.filters.laplacianOfGaussian(im, s*4 )
-    f[:,:, 7]  = vigra.filters.gaussianGradientMagnitude(im, s*8) 
-    f[:,:, 8]  = vigra.filters.laplacianOfGaussian(im, s*8 )
-    f[:,:, 9]  = vigra.filters.gaussianGradientMagnitude(im, s*16) 
-    f[:,:, 10] = vigra.filters.laplacianOfGaussian(im, s*16 )
-    f[:,:, 11]  = vigra.filters.gaussianGradientMagnitude(im, s*32) 
-    f[:,:, 12]  = vigra.filters.laplacianOfGaussian(im, s*32 )
-
-    return f
 def local_shape_features_basic(im,scaleStart):
     #Exactly as in the Luca Fiaschi paper.
     s = scaleStart
@@ -756,7 +732,7 @@ def channels_for_display(par_obj, int_obj,imRGB):
             newImg[:,:,2] = imRGB[:,:,2]
 
     return newImg
-    
+
 def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
     """Loads up requested image and displays"""
     b=0
@@ -877,11 +853,11 @@ def load_and_initiate_plots(par_obj, int_obj,zslice,tpt):
     
     newImg=np.zeros((int(par_obj.height),int(par_obj.width),3))
     int_obj.plt1.cla()
-    int_obj.plt1.imshow(newImg)
+    int_obj.plt1.imshow(newImg,interpolation='nearest')
     int_obj.plt1.axis("off")
 
     int_obj.plt2.cla()
-    int_obj.plt2.imshow(newImg)
+    int_obj.plt2.imshow(newImg,interpolation='none')
     int_obj.plt2.axis("off")
     int_obj.plt2.autoscale()
     int_obj.cursor.draw_ROI()
@@ -1003,8 +979,20 @@ def import_data_fn(par_obj,file_array):
             if par_obj.file_ext == 'tif' or par_obj.file_ext == 'tiff':
                 par_obj.tiff_file = TiffFile(imStr)
                 meta = par_obj.tiff_file.series[0]
-                
-                
+                try: #if an imagej file, we know where, and can extract the x,y,z
+                    x = par_obj.tiff_file.pages[0].tags.x_resolution
+                    y = par_obj.tiff_file.pages[0].tags.x_resolution
+                    if x!=y: raise Exception('x resolution different to y resolution')# if this isn't true then something is wrong
+                    x_res=float(x[1])/float(x[0])
+                    
+                    z=par_obj.tiff_file.pages[0].imagej_tags['spacing']
+                    par_obj.z_calibration = z/x_res
+                    print ('z_scale_factor', par_obj.z_calibration)
+                except:
+                    #might need to modify this to work with OME-TIFFs
+                    print 'tiff resolution not recognised'
+                    
+                    
                 order = meta.axes
                 par_obj.order =order
                 for n,b in enumerate(order):
@@ -1143,10 +1131,10 @@ def save_output_mask_fn(par_obj,int_obj):
 
     image = np.zeros([par_obj.total_time_pt+1,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'uint8')
     for tpt in par_obj.time_pt_list:
-
+        
         for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
             [x,y,z]=par_obj.data_store[tpt]['pts'][i]
-            image[tpt,z,0,y,x]=1
+            image[tpt,z,0,x,y]=255
     imsave(par_obj.csvPath+par_obj.file_name+'_'+par_obj.modelName+'Mask.tif',image, imagej=True)
     int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
 def save_output_data_fn(par_obj,int_obj):

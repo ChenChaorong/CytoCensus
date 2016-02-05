@@ -1403,7 +1403,7 @@ class Win_fn(QtGui.QWidget):
             v2.refresh_all_density(par_obj)
             par_obj.min_distance[0]= int(round(par_obj.sigma_data))
             par_obj.min_distance[1]= int(round(par_obj.sigma_data))
-            par_obj.min_distance[2]= int(round(par_obj.sigma_data))
+            par_obj.min_distance[2]= int(round(par_obj.sigma_data/par_obj.z_calibration))
             self.count_txt_1.setText(str(par_obj.min_distance[0]))
             self.count_txt_2.setText(str(par_obj.min_distance[1]))
             self.count_txt_3.setText(str(par_obj.min_distance[2]))
@@ -1602,6 +1602,7 @@ class parameterClass:
         self.oldImg=[]
         self.newImg=[]
         
+        self.z_calibration=1
         self.t={}
         self.z={}
         self.i={}
