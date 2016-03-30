@@ -20,6 +20,7 @@ from matplotlib.figure import Figure
 from scipy.ndimage import filters
 import v2_functions as v2
 
+import numdifftools as ndt
 import pdb
 
 
@@ -311,16 +312,17 @@ class Load_win_fn(QtGui.QWidget):
         self.radio_group=QtGui.QButtonGroup(self) # Number
         self.r0 = QtGui.QRadioButton("Basic",self)
         self.r1 = QtGui.QRadioButton("Fine",self)
-
+        self.r2 = QtGui.QRadioButton("Fine3",self)
         self.r0.setChecked(True)
         self.radio_group.addButton(self.r0)
         self.radio_group.addButton(self.r1)
-
+        self.radio_group.addButton(self.r2)
         vbox.addWidget(self.r0)
         vbox.addWidget(self.r1)
-
+        vbox.addWidget(self.r2)
         self.r0.hide()
         self.r1.hide()
+        self.r2.hide()
         vbox.addStretch()
         #Green status text.
 
@@ -386,7 +388,7 @@ class Load_win_fn(QtGui.QWidget):
     def resize_factor_change(self,text):
         """Updates on change of image resize parameter"""
         if text != "":
-            par_obj.resize_factor = float(text)
+            par_obj.resize_factor = int(text)
     def sampling_change(self,text):
         """Updates on change of sampling"""
         if (text != ""):
@@ -462,6 +464,7 @@ class Load_win_fn(QtGui.QWidget):
         self.featuresText.show()
         self.r0.show()
         self.r1.show()
+        self.r2.show()
         self.Text_Radio.show()
     def hyphen_range(self,s):
         """ yield each integer from a complex range string like "1-9,12, 15-20,23"
@@ -524,10 +527,11 @@ class Load_win_fn(QtGui.QWidget):
         par_obj.eval_load_im_win_eval = False
 
         if self.r0.isChecked():
-            par_obj.feature_type = 'basic'
+            par_obj.feature_type = 'patch'
         if self.r1.isChecked():
             par_obj.feature_type = 'fine'
-
+        if self.r2.isChecked():
+            par_obj.feature_type = 'fine3'
         #Now we commit our options to our imported files.
         if par_obj.file_ext == 'png':
             for i in range(0,par_obj.file_array.__len__()):
@@ -930,35 +934,15 @@ class Win_fn(QtGui.QWidget):
         self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
     def replot_fn(self):
             v2.eval_pred_show_fn(par_obj.curr_z,par_obj,self)
+            
+
     def count_maxima_btn_fn(self):
-        predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.num_of_train_im))
-        for i in range(0,par_obj.frames_2_load[0].__len__()):
-            predMtx[:,:,i]= par_obj.data_store[par_obj.time_pt]['pred_arr'][par_obj.frames_2_load[0][i]]
+        t0=time.time()
 
-
-        gau_stk = filters.gaussian_filter(predMtx,[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-        y,x,z = np.gradient(gau_stk,1)
-        xy,xx,xz = np.gradient(x)
-        yy,yx,yz = np.gradient(y)
-        zy,zx,zz = np.gradient(z)
-        det = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
-        detl = -1*np.min(det)+det
-        detn = detl/np.max(detl)*255
-        par_obj.data_store[par_obj.time_pt]['maxi_arr'] = {}
-        for i in range(0,par_obj.frames_2_load[0].__len__()):
-            par_obj.data_store[par_obj.time_pt]['maxi_arr'][par_obj.frames_2_load[0][i]] = detn[:,:,i]
-        #instk = (255*(detn/np.max(detn))).astype(np.int32)
-        par_obj.min_distance = [int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())]
-        par_obj.abs_thr = float(self.abs_thr_txt.text())
-        par_obj.rel_thr = float(self.rel_thr_txt.text())
-
-
-
-        pts = v2.peak_local_max(detn,min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
-        par_obj.data_store[par_obj.time_pt]['pts'] = pts
-
-        #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-
+        par_obj.min_distance = [float(self.count_txt_1.text()),float(self.count_txt_2.text()),float(self.count_txt_3.text())]
+        par_obj.abs_thr =float(self.abs_thr_txt.text())
+        par_obj.rel_thr =float(self.rel_thr_txt.text())
+        v2.count_maxima(par_obj,par_obj.time_pt)
         par_obj.show_pts = 1
         self.kernel_btn_fn()
 
@@ -1056,7 +1040,7 @@ class Win_fn(QtGui.QWidget):
     def on_unclick(self, event):
         """When the mouse is released"""
         par_obj.mouse_down = False
-
+        self.on_resize(None) #ensures zoom is updated when scaling in figure1
         #If we are in the roi drawing phase
         if(par_obj.draw_ROI == True):
             t2 = time.time()
@@ -1312,6 +1296,7 @@ class Win_fn(QtGui.QWidget):
 
     def goto_img_fn(self,zslice,tpt):
         #Goto and evaluate image function.
+
         v2.goto_img_fn_new(par_obj,self,zslice,tpt)
         #v2.return_imRGB_slice_new(par_obj,zslice,tpt)
         #self.draw_saved_dots_and_roi()
@@ -1400,6 +1385,7 @@ class Win_fn(QtGui.QWidget):
     def sigmaOnChange(self,text):
         if (text != ""):
             par_obj.sigma_data = float(text)
+            par_obj.gaussian_im_max=[]
             v2.refresh_all_density(par_obj)
             par_obj.min_distance[0]= int(round(par_obj.sigma_data))
             par_obj.min_distance[1]= int(round(par_obj.sigma_data))
@@ -1504,6 +1490,7 @@ class Win_fn(QtGui.QWidget):
     def checkChange(self):
         #v2.eval_goto_img_fn(par_obj, self,par_obj.curr_z,par_obj.time_pt)
         v2.load_and_initiate_plots(par_obj, self,par_obj.curr_z,par_obj.time_pt)
+        self.sigmaOnChange(par_obj.sigma_data) #makes sure Z_calibration is set
 
 class checkBoxCH(QtGui.QCheckBox):
     def __init__(self):
@@ -1537,7 +1524,7 @@ class checkBoxCH(QtGui.QCheckBox):
             win.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
 
 
-class parameterClass:
+class parameterClass(object):
     def __init__(self):
 
         self.roi_tolerance = 10
@@ -1553,7 +1540,7 @@ class parameterClass:
         self.min_samples_split=20
         self.min_samples_leaf=10
         self.max_features = 14#7
-        self.num_of_tree = 50#30
+        self.num_of_tree = 75#50#30
         self.feature_scale = 1.2
         self.x_limit = 5024
         self.y_limit = 5024
@@ -1601,6 +1588,7 @@ class parameterClass:
         self.prev_img=[]
         self.oldImg=[]
         self.newImg=[]
+        self.gaussian_im_max=[]
         
         self.z_calibration=1
         self.t={}
@@ -1610,6 +1598,8 @@ class parameterClass:
         
         self.curr_file=0
         self.max_file=0
+        self.max_det=[]
+        
 #generate layout
 app = QtGui.QApplication([])
 

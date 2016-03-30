@@ -811,7 +811,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
     def count_all_fn(self):
         for tpt in par_obj.time_pt_list:
-            self.count_maxima(tpt)
+            v2.count_maxima(par_obj,tpt)
         par_obj.show_pts = 1
         self.kernel_btn_fn()
     def kernel_btn_fn(self):
@@ -840,60 +840,13 @@ class Eval_disp_im_win(QtGui.QWidget):
         par_obj.abs_thr =float(self.abs_thr_txt.text())
         par_obj.rel_thr =float(self.rel_thr_txt.text())
         
-        self.count_maxima(par_obj.time_pt)
+        v2.count_maxima(par_obj,par_obj.time_pt)
         par_obj.show_pts= 1
         self.kernel_btn_fn()
         #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
         #self.goto_img_fn(par_obj.curr_z,par_obj)
         #self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
         return
-    def count_maxima(self,time_pt):
-
-        predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.num_of_train_im))
-        for i in range(par_obj.test_im_start,par_obj.test_im_end):
-            predMtx[:,:,i]= par_obj.data_store[time_pt]['pred_arr'][i]
-       
-        gau_stk = filters.gaussian_filter(predMtx,par_obj.min_distance)
-        y,x,z = np.gradient(gau_stk,1)
-        xy,xx,xz = np.gradient(x)
-        yy,yx,yz = np.gradient(y)
-        zy,zx,zz = np.gradient(z)
-        det = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
-        detl = -1*np.min(det)+det
-        detn = detl/np.max(detl)*255
-        par_obj.data_store[time_pt]['maxi_arr'] = {}
-        for i in range(par_obj.test_im_start,par_obj.test_im_end):
-            par_obj.data_store[time_pt]['maxi_arr'][i] = detn[:,:,i]
-        
-        
-
-        pts = v2.peak_local_max(detn, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
-        
-        #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-
-        par_obj.show_pts = 1
-
-        #Filter those which are not inside the region.
-        if par_obj.data_store[time_pt]['roi_stkint_x'].__len__() >0:
-            pts2keep = []
-            
-            for i in par_obj.data_store[time_pt]['roi_stkint_x']:
-                 for pt2d in pts:
-
-
-                    if pt2d[2] == i:
-                        #Find the region of interest.
-                        ppt_x = par_obj.data_store[time_pt]['roi_stkint_x'][i]
-                        ppt_y = par_obj.data_store[time_pt]['roi_stkint_y'][i]
-                        #Reformat to make the path object.
-                        pot = []
-                        for b in range(0,ppt_x.__len__()):
-                            pot.append([ppt_x[b],ppt_y[b]])
-                        p = Path(pot)
-                        if p.contains_point([pt2d[1],pt2d[0]]) == True:
-                                pts2keep.append(pt2d)
-            pts = pts2keep
-        par_obj.data_store[time_pt]['pts'] = pts
 
         
     def evaluate_images(self):
@@ -916,7 +869,7 @@ class Eval_disp_im_win(QtGui.QWidget):
                     v2.evaluate_forest_new(par_obj,self,False,0,[i],[tpt],False,b)
                     count = count+1
             par_obj.data_store[tpt]['feat_arr'] = {}
-            self.count_maxima(tpt)
+            v2.count_maxima(par_obj,tpt)
 
         self.count_txt_1.setText(str(par_obj.min_distance[0]))
         self.count_txt_2.setText(str(par_obj.min_distance[1]))
@@ -1268,7 +1221,7 @@ class Parameter_class:
         self.prev_img=[]
         self.oldImg=[]
         self.newImg=[]
-
+        self.max_det=[]
 
 #Creates win, an instance of QWidget
 class widgetSP(QtGui.QWidget):

@@ -7,9 +7,11 @@ import pylab
 import csv
 import time
 from skimage.filters.rank import entropy
-from skimage import feature
+from skimage import feature as skfeat
 from skimage import morphology
-from sklearn.ensemble import ExtraTreesRegressor
+from sklearn.ensemble import *
+import sklearn
+from sklearn import linear_model
 import cPickle as pickle
 from scipy.ndimage import filters
 from scipy import signal
@@ -21,13 +23,16 @@ import itertools as itt
 import struct
 import copy
 import functools
+import matplotlib
 from matplotlib.lines import Line2D
 from matplotlib.path import Path
 import scipy
 from multiprocessing import Pool
 from multiprocessing.dummy import Pool as ThreadPool 
-
+import modest_image
 import pdb
+import scipy.ndimage as ndimage
+import skimage
 """QuantiFly3d Software v0.1
 
     Copyright (C) 2016  Dominic Waithe Martin Hailstone
@@ -135,34 +140,6 @@ def peak_local_max(image,min_distance=10, threshold_abs=0, threshold_rel=0.1,
 
     """
     out = np.zeros_like(image, dtype=np.bool)
-    # In the case of labels, recursively build and return an output
-    # operating on each label separately
-    """
-    if labels is not None:
-        label_values = np.unique(labels)
-        # Reorder label values to have consecutive integers (no gaps)
-        if np.any(np.diff(label_values) != 1):
-            mask = labels >= 1
-            labels[mask] = 1 + rank_order(labels[mask])[0].astype(labels.dtype)
-        labels = labels.astype(np.int32)
-
-        # New values for new ordering
-        label_values = np.unique(labels)
-        for label in label_values[label_values != 0]:
-            maskim = (labels == label)
-            out += peak_local_max(image * maskim, min_distance=min_distance,
-                                  threshold_abs=threshold_abs,
-                                  threshold_rel=threshold_rel,
-                                  exclude_border=exclude_border,
-                                  indices=False, num_peaks=np.inf,
-                                  footprint=footprint, labels=None,overlap=overlap)
-
-        if indices is True:
-            return np.transpose(out.nonzero())
-        else:
-            return out.astype(np.bool)
-            """
-
 
 
     if np.all(image == image.flat[0]):
@@ -224,7 +201,59 @@ Original author: Lee Kamentstky
 """
 import numpy as np
 
+def count_maxima(par_obj,time_pt):
 
+    predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.num_of_train_im))
+    for i in range(par_obj.test_im_start,par_obj.test_im_end):
+        predMtx[:,:,i]= par_obj.data_store[time_pt]['pred_arr'][i]
+
+    gau_stk = filters.gaussian_filter(predMtx,par_obj.min_distance)
+    y,x,z = np.gradient(gau_stk,1)
+    xy,xx,xz = np.gradient(x)
+    yy,yx,yz = np.gradient(y)
+    zy,zx,zz = np.gradient(z)
+    det = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
+    #detl = -1*np.min(det)+det
+    #det[np.where(det<0)]=0
+    # if not already set, create. This is then used for the entire image and all subsequent training. A little hacky, but otherwise the normalisation screws everything up
+    if not par_obj.max_det:
+        par_obj.max_det=np.max(det)
+        
+    detn = det/par_obj.max_det
+    par_obj.data_store[time_pt]['maxi_arr'] = {}
+    for i in range(par_obj.test_im_start,par_obj.test_im_end):
+        #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
+        par_obj.data_store[time_pt]['maxi_arr'][i] = detn[:,:,i]
+    
+
+    pts = peak_local_max(detn, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
+
+    #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
+
+    par_obj.show_pts = 1
+
+    #Filter those which are not inside the region.
+    if par_obj.data_store[time_pt]['roi_stkint_x'].__len__() >0:
+        pts2keep = []
+        
+        for i in par_obj.data_store[time_pt]['roi_stkint_x']:
+             for pt2d in pts:
+
+
+                if pt2d[2] == i:
+                    #Find the region of interest.
+                    ppt_x = par_obj.data_store[time_pt]['roi_stkint_x'][i]
+                    ppt_y = par_obj.data_store[time_pt]['roi_stkint_y'][i]
+                    #Reformat to make the path object.
+                    pot = []
+                    for b in range(0,ppt_x.__len__()):
+                        pot.append([ppt_x[b],ppt_y[b]])
+                    p = Path(pot)
+                    if p.contains_point([pt2d[1],pt2d[0]]) == True:
+                            pts2keep.append(pt2d)
+        pts = pts2keep
+    par_obj.data_store[time_pt]['pts'] = pts
+        
 def rank_order(image):
     """Return an image of the same shape where each pixel is the
     index of the pixel value in the ascending order of the unique
@@ -347,7 +376,22 @@ def save_roi_fn(par_obj):
     
     return False
     
+def stratified_sample(par_obj,binlength,samples_indices,imhist,samples_at_tiers,mImRegion,denseRegion):
+    indices=np.zeros(samples_indices[-1],'uint32') #preallocate array rather than extend, size corrects for rounding errors
+    #Randomly sample from input ROI or im a certain number (par_obj.limit_size) patches. With replacement.
+    for it in range(binlength):
+        if samples_at_tiers[it]>0:
+            bin1=imhist[1][it]
+            bin2=imhist[1][it+1]
 
+            
+            stratified_indices=np.nonzero(((denseRegion>=bin1) & (denseRegion<bin2)).flat)
+            if stratified_indices[0].__len__() != 0:
+                stratified_sampled_indices =  np.random.choice(stratified_indices[0], size= samples_at_tiers[it], replace=True, p=None)
+            else:
+                stratified_sampled_indices=[]
+            indices[range(samples_indices[it],samples_indices[it+1])] = stratified_sampled_indices
+    return indices
 def update_training_samples_fn_new_only(par_obj,int_obj,model_num,tpt,zslice):
     """Collects the pixels or patches which will be used for training and 
     trains the forest."""
@@ -361,12 +405,21 @@ def update_training_samples_fn_new_only(par_obj,int_obj,model_num,tpt,zslice):
         region_size += rects[4]*rects[3]       
     '''
     calc_ratio = par_obj.limit_ratio_size
-    
     #print 'calcratio',calc_ratio
-    #print 'aftercratio',region_size/par_obj.limit_ratio_size
-
+    STRATIFY=False
+    dot_im=np.pad(np.ones((1,1)),(int(par_obj.sigma_data)*6,int(par_obj.sigma_data)*4),mode='constant')
+    dot_im=filters.gaussian_filter(dot_im,float(par_obj.sigma_data),mode='constant',cval=0)
+    dot_im/=dot_im.max()
+    binlength=10
+    imhist=np.histogram(dot_im,bins=binlength,range=(0,1),density=True)
+    imhist[1][binlength]=5 # adjust top bin to make sure we include everthing if we have overlapping gaussians-try to avoid though-if very common will distort bins
+    samples_at_tiers=(imhist[0]/binlength*par_obj.limit_size).astype('int')
+    print samples_at_tiers
+    samples_indices = [0]+(np.cumsum(samples_at_tiers)).tolist() #to allow preallocation of array
+    
+    
     for b in range(0,par_obj.saved_ROI.__len__()):
-
+        #TODO check this works for edge cases- with very sparse sampling, and with v small bin sizes
         #Iterates through saved ROI.
         rects = par_obj.saved_ROI[b]
 
@@ -385,8 +438,13 @@ def update_training_samples_fn_new_only(par_obj,int_obj,model_num,tpt,zslice):
                     if(par_obj.limit_ratio == True):
                         par_obj.limit_size = round(mImRegion.shape[0]*mImRegion.shape[1]/calc_ratio,0)
                         print mImRegion.shape[0]*mImRegion.shape[1]
-                    #Randomly sample from input ROI or im a certain number (par_obj.limit_size) patches. With replacement.
-                    indices =  np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
+                        if STRATIFY==True:
+                            indices =stratified_sample(par_obj,binlength,samples_indices,imhist,samples_at_tiers,mImRegion,denseRegion)
+                        else:
+                            indices =  np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
+                    else:
+                        #this works because the first n indices refer to the full first two dimensions, and np indexing takes slices
+                        indices =  np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
                     #Add to feature vector and output vector.
                     par_obj.f_matrix.extend(mimg_lin[indices])
                     par_obj.o_patches.extend(dense_lin[indices])
@@ -404,20 +462,27 @@ def update_training_samples_fn_train_only(par_obj,int_obj,model_num):
     if par_obj.max_features>par_obj.num_of_feat:
         par_obj.max_features=par_obj.num_of_feat
     par_obj.RF[model_num] = ExtraTreesRegressor(par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features, bootstrap=True, n_jobs=-1)
-    
+    #par_obj.RF[model_num] = sklearn.ensemble.GradientBoostingRegressor(loss='ls', learning_rate=0.1, n_estimators=par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features)    
+    #par_obj.RF[model_num] = sklearn.linear_model.BayesianRidge(par_obj.n_iter, par_obj.tol, par_obj.alpha_1, par_obj.alpha_2, par_obj.lambda_1, par_obj.lambda_2)    
     #Fits the data.
     t3 = time.time()
     print 'fmatrix',np.array(par_obj.f_matrix).shape
     print 'o_patches',np.array(par_obj.o_patches).shape
-    par_obj.RF[model_num].fit(np.asfortranarray(par_obj.f_matrix), np.asfortranarray(par_obj.o_patches))
+    
+    par_obj.RF[model_num].fit(par_obj.f_matrix, par_obj.o_patches)
+
+    '''
     importances = par_obj.RF[model_num].feature_importances_
     indices = np.argsort(importances)[::-1]
     print("Feature ranking:")
+    
     X=np.asfortranarray(par_obj.f_matrix)
     for f in range(X.shape[1]):
         print("%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]]))
+    '''
     t4 = time.time()
     print 'actual training',t4-t3 
+    
     par_obj.o_patches=[]
     par_obj.f_matrix=[]    
     
@@ -433,26 +498,36 @@ def update_density_fn_new(par_obj,tpt,zslice):
     #Construct empty array for current image.
     dots_im = np.zeros((par_obj.height,par_obj.width))
     #In array of all saved dots.
+    if par_obj.saved_dots.__len__()>0:
+        for i in range(0,par_obj.saved_dots.__len__()):
+            #Any ROI in the present image.
+            #print 'iiiii',win.saved_dots.__len__()
+            if(par_obj.saved_ROI[i][0] == zslice and par_obj.saved_ROI[i][5] == tpt):
+                #Save the corresponding dots.
+                dots = par_obj.saved_dots[i]
+                #Scan through the dots
+                for b in range(0,dots.__len__()):
+                   
+                    #save the column and row 
+                    c_dot = dots[b][2]
+                    r_dot = dots[b][1]
+                    #Set it to register as dot.
+                    dots_im[c_dot, r_dot] = 1 #change from 255
+        #Convolve the dots to represent density estimation.
+        #dense_im = filters.gaussian_laplace(dots_im.astype(np.float32),float(par_obj.sigma_data), output=None, mode='reflect', cval=0.0)
+        dense_im = filters.gaussian_filter(dots_im.astype(np.float32),float(par_obj.sigma_data), order=0, output=None, mode='reflect', cval=0.0)
+        '''NORMALISE GAUSSIANS. THIS MAKES IT USELESS FOR DOING 2D DENSITY ESTIMATION,
+ but super useful if you want a probability output between 0 and 1 at the end of the day
+for thresholding and the like'''
+        if not par_obj.gaussian_im_max:
+            dot_im=filters.gaussian_filter(np.ones((1,1)),float(par_obj.sigma_data),mode='constant',cval=0)
+            par_obj.gaussian_im_max=dot_im[0,0]
 
-    for i in range(0,par_obj.saved_dots.__len__()):
-        #Any ROI in the present image.
-        #print 'iiiii',win.saved_dots.__len__()
-        if(par_obj.saved_ROI[i][0] == zslice and par_obj.saved_ROI[i][5] == tpt):
-            #Save the corresponding dots.
-            dots = par_obj.saved_dots[i]
-            #Scan through the dots
-            for b in range(0,dots.__len__()):
-               
-                #save the column and row 
-                c_dot = dots[b][2]
-                r_dot = dots[b][1]
-                #Set it to register as dot.
-                dots_im[c_dot, r_dot] = 255
-    #Convolve the dots to represent density estimation.
-    dense_im = filters.gaussian_filter(dots_im.astype(np.float32),float(par_obj.sigma_data), order=0, output=None, mode='reflect', cval=0.0)
-    #Replace member of dense_array with new image.
-    
-    par_obj.data_store[tpt]['dense_arr'][zslice] = dense_im
+        dense_im=dense_im/par_obj.gaussian_im_max*10000
+        #TODO? Possibly we could make the density counting assumption in 3D and use it for counting, but at the end of the day, I think we really want to know where they are
+        #TODO Now that I'm normalising at this step, probably should check everything else to make sure that I only normalise here -suspect that there is a normalisation step somewhere in the processing of the probability output
+        #Replace member of dense_array with new image.
+        par_obj.data_store[tpt]['dense_arr'][zslice] = dense_im
 
 def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,threaded=False,b=0):
     """Accesses TIFF file slice or opens png. Calculates features to indices present in par_obj.left_2_calc"""
@@ -467,12 +542,14 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,threaded=False,b=0
         par_obj.crop_y2=par_obj.height
     par_obj.height = par_obj.crop_y2-par_obj.crop_y1
     par_obj.width = par_obj.crop_x2-par_obj.crop_x1
+    #threaded=False
     if threaded == False:
         for tpt in tptList:
             for zslice in zsliceList:
                 #checks if features already in array
                 if zslice not in par_obj.data_store[tpt]['feat_arr']:
                     imRGB=return_imRGB_slice_new(par_obj,zslice,tpt)
+                    imRGB/=par_obj.tiffarraymax
                     #If you want to ignore previous features which have been saved.
                     int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Frame: ' +str(zslice+1) +' Timepoint: '+str(tpt+1))
                     feat =feature_create_threadable(par_obj,imStr,imRGB)
@@ -488,8 +565,8 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,threaded=False,b=0
             for zslice in zsliceList:
                 if zslice not in par_obj.data_store[tpt]['feat_arr']:
                     imRGB=return_imRGB_slice_new(par_obj,zslice,tpt)
-                    imRGBlist.append(imRGB)
-                        
+                    #imRGBlist.append(imRGB)
+                    imRGBlist.append(imRGB/ par_obj.tiffarraymax)    
             #initiate pool and start caclulating features
             int_obj.report_progress('Calculating Features for Image: '+str(b+1)+' Timepoint: '+str(tpt+1) +' All  Frames')
             featlist=[]
@@ -524,17 +601,19 @@ def return_imRGB_slice_new(par_obj,zslice,tpt):
         imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
         if par_obj.ch_active.__len__() > 1 or (par_obj.ch_active.__len__() == 1 and par_obj.numCH>1):
             #input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
-            input_im = get_tiff_slice(par_obj,[tpt],zslice,range(0,par_obj.ori_width,int(par_obj.resize_factor)),range(0,par_obj.ori_height,int(par_obj.resize_factor)),range(par_obj.numCH))
-
+            #imRGB = np.zeros((int(par_obj.height),int(par_obj.width),par_obj.ch_active.__len__()))
             for c in range(0,par_obj.ch_active.__len__()):
-                imRGB[:,:,par_obj.ch_active[c]] = input_im[:,:,par_obj.ch_active[c]]
+                t0=time.time()
+                input_im = get_tiff_slice(par_obj,[tpt],zslice,range(0,par_obj.ori_width,int(par_obj.resize_factor)),range(0,par_obj.ori_height,int(par_obj.resize_factor)),[c])
+                imRGB[:,:,par_obj.ch_active[c]] = input_im
+
         else:
             #input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor)]
             input_im = get_tiff_slice(par_obj,[tpt],zslice,range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor))
 
-            imRGB[:,:,0] = input_im[:,:]
-            imRGB[:,:,1] = input_im[:,:]
-            imRGB[:,:,2] = input_im[:,:]
+            imRGB[:,:,0] = input_im
+            imRGB[:,:,1] = input_im
+            imRGB[:,:,2] = input_im
 
     elif par_obj.file_ext == 'png':
         imRGB = pylab.imread(str(imStr))*255
@@ -560,27 +639,78 @@ def feature_create_threadable(par_obj,imStr,imRGB):
         feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),13*par_obj.ch_active.__len__()))
     if (par_obj.feature_type == 'fine'):
         feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),21*par_obj.ch_active.__len__()))
+    if (par_obj.feature_type == 'fine3'):
+        feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),26*par_obj.ch_active.__len__()))
+    if (par_obj.feature_type == 'texton'):
+        feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),21*par_obj.ch_active.__len__()))
+    if (par_obj.feature_type == 'patch'):
+        feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),45*par_obj.ch_active.__len__()))
 
     for b in range(0,par_obj.ch_active.__len__()):
         if (par_obj.feature_type == 'basic'):
             imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
 
-            feat[:,:,(b*13):((b+1)*13)] = local_shape_features_basic(imG,par_obj.feature_scale)  
+            feat[:,:,(b*13):((b+1)*13)] = local_shape_features_basic2(imG,par_obj.feature_scale)  
             
         if (par_obj.feature_type == 'fine'):
             imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
 
             feat[:,:,(b*21):((b+1)*21)] = local_shape_features_fine(imG,par_obj.feature_scale)
+        if (par_obj.feature_type == 'fine3'):
+            imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
 
+            feat[:,:,(b*26):((b+1)*26)] = local_shape_features_fine3(imG,par_obj.feature_scale)
+        if (par_obj.feature_type == 'texton'):
+            imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
+            feat[:,:,(b*21):((b+1)*21)] = local_shape_features_texton(imG,par_obj.feature_scale)
+        
+        if (par_obj.feature_type == 'patch'):
+            imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
+            feat[:,:,(b*45):((b+1)*45)] = local_shape_features_patch(imG,par_obj.feature_scale)
+    
     if par_obj.numCH==0:
         imG = imRGB[:,:,0].astype(np.float32)
         if (par_obj.feature_type == 'basic'):
-            feat = local_shape_features_basic(imRGB[:,:,0].astype(np.float32),par_obj.feature_scale)  
+            feat = local_shape_features_basic2(imRGB[:,:,0].astype(np.float32),par_obj.feature_scale)  
         if (par_obj.feature_type == 'fine'):
             feat = local_shape_features_fine(imRGB[:,:,0].astype(np.float32),par_obj.feature_scale)  
+        if (par_obj.feature_type == 'fine3'):
+            feat = local_shape_features_fine3(imRGB[:,:,0].astype(np.float32),par_obj.feature_scale)  
+        if (par_obj.feature_type == 'texton'):
+            feat = local_shape_features_texton(imRGB[:,:,0].astype(np.float32),par_obj.feature_scale)  
+        if (par_obj.feature_type == 'patch'):
+            feat = local_shape_features_patch(imRGB[:,:,0].astype(np.float32),par_obj.feature_scale)  
+            
             
     return feat
 
+#The following constant was computed in maxima 5.35.1 using 64 bigfloat digits of precision
+__logBase10of2 = 3.010299956639811952137388947244930267681898814621085413104274611e-1
+def RoundToSigFigs( x, sigfigs ):
+    """
+    Rounds the value(s) in x to the number of significant figures in sigfigs.
+
+    Restrictions:
+    sigfigs must be an integer type and store a positive value.
+    x must be a real value or an array like object containing only real values.
+    """
+    if not ( type(sigfigs) is int or np.issubdtype(sigfigs, np.integer)):
+        raise TypeError( "RoundToSigFigs: sigfigs must be an integer." )
+
+    if not np.all(np.isreal( x )):
+        raise TypeError( "RoundToSigFigs: all x must be real." )
+
+    if sigfigs <= 0:
+        raise ValueError( "RoundtoSigFigs: sigfigs must be positive." )
+
+    mantissas, binaryExponents = np.frexp( x )
+
+    decimalExponents = __logBase10of2 * binaryExponents
+    intParts = np.floor(decimalExponents)
+
+    mantissas *= 10.0**(decimalExponents - intParts)
+
+    return np.around( mantissas, decimals=sigfigs - 1 ) * 10.0**intParts
 def evaluate_forest_new(par_obj,int_obj,withGT,model_num,zsliceList,tptList,threaded=False,b=0):
 
     #Finds the current frame and file.
@@ -599,6 +729,7 @@ def evaluate_forest_new(par_obj,int_obj,withGT,model_num,zsliceList,tptList,thre
                 mimg_lin = np.reshape(par_obj.data_store[tpt]['feat_arr'][zslice], (par_obj.height * par_obj.width, par_obj.data_store[tpt]['feat_arr'][zslice].shape[2]))
                 t2 = time.time()
                 linPred = par_obj.RF[model_num].predict(mimg_lin)
+
                 t1 = time.time()
                 
 
@@ -611,6 +742,7 @@ def evaluate_forest_new(par_obj,int_obj,withGT,model_num,zsliceList,tptList,thre
             par_obj.minPred=min([par_obj.minPred,minPred])
             sum_pred =np.sum(linPred/255)
             par_obj.data_store[tpt]['sum_pred'][zslice] = sum_pred
+            
             print 'prediction time taken',t1 - t2
             print 'Predicted i:',par_obj.data_store[tpt]['sum_pred'][zslice]
             int_obj.report_progress('Making Prediction for Image: '+str(b+1)+' Frame: ' +str(zslice+1)+' Timepoint: '+str(tpt+1))
@@ -665,7 +797,217 @@ def local_shape_features_fine(im,scaleStart):
     
     
     return f
+def local_shape_features_fine3_1(im,scaleStart):
+    #Exactly as in the Luca Fiaschi paper.
+    #FIXME normalisation. Broke comparing image, implement based on max datatype stored instead
+    pyr_levels=5
+    
+    scale_mode='nearest'
+    s = scaleStart
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,1+pyr_levels*4))
+    f[:,:, 0]  = im
+    
+    pyr=skimage.transform.pyramid_gaussian(im,sigma=1.5, max_layer=pyr_levels, downscale=1.5)
+    for layer in range(0,pyr_levels):
+        a=pyr.next()
+        scale=[float(im.shape[0])/float(a.shape[0]),float(im.shape[1])/float(a.shape[1])]
+        lap=scipy.ndimage.filters.laplace(a)
+        lap=scipy.ndimage.interpolation.zoom(lap, scale,order=1,mode=scale_mode)
+        [m,n]=np.gradient(a)
+        ggm=np.hypot(m,n)
+        ggm=scipy.ndimage.interpolation.zoom(ggm, scale,order=1,mode=scale_mode)
+    
+        x,y,z=skfeat.structure_tensor(a,1)
+        st =skfeat.structure_tensor_eigvals(x,y,z)
+        st0=scipy.ndimage.interpolation.zoom(st[0], scale,order=1,mode=scale_mode)
+        st1=scipy.ndimage.interpolation.zoom(st[1], scale,order=1,mode=scale_mode)
 
+
+        f[:,:, layer*4+1]  = lap
+        f[:,:, layer*4+2]  = ggm
+        f[:,:, layer*4+3]  = st0
+        f[:,:, layer*4+4]  = st1
+
+    return f
+def local_shape_features_fine3(im,scaleStart):
+    #Exactly as in the Luca Fiaschi paper.
+    #FIXME normalisation. Broke comparing image, implement based on max datatype stored instead
+    s = scaleStart
+    
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,26))
+    f[:,:, 0]  = im
+    
+    pyr=skimage.transform.pyramid_gaussian(im,sigma=1.5, max_layer=5, downscale=2)
+    a=im
+    for layer in range(0,5):
+        scale=[float(im.shape[0])/float(a.shape[0]),float(im.shape[1])/float(a.shape[1])]
+        lap=scipy.ndimage.filters.laplace(a)
+        lap=scipy.ndimage.interpolation.zoom(lap, scale,order=1)
+        
+        [m,n]=np.gradient(a)
+        ggm=np.hypot(m,n)
+        ggm=scipy.ndimage.interpolation.zoom(ggm, scale,order=1)
+
+        x,y,z=skfeat.structure_tensor(a,1)
+        st =skfeat.structure_tensor_eigvals(x,y,z)
+        st0=scipy.ndimage.interpolation.zoom(st[0], scale,order=1)
+        st1=scipy.ndimage.interpolation.zoom(st[1], scale,order=1)
+
+        #ent=entropy(a,skimage.morphology.disk(3))
+        #ent=scipy.ndimage.interpolation.zoom(ent, scale,order=1)
+        ent=scipy.ndimage.interpolation.zoom(a, scale,order=1,mode='nearest')
+        f[:,:, layer*5+1]  = lap
+        f[:,:, layer*5+2]  = ggm
+        f[:,:, layer*5+3]  = st0
+        f[:,:, layer*5+4]  = st1
+        f[:,:, layer*5+5]  = ent
+        a=pyr.next()
+    return f
+def local_shape_features_texton(im,scaleStart):
+    #FIXME normalisation. Broke comparing image, implement based on max datatype stored instead
+    pyr_levels=5
+    
+    s = scaleStart
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,1+pyr_levels*4))
+    f[:,:, 0]  = im
+    
+    pyr=skimage.transform.pyramid_gaussian(im,sigma=1.5, max_layer=5, downscale=2)
+    #generate filters
+    #could precalculate for speed
+    n_orientations=6
+    edge, bar, rot=makeRFSfilters(radius=10, sigmas=[1], n_orientations=n_orientations)
+    #we will use only one scale, and then apply repeatedly to different parts of the pyramid
+    #at each level of the pyramid we end up with two filter responses, plus a lap and a gauss
+    #this differs from the original paper, but seems a reasonable way to test if it works
+    for layer in range(0,pyr_levels):
+        
+        a=pyr.next()
+        scale=[float(im.shape[0])/float(a.shape[0]),float(im.shape[1])/float(a.shape[1])]
+        
+        gauss=scipy.ndimage.interpolation.zoom(a, scale,order=1)        
+        
+        lap=scipy.ndimage.filters.laplace(a)
+        lap=scipy.ndimage.interpolation.zoom(lap, scale,order=1)
+        
+        barmax=edgemax=np.zeros(a.shape)
+        for orient in range(n_orientations):
+            edgemax = np.maximum(edgemax,scipy.ndimage.convolve(a,edge[0,orient,:,:]))
+            barmax = np.maximum(edgemax,scipy.ndimage.convolve(a,bar[0,orient,:,:]))
+        edgemax=scipy.ndimage.interpolation.zoom(edgemax, scale,order=1)     
+        barmax=scipy.ndimage.interpolation.zoom(barmax, scale,order=1)
+        
+        f[:,:, layer*4+1]  = gauss
+        f[:,:, layer*4+2]  = lap
+        f[:,:, layer*4+3]  = edgemax
+        f[:,:, layer*4+4]  = barmax
+
+    return f
+    
+def local_shape_features_patch(im,scaleStart):
+    #FIXME normalisation. Broke comparing image, implement based on max datatype stored instead
+    pyr_levels=5
+    #check pyramid for starting point and if loops match up correctly
+    s = scaleStart
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,pyr_levels*9))
+    #f[:,:, 0]  = im
+    pyr=skimage.transform.pyramid_gaussian(im,sigma=1.5, max_layer=pyr_levels, downscale=2)
+    a=im
+    for layer in range(0,pyr_levels):
+
+        scale=[float(im.shape[0])/float(a.shape[0]),float(im.shape[1])/float(a.shape[1])]
+        
+        gauss=scipy.ndimage.interpolation.zoom(a, scale,order=1)        
+        
+        lap=scipy.ndimage.filters.laplace(a)
+        lap=scipy.ndimage.interpolation.zoom(lap, scale,order=1)
+        [cx,cy]=np.where(np.ones((3,3)))
+        for it in range(len(cx)):
+            x=cx[it]
+            y=cy[it]
+            shifted=scipy.ndimage.interpolation.shift(a,(x-1,y-1),order=0,mode='nearest') 
+            shifted=scipy.ndimage.interpolation.zoom(shifted, scale,order=1)
+            f[:,:, layer*9+it] = shifted
+           
+        #f[:,:, layer*4+1]  = gauss
+        #f[:,:, layer*4+2]  = lap
+        #f[:,:, layer*4+3]  = 
+        #f[:,:, layer*4+4]  = 
+        a=pyr.next()
+    return f
+    
+def makeRFSfilters(radius=24, sigmas=[1, 2, 4], n_orientations=6):
+    """ Generates filters for RFS filterbank.
+    Parameters
+    ----------
+    radius : int, default 28
+        radius of all filters. Size will be 2 * radius + 1
+    sigmas : list of floats, default [1, 2, 4] as in paper
+        define scales on which the filters will be computed
+    n_orientations : int
+        number of fractions the half-angle will be divided in
+    Returns
+    -------
+    edge : ndarray (len(sigmas), n_orientations, 2*radius+1, 2*radius+1)
+        Contains edge filters on different scales and orientations
+    bar : ndarray (len(sigmas), n_orientations, 2*radius+1, 2*radius+1)
+        Contains bar filters on different scales and orientations
+    rot : ndarray (2, 2*radius+1, 2*radius+1)
+        contains two rotation invariant filters, Gaussian and Laplacian of
+        Gaussian
+    """
+    def make_gaussian_filter(x, sigma, order=0):
+        if order > 2:
+            raise ValueError("Only orders up to 2 are supported")
+        # compute unnormalized Gaussian response
+        response = np.exp(-x ** 2 / (2. * sigma ** 2))
+        if order == 1:
+            response = -response * x
+        elif order == 2:
+            response = response * (x ** 2 - sigma ** 2)
+        # normalize
+        response /= np.abs(response).sum()
+        return response
+
+    def makefilter(scale, phasey, pts, sup):
+        gx = make_gaussian_filter(pts[0, :], sigma=3 * scale)
+        gy = make_gaussian_filter(pts[1, :], sigma=scale, order=phasey)
+        f = (gx * gy).reshape(sup, sup)
+        # normalize
+        f /= np.abs(f).sum()
+        return f
+
+    support = 2 * radius + 1
+    x, y = np.mgrid[-radius:radius + 1, radius:-radius - 1:-1]
+    orgpts = np.vstack([x.ravel(), y.ravel()])
+
+    rot, edge, bar = [], [], []
+    for sigma in sigmas:
+        for orient in xrange(n_orientations):
+            # Not 2pi as filters have symmetry
+            angle = np.pi * orient / n_orientations
+            c, s = np.cos(angle), np.sin(angle)
+            rotpts = np.dot(np.array([[c, -s], [s, c]]), orgpts)
+            edge.append(makefilter(sigma, 1, rotpts, support))
+            bar.append(makefilter(sigma, 2, rotpts, support))
+    length = np.sqrt(x ** 2 + y ** 2)
+    rot.append(make_gaussian_filter(length, sigma=10))
+    rot.append(make_gaussian_filter(length, sigma=10, order=2))
+
+    # reshape rot and edge
+    edge = np.asarray(edge)
+    edge = edge.reshape(len(sigmas), n_orientations, support, support)
+    bar = np.asarray(bar).reshape(edge.shape)
+    rot = np.asarray(rot)[:, np.newaxis, :, :]
+    return edge, bar, rot
+    
 def local_shape_features_basic(im,scaleStart):
     #Exactly as in the Luca Fiaschi paper.
     s = scaleStart
@@ -681,22 +1023,133 @@ def local_shape_features_basic(im,scaleStart):
     f[:,:, 0]  = im
     f[:,:, 1]  = vigra.filters.gaussianGradientMagnitude(im, s,window_size=2.5)
 
-    f[:,:, 2]  = st08[:,:,0]
-    f[:,:, 3]  = st08[:,:,1]
+    f[:,:, (2,3)]  = st08
     f[:,:, 4]  = vigra.filters.laplacianOfGaussian(im, s ,window_size=2.5)
 
     f[:,:, 5]  = vigra.filters.gaussianGradientMagnitude(im, s*2,window_size=2.5) 
 
-    f[:,:, 6]  =  st16[:,:,0]
-    f[:,:, 7]  = st16[:,:,1]
+    f[:,:, (6,7)]  =  st16
+
     f[:,:, 8]  = vigra.filters.laplacianOfGaussian(im, s*2 ,window_size=2.5)
 
     f[:,:, 9]  = vigra.filters.gaussianGradientMagnitude(im, s*4,window_size=2.5) 
 
-    f[:,:, 10] =  st32[:,:,0]
-    f[:,:, 11] =  st32[:,:,1]
+    f[:,:, (10,11)] =  st32
+
     f[:,:, 12] = vigra.filters.laplacianOfGaussian(im, s*4 ,window_size=2.5)
     return f
+
+def local_shape_features_basic2(im,scaleStart):
+    #Exactly as in the Luca Fiaschi paper.
+    s = scaleStart
+    
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,13))
+
+    #st08 = vigra.filters.structureTensorEigenvalues(im,s*1,s*2)
+    x,y,z=skfeat.structure_tensor(im,s*1)
+    st08 =skfeat.structure_tensor_eigvals(x,y,z)
+    #st16 = vigra.filters.structureTensorEigenvalues(im,s*2,s*4)
+    x,y,z=skfeat.structure_tensor(im,s*2)
+    st16 =skfeat.structure_tensor_eigvals(x,y,z)
+    #st32 = vigra.filters.structureTensorEigenvalues(im,s*4,s*8)
+    x,y,z=skfeat.structure_tensor(im,s*4)
+    st32 = skfeat.structure_tensor_eigvals(x,y,z)
+
+    f[:,:, 0]  = im
+    f[:,:, 1]  = ndimage.gaussian_gradient_magnitude(im,s,truncate=2.5)
+
+    f[:,:, 2]  = st08[0]
+    f[:,:, 3]  = st08[1]
+    f[:,:, 4]  = ndimage.gaussian_laplace(im,s,truncate=2.5)
+
+    f[:,:, 5]  =ndimage.gaussian_gradient_magnitude(im,s*2,truncate=2.5)
+
+    f[:,:, 6]  = st08[0]
+    f[:,:, 7]  = st08[1]
+
+    f[:,:, 8]  = ndimage.gaussian_laplace(im,s*2,truncate=2.5)
+
+    f[:,:, 9]  = ndimage.gaussian_gradient_magnitude(im,s*4,truncate=2.5)
+
+    f[:,:, 10]  = st08[0]
+    f[:,:, 11]  = st08[1]
+
+    f[:,:, 12] = ndimage.gaussian_laplace(im,s*4,truncate=2.5)
+    return f
+def local_shape_features_basic3(im,scaleStart):
+    #Exactly as in the Luca Fiaschi paper.
+    intp='bilinear' 
+    s = scaleStart
+    pyr=skimage.transform.pyramid_gaussian(im,sigma=1.5, max_layer=4, downscale=2)
+    a=pyr.next()
+    a1=scipy.ndimage.filters.laplace(a)
+    a1=scipy.misc.imresize(a1,im.shape,interp=intp)
+    [m,n]=np.gradient(a)
+    a2=np.hypot(m,n)
+    a2=scipy.misc.imresize(a2,im.shape,interp=intp)
+    
+    x,y,z=skfeat.structure_tensor(a,1)
+    st =skfeat.structure_tensor_eigvals(x,y,z)
+    a3=scipy.misc.imresize(st[0],im.shape,interp=intp)
+    a4=scipy.misc.imresize(st[1],im.shape,interp=intp)
+    
+    b=pyr.next()
+    b1=scipy.ndimage.filters.laplace(b)
+    b1=scipy.misc.imresize(b1,im.shape,interp=intp)
+    [m,n]=np.gradient(b)
+    b2=np.hypot(m,n)
+    b2=scipy.misc.imresize(b2,im.shape,interp=intp)
+    
+    x,y,z=skfeat.structure_tensor(b,1)
+    st =skfeat.structure_tensor_eigvals(x,y,z)
+    b3=scipy.misc.imresize(st[0],im.shape,interp=intp)
+    b4=scipy.misc.imresize(st[1],im.shape,interp=intp)
+    c=pyr.next()
+    
+    c1=scipy.ndimage.filters.laplace(c)
+    c1=scipy.misc.imresize(c1,im.shape,interp=intp)
+    [m,n]=np.gradient(c)
+    c2=np.hypot(m,n)
+    c2=scipy.misc.imresize(c2,im.shape,interp=intp)
+
+    x,y,z=skfeat.structure_tensor(c,1)
+    st =skfeat.structure_tensor_eigvals(x,y,z)
+    c3=scipy.misc.imresize(st[0],im.shape,interp=intp)
+    c4=scipy.misc.imresize(st[1],im.shape,interp=intp)
+    '''
+    d=pyr.next()
+    
+    d1=scipy.ndimage.filters.laplace(d)
+    d1=scipy.misc.imresize(d1,im.shape)
+    [m,n]=np.gradient(d)
+    d2=np.hypot(m,n)
+    d2=scipy.misc.imresize(d2,im.shape)
+    
+    st=vigra.filters.structureTensorEigenvalues(d.astype('float32'),1,2)
+    d3=scipy.misc.imresize(st[:,:,0],im.shape)
+    d4=scipy.misc.imresize(st[:,:,1],im.shape)
+    '''
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,13))
+    f[:,:, 0]  = im
+    f[:,:, 1]  = a1
+    f[:,:, 2]  = a2
+    f[:,:, 3]  = a3
+    f[:,:, 4]  = a4
+    f[:,:, 5]  = b1
+    f[:,:, 6]  = b2
+    f[:,:, 7]  = b3
+    f[:,:, 8]  = b4
+    f[:,:, 9]  = c1
+    f[:,:, 10]  = c2
+    f[:,:, 11]  = c3
+    f[:,:, 12] = c4
+    return f
+    
+    
 def channels_for_display(par_obj, int_obj,imRGB):
     '''deals with displaying different channels'''
     count = 0
@@ -733,18 +1186,53 @@ def channels_for_display(par_obj, int_obj,imRGB):
 
     return newImg
 
+def channels_for_display2(par_obj, int_obj,imRGB):
+    '''deals with displaying different channels'''
+    count = 0
+    CH = [0]*5 #up to 5 channels-get checkbox values
+    for c in range(0,par_obj.numCH):
+        name = 'a = int_obj.CH_cbx'+str(c)+'.checkState()'
+        exec(name)
+        if a ==2: #presumably a==2 if checked
+            count = count + 1
+            CH[c] = 1
+    newImg =np.zeros((par_obj.height,par_obj.width,3),'uint8')
+    newImg=create_channels_image(newImg,par_obj.numCH,CH,count,(255*imRGB).astype('uint8'))
+    return newImg
+
+def create_channels_image(newImg,numCH,CH,count,imRGB):
+    
+    if count == 0 and numCH==0: #deals with the none-ticked case
+        newImg = imRGB
+        '''    elif count == 1: #only one channel selected-display in grayscale # this may be broken or unecessary
+            newImg[:,:,0] = imRGB
+            newImg[:,:,1] = imRGB
+            newImg[:,:,2] = imRGB'''
+    elif count ==3:
+        newImg = imRGB
+    else:
+        if CH[0] == 1:
+            newImg[:,:,0] = imRGB[:,:,0]
+        if CH[1] == 1:
+            newImg[:,:,1] = imRGB[:,:,1]
+        if CH[2] == 1:
+            newImg[:,:,2] = imRGB[:,:,2]
+    return newImg
+
 def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
     """Loads up requested image and displays"""
     b=0
     t0=time.time()
     #Finds the current frame and file.
-    imRGB=return_imRGB_slice_new(par_obj,zslice,tpt)
+    newImg=return_imRGB_slice_new(par_obj,zslice,tpt)
+    par_obj.save_im = newImg
     #deals with displaying different channels
-    newImg=channels_for_display(par_obj, int_obj,imRGB)
-    newImg=newImg/par_obj.tiffarraymax
+    newImg/=par_obj.tiffarraymax
+    newImg=channels_for_display2(par_obj, int_obj,newImg)
+    
     if par_obj.overlay and zslice in par_obj.data_store[tpt]['pred_arr']:
-        newImg[:,:,2]= (par_obj.data_store[tpt]['pred_arr'][zslice])/par_obj.maxPred
-    par_obj.save_im = imRGB
+        newImg[:,:,2]= (par_obj.data_store[tpt]['pred_arr'][zslice])/par_obj.maxPred*255
+
     for i in range(0,int_obj.plt1.lines.__len__()):
         int_obj.plt1.lines.pop(0)
 
@@ -755,11 +1243,11 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
     #int_obj.plt1.axis("off")
     #int_obj.plt1.set_xticklabels([])
     #int_obj.plt1.set_yticklabels([])
+    
     int_obj.image_num_txt.setText('The Current image is No. ' + str(par_obj.curr_z+1)+' and the time point is: '+str(par_obj.time_pt+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
 
     """Deals with displaying Kernel/Prediction/Counts""" 
 #    int_obj.image_num_txt.setText('The Current Image is No. ' + str(zslice+1)+' and the time point is: '+str(tpt+1))
-    
     im2draw=None
     if par_obj.show_pts == 0:
         if zslice in par_obj.data_store[tpt]['dense_arr']:
@@ -772,6 +1260,7 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
             im2draw = np.zeros((par_obj.height,par_obj.width))
             int_obj.plt2.images[0].set_data(im2draw)
             int_obj.canvas2.draw()
+            print 'test2'
 
     elif par_obj.show_pts == 1:
         if zslice in par_obj.data_store[tpt]['pred_arr']:
@@ -797,21 +1286,18 @@ def goto_img_fn_new(par_obj, int_obj,zslice,tpt):
         #int_obj.plt2.clear()
         int_obj.plt2.lines = []
 
-        int_obj.plt2.axes.plot(pt_x,pt_y, 'go')
+        int_obj.plt2.axes.plot(pt_x,pt_y, 'wo')
         int_obj.plt2.autoscale_view(tight=True)
         
-        int_obj.plt1.axes.plot(pt_x,pt_y, 'go')
+        int_obj.plt1.axes.plot(pt_x,pt_y, 'wo')
         int_obj.plt1.autoscale_view(tight=True)
         
         string_2_show = 'The Predicted Count: ' + str(pts.__len__())
         if zslice in par_obj.data_store[tpt]['maxi_arr']:
             im2draw = par_obj.data_store[tpt]['maxi_arr'][zslice].astype(np.float32)
             int_obj.plt2.images[0].set_data(im2draw)
-            int_obj.plt2.images[0].set_clim(0,255)
-            
-            
-        
-        int_obj.canvas2.draw()
+            int_obj.plt2.images[0].set_clim(0,1)
+            int_obj.canvas2.draw()
 
 
 
@@ -851,13 +1337,17 @@ def load_and_initiate_plots(par_obj, int_obj,zslice,tpt):
             f = f+'.tif'
             imRGB[:,:,c] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
     
-    newImg=np.zeros((int(par_obj.height),int(par_obj.width),3))
+    #newImg=np.zeros((int(par_obj.height),int(par_obj.width),4),'uint8')
+    newImg=np.zeros((int(par_obj.height),int(par_obj.width),3),'uint8')
+    #newImg[:,:,3]=1
     int_obj.plt1.cla()
-    int_obj.plt1.imshow(newImg,interpolation='nearest')
+    modest_image.imshow(int_obj.plt1.axes,newImg,interpolation='nearest', vmin=0, vmax=255)
+    #int_obj.plt1.imshow(newImg,interpolation='nearest')
     int_obj.plt1.axis("off")
-
+    newImg=np.zeros((int(par_obj.height),int(par_obj.width),3))
     int_obj.plt2.cla()
     int_obj.plt2.imshow(newImg,interpolation='none')
+    #modest_image.imshow(int_obj.plt2.axes,newImg,interpolation='none')
     int_obj.plt2.axis("off")
     int_obj.plt2.autoscale()
     int_obj.cursor.draw_ROI()
@@ -865,6 +1355,20 @@ def load_and_initiate_plots(par_obj, int_obj,zslice,tpt):
     
     goto_img_fn_new(par_obj, int_obj,zslice,tpt)
     
+def detHess(predMtx,min_distance):
+    gau_stk = filters.gaussian_filter(predMtx,min_distance)
+    gradlist = np.gradient(gau_stk,1)
+
+    pool = ThreadPool(3) 
+    grad2list=pool.map(np.gradient,gradlist)
+    pool.close()
+    pool.join() 
+    xy,xx,xz = grad2list[0]
+    yy,yx,yz = grad2list[1]
+    zy,zx,zz = grad2list[2]
+    det = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
+    detl = -1*np.min(det)+det
+    return detl
 def eval_pred_show_fn(par_obj,int_obj,zslice,tpt):
     """Shows Prediction Image when forest is loaded"""
     if par_obj.eval_load_im_win_eval == True:
@@ -903,8 +1407,8 @@ def eval_pred_show_fn(par_obj,int_obj,zslice,tpt):
                         pt_y.append(pt2d[0])
 
 
-            int_obj.plt1.plot(pt_x,pt_y, 'go')
-            int_obj.plt2.plot(pt_x,pt_y, 'go')
+            int_obj.plt1.plot(pt_x,pt_y, 'wo')
+            int_obj.plt2.plot(pt_x,pt_y, 'wo')
             string_2_show = 'The Predicted Count: ' + str(pts.__len__())
             int_obj.output_count_txt.setText(string_2_show)
             im2draw = np.zeros((par_obj.height,par_obj.width))
@@ -947,13 +1451,17 @@ def get_tiff_slice(par_obj,tpt=[0],zslice=[0],x=[0],y=[0],c=[0]):
     
     tiff2=par_obj.tiffarray.transpose(blist)
     if par_obj.order.__len__()==5:
-        tiff=np.squeeze(tiff2[alist[0],:,:,:,:][:,alist[1],:,:,:][:,:,alist[2],:,:][:,:,:,alist[3],:][:,:,:,:,alist[4]])
+        #tiff=np.squeeze(tiff2[alist[0],:,:,:,:][:,alist[1],:,:,:][:,:,alist[2],:,:][:,:,:,alist[3],:][:,:,:,:,alist[4]])
+        tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1],alist[2],alist[3],alist[4])])
     elif par_obj.order.__len__()==4:
-        tiff=np.squeeze(tiff2[alist[0],:,:,:][:,alist[1],:,:][:,:,alist[2],:][:,:,:,alist[3]])
+        #tiff=np.squeeze(tiff2[alist[0],:,:,:][:,alist[1],:,:][:,:,alist[2],:][:,:,:,alist[3]])
+        tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1],alist[2],alist[3])])
     elif par_obj.order.__len__()==3:
-        tiff=np.squeeze(tiff2[alist[0],:,:][:,alist[1],:][:,:,alist[2]])
+        #tiff=np.squeeze(tiff2[alist[0],:,:][:,alist[1],:][:,:,alist[2]])
+        tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1],alist[2])])
     elif par_obj.order.__len__()==2:
-        tiff=np.squeeze(tiff2[alist[0],:][:,alist[1]])
+        #tiff=np.squeeze(tiff2[alist[0],:][:,alist[1]])
+        tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1])])
     return tiff
     
 def import_data_fn(par_obj,file_array):
@@ -980,14 +1488,15 @@ def import_data_fn(par_obj,file_array):
                 par_obj.tiff_file = TiffFile(imStr)
                 meta = par_obj.tiff_file.series[0]
                 try: #if an imagej file, we know where, and can extract the x,y,z
-                    x = par_obj.tiff_file.pages[0].tags.x_resolution
-                    y = par_obj.tiff_file.pages[0].tags.x_resolution
+                    x = par_obj.tiff_file.pages[0].tags.x_resolution.value
+                    y = par_obj.tiff_file.pages[0].tags.x_resolution.value
                     if x!=y: raise Exception('x resolution different to y resolution')# if this isn't true then something is wrong
                     x_res=float(x[1])/float(x[0])
                     
                     z=par_obj.tiff_file.pages[0].imagej_tags['spacing']
                     par_obj.z_calibration = z/x_res
-                    print ('z_scale_factor', par_obj.z_calibration)
+                    par_obj.min_distance[2]=par_obj.min_distance[2]/par_obj.z_calibration
+                    print('z_scale_factor', par_obj.z_calibration)
                 except:
                     #might need to modify this to work with OME-TIFFs
                     print 'tiff resolution not recognised'
@@ -1013,6 +1522,7 @@ def import_data_fn(par_obj,file_array):
                         
                 par_obj.bitDepth = meta.dtype
                 par_obj.test_im_end = par_obj.max_zslices
+
                 par_obj.tiffarray=par_obj.tiff_file.asarray(memmap=True)
                 par_obj.tiffarraymax = par_obj.tiffarray.max()
 
@@ -1117,7 +1627,7 @@ def import_data_fn(par_obj,file_array):
 def save_output_prediction_fn(par_obj,int_obj):
     #funky ordering TZCYX
 
-    image = np.zeros([par_obj.total_time_pt+1,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'float32')
+    image = np.zeros([par_obj.total_time_pt,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'float32')
     for tpt in par_obj.time_pt_list:
 
         #for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
@@ -1129,7 +1639,7 @@ def save_output_prediction_fn(par_obj,int_obj):
 def save_output_mask_fn(par_obj,int_obj):
     #funky ordering TZCYX
 
-    image = np.zeros([par_obj.total_time_pt+1,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'uint8')
+    image = np.zeros([par_obj.total_time_pt,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'uint8')
     for tpt in par_obj.time_pt_list:
         
         for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
