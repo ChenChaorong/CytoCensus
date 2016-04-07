@@ -28,6 +28,9 @@ from gnu import return_license
 from matplotlib.path import Path
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 import pdb
+from common_navigation import *
+from parameter_object import parameterClass
+
 #Apparently matplotlib slows the loading drammatically due to a font cache issue. This resolves it.
 try:
     #mac location.
@@ -87,7 +90,7 @@ class Eval_load_im_win(QtGui.QWidget):
         self.loadImages_button_panel.addStretch()
 
         about_btn = QtGui.QPushButton('About')
-        about_btn.clicked.connect(self.on_about)
+        about_btn.clicked.connect(lambda: on_about(self))
         self.loadImages_button_panel.addWidget(about_btn)
 
 
@@ -130,39 +133,6 @@ class Eval_load_im_win(QtGui.QWidget):
         self.image_status_text.showMessage('Status: Highlight training images in folder. ')
         vbox0.addWidget(self.image_status_text)
 
-    def on_about(self):
-        self.about_win = QtGui.QWidget()
-        self.about_win.setWindowTitle('About QuantiFly Software v2.0')
-        
-        license = return_license()
-        #with open ('GNU GENERAL PUBLIC LICENSE.txt', "r") as myfile:
-        #    data=myfile.read().replace('\n', ' ')
-        #    license.append(data)
-        
-        # And give it a layout
-        layout = QtGui.QVBoxLayout()
-        
-        self.view = QtWebKit.QWebView()
-        self.view.setHtml('''
-          <html>
-            
-         
-            <body>
-              <form>
-                <h1 >About</h1>
-                
-                <p>Software written by Dominic Waithe (c) 2015</p>
-                '''+str(license)[2:-2]+'''
-                
-                
-              </form>
-            </body>
-          </html>
-        ''')
-        layout.addWidget(self.view)
-        self.about_win.setLayout(layout)
-        self.about_win.show()
-        self.about_win.raise_()   
     def goto_model_import(self):
             win_tab.setCurrentWidget(evalLoadModelWin)
             #Checks the correct things are disabled.
@@ -219,7 +189,7 @@ class Eval_load_model_win(QtGui.QWidget):
         #Button for going to model evaluation.
         self.gotoEvalButton = QtGui.QPushButton("Goto Image Evaluation")
         self.gotoEvalButton.setEnabled(False)
-        self.gotoEvalButton.clicked.connect(self.process_imgs)
+        self.gotoEvalButton.clicked.connect(self.gotoEvalButton_fn)
         
         vbox0.addWidget(self.gotoEvalButton)
 
@@ -424,7 +394,7 @@ class Eval_load_model_win(QtGui.QWidget):
             self.gotoEvalButton.setEnabled(True)
             evalImWin.eval_im_btn.setEnabled(True)
             par_obj.eval_load_im_win_eval = False
-
+    '''
     def process_imgs(self):
         imgs =[]
         gt_im_sing_chgs =[]
@@ -530,8 +500,26 @@ class Eval_load_model_win(QtGui.QWidget):
         v2.import_data_fn(par_obj,par_obj.file_array)
         
         evalImWin.loadTrainFn()
-        v2.load_and_initiate_plots(par_obj, evalImWin,par_obj.curr_z,par_obj.time_pt)
+        v2.load_and_initiate_plots(par_obj, evalImWin)
         #v2.eval_goto_img_fn(par_obj.curr_z,par_obj,evalImWin)
+    '''
+    def gotoEvalButton_fn(self):
+        for i in range(par_obj.file_array.__len__()):
+            par_obj.frames_2_load = range(0,par_obj.max_zslices) #TODO make max_zslices  a list
+            par_obj.time_pt_list = range(0,par_obj.total_time_pt)
+
+        v2.processImgs(self,par_obj)
+        par_obj.eval_load_im_win_eval = False
+        win_tab.setCurrentWidget(evalImWin)
+        evalImWin.prev_im_btn.setEnabled(True)
+        evalImWin.next_im_btn.setEnabled(True)
+        
+
+        #Now that we have correct resize factor from the model import.
+        v2.import_data_fn(par_obj,par_obj.file_array)
+        
+        evalImWin.loadTrainFn()
+        v2.load_and_initiate_plots(par_obj, evalImWin)
     def hyphen_range(self,s):
         """ yield each integer from a complex range string like "1-9,12, 15-20,23"
 
@@ -619,43 +607,14 @@ class Eval_disp_im_win(QtGui.QWidget):
         #Set the layout of the panels to be the grids.
         top_left_panel.setLayout(self.top_left_grid)
         
-        #Sets up the button which changes to the prev image
-        self.prev_im_btn = QtGui.QPushButton('Z-slice (<)')
-        self.prev_im_btn.setEnabled(True)
         
-        #Sets up the button which changes to the next Image.
-        self.next_im_btn = QtGui.QPushButton('Z-slice (>)')
-        self.next_im_btn.setEnabled(True)
-
-         #Sets up the button which changes to the prev image
-        self.prev_time_btn = QtGui.QPushButton('Time-pt (<)')
-        self.prev_time_btn.setEnabled(True)
-        
-        #Sets up the button which changes to the next Image.
-        self.next_time_btn = QtGui.QPushButton('Time-pt (>)')
-        self.next_time_btn.setEnabled(True)
-        
-        
+        navigation_setup(self,par_obj)
         #Sets the current text.
         self.image_num_txt.setText('The Current Image is: ' + str(par_obj.curr_z +1)+' and the time point is: '+str(par_obj.time_pt+1))
         self.count_txt = QtGui.QLabel()
-        
-        
-        self.output_count_txt = QtGui.QLabel()
-
-        panel_buttons = QtGui.QHBoxLayout()
-        panel_buttons.addWidget(self.prev_im_btn)
-        panel_buttons.addWidget(self.next_im_btn)
-        panel_buttons.addWidget(self.prev_time_btn)
-        panel_buttons.addWidget(self.next_time_btn)
-
-        self.prev_im_btn.clicked.connect(self.prev_im_btn_fn)
-        self.next_im_btn.clicked.connect(self.next_im_btn_fn)
-        self.prev_time_btn.clicked.connect(self.prev_time_btn_fn)
-        self.next_time_btn.clicked.connect(self.next_time_btn_fn)
 
         #Populates the grid with the different widgets.
-        self.top_left_grid.addLayout(panel_buttons, 0, 0,1,4)
+        self.top_left_grid.addLayout(self.panel_buttons, 0, 0,1,4)
         
         self.top_left_grid.addWidget(self.image_num_txt, 2, 0, 2, 3)
 
@@ -802,12 +761,12 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.canvas1.mpl_connect('button_release_event', self.cursor.button_release_callback)
     def interpolate_roi_fn(self):
         self.cursor.interpolate_ROI()
-        self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
+        self.goto_img_fn()
         
         #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
     def interpolate_roi_in_time_fn(self):
         self.cursor.interpolate_ROI_in_time()
-        self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
+        self.goto_img_fn()
         #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
     def count_all_fn(self):
         for tpt in par_obj.time_pt_list:
@@ -824,13 +783,13 @@ class Eval_disp_im_win(QtGui.QWidget):
         if par_obj.show_pts == 1:
             self.kernel_show_btn.setText('Showing Probability')
             #self.goto_img_fn(par_obj.curr_z,par_obj)
-            self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
+            self.goto_img_fn()
             #v2.goto_img_fn(par_obj, int_obj,par_obj.curr_z,par_obj.time_pt)
             #v2.eval_goto_img_fn(par_obj.curr_z,par_obj,self) ###needs correcting??###
         elif par_obj.show_pts == 2:
             self.kernel_show_btn.setText('Showing Counts')
             #self.goto_img_fn(par_obj.curr_z,par_obj)
-            self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
+            self.goto_img_fn()
             #v2.goto_img_fn(par_obj, int_obj,par_obj.curr_z,par_obj.time_pt)
             #v2.eval_goto_img_fn(par_obj.curr_z,par_obj,self)
     def count_maxima_btn_fn(self):
@@ -854,21 +813,19 @@ class Eval_disp_im_win(QtGui.QWidget):
         par_obj.pred_arr = {}
         par_obj.sum_pred = {}
         
-        
-        for tpt in par_obj.time_pt_list:
-
-            count = -1
-            for b in par_obj.left_2_calc:
-                frames =par_obj.frames_2_load[b]
+        for fileno in range(par_obj.max_file):
+            for tpt in par_obj.time_pt_list:
+                count = -1
+                frames =par_obj.frames_2_load
                 #try to make it threadable
                 #v2.im_pred_inline_fn_eval(par_obj, self,outer_loop=b,inner_loop=frames,threaded=True)
-                v2.im_pred_inline_fn_new(par_obj, self,frames,[tpt],True,b)
+                v2.im_pred_inline_fn_new(par_obj, self,frames,[tpt],[fileno],True)
                 for i in frames:
                     #v2.im_pred_inline_fn(par_obj, self,inline=True,outer_loop=b,inner_loop=frames,count=count)
                     #v2.evaluate_forest(par_obj,self, False, 0,inline=True,outer_loop=b,inner_loop=i,count=count)
-                    v2.evaluate_forest_new(par_obj,self,False,0,[i],[tpt],False,b)
+                    v2.evaluate_forest_new(par_obj,self,False,0,[i],[tpt],[fileno],False)
                     count = count+1
-            par_obj.data_store[tpt]['feat_arr'] = {}
+            par_obj.data_store[fileno][tpt]['feat_arr'] = {}
             v2.count_maxima(par_obj,tpt)
 
         self.count_txt_1.setText(str(par_obj.min_distance[0]))
@@ -887,6 +844,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.image_status_text.showMessage('Status: evaluation finished.')
         par_obj.eval_load_im_win_eval = True
         par_obj.time_pt = 0
+        #TODO check why this is not using the local version of goto_img
         v2.goto_img_fn_new(par_obj, self,par_obj.curr_z,par_obj.time_pt)
         
         #v2.eval_pred_show_fn(par_obj,self,par_obj.curr_z,par_obj.time_pt)
@@ -905,56 +863,23 @@ class Eval_disp_im_win(QtGui.QWidget):
         #Win_fn()
         channel_wid = QtGui.QWidget()
         channel_lay = QtGui.QHBoxLayout()
-        for b in range(0,par_obj.numCH):    
-            name = 'self.CH_cbx'+str(b)+'= checkBoxCH()'
-            exec(name)
-            name = 'self.CH_cbx'+str(b)+'.setText(\'CH '+str(b+1)+'\')'
-            exec(name)  
-            name = 'self.CH_cbx'+str(b)+'.setChecked(True)'
-            exec(name)
-            name = 'self.CH_cbx'+str(b)+'.type=\'visual_ch\''
-            exec(name)
-            name = 'self.CH_cbx'+str(b)+'.id='+str(b)
-            exec(name)
-            name = 'channel_lay.addWidget(self.CH_cbx'+str(b)+')';
-            exec(name)
+        ButtonGroup=create_channel_objects(self,par_obj,par_obj.numCH)
+        for x in ButtonGroup:
+            channel_lay.addWidget(x)
+            x.show()
+            x.setChecked(True)
         channel_lay.addStretch()
         channel_wid.setLayout(channel_lay)
         self.top_left_grid.addWidget(channel_wid,1,0,1,3)
-    def prev_im_btn_fn(self):
-        for ind, zim in enumerate(par_obj.frames_2_load[0]):
-            if zim == par_obj.curr_z:
-                if ind > 0:
-                    par_obj.curr_z  = par_obj.frames_2_load[0][ind-1]
-                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
-                    break;
 
-    def next_im_btn_fn(self):
-         for ind, zim in enumerate(par_obj.frames_2_load[0]):
-            if zim == par_obj.curr_z:
-                if ind < par_obj.frames_2_load[0].__len__()-1:
-                    par_obj.curr_z  = par_obj.frames_2_load[0][ind+1]
-                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
-                    break;
-    def prev_time_btn_fn(self):
-        for ind, tim in enumerate(par_obj.time_pt_list):
-            if tim == par_obj.time_pt:
-                if ind > 0:
-                    par_obj.time_pt  = par_obj.time_pt_list[ind-1]
-                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
-                    break;
-
-    def next_time_btn_fn(self):
-
-        for ind, tim in enumerate(par_obj.time_pt_list):
-            if tim == par_obj.time_pt:
-                if ind < par_obj.time_pt_list.__len__()-1:
-                    par_obj.time_pt  = par_obj.time_pt_list[ind+1]
-                    self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
-
-                    break;
-
-    def goto_img_fn(self,zslice,tpt):
+    def goto_img_fn(self,zslice=None,tpt=None,imno=None):
+        if zslice!=None:
+            par_obj.curr_z=zslice
+        if tpt!=None:
+            par_obj.time_pt=tpt
+        if imno!=None:
+            par_obj.curr_file=imno
+            
         self.cursor.ppt_x = []
         self.cursor.ppt_y = []
         self.cursor.line = [None]
@@ -963,18 +888,18 @@ class Eval_disp_im_win(QtGui.QWidget):
         
         self.cursor.complete = False
         self.cursor.flag = False
-        try: #not really sure what went wrong here, fix later
-            for bt in par_obj.data_store[tpt]['roi_stk_x']:
+        try: #TODO not really sure what went wrong here, fix later
+            for bt in par_obj.data_store[imno][tpt]['roi_stk_x']:
                 if bt == zslice:
                     self.cursor.complete = True
-                    self.cursor.ppt_x = copy.deepcopy(par_obj.data_store[tpt]['roi_stk_x'][bt])
-                    self.cursor.ppt_y = copy.deepcopy(par_obj.data_store[tpt]['roi_stk_y'][bt])
+                    self.cursor.ppt_x = copy.deepcopy(par_obj.data_store[imno][tpt]['roi_stk_x'][bt])
+                    self.cursor.ppt_y = copy.deepcopy(par_obj.data_store[imno][tpt]['roi_stk_y'][bt])
                     
                     break;
         except KeyError:
             pass
         #v2.eval_goto_img_fn(im_num,par_obj,self)
-        v2.goto_img_fn_new(par_obj, self,zslice,tpt)
+        v2.goto_img_fn_new(par_obj, self)
                   
 class checkBoxCH(QtGui.QCheckBox):
     def __init__(self):
@@ -985,7 +910,7 @@ class checkBoxCH(QtGui.QCheckBox):
         
         if self.type == 'visual_ch':
             #v2.eval_goto_img_fn(par_obj.curr_z,par_obj,evalImWin)
-            Eval_disp_im_win.goto_img_fn(evalImWin,par_obj.curr_z,par_obj.time_pt)
+            Eval_disp_im_win.goto_img_fn(evalImWin)
 
             
 class File_Dialog(QtGui.QMainWindow):
@@ -1027,11 +952,10 @@ class File_Dialog(QtGui.QMainWindow):
         #self.show()
         
     def showDialog(self):
-        par_obj.file_array =[]
         self.int_obj.selIntButton.setEnabled(False)
         #filepath = QtGui.QFileDialog.getOpenFileName(self, 'Open file', '/home')
+        par_obj.file_array =[]
         for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file', self.par_obj.filepath,'Images(*.tif *.tiff *.png *.oib *.oif);;'):
-            
             par_obj.file_array.append(path)
         
         self.par_obj.config['evalpath'] = str(QtCore.QFileInfo(path).absolutePath())+'/'
@@ -1042,60 +966,7 @@ class File_Dialog(QtGui.QMainWindow):
 
 
         v2.import_data_fn(par_obj,par_obj.file_array)
-        par_obj.left_2_calc=[]
-        par_obj.frames_2_load={}
-        if par_obj.file_ext == 'png':
-            for i in range(0,par_obj.file_array.__len__()):
-                par_obj.left_2_calc.append(i)
-                par_obj.frames_2_load[i] = [0]
-            self.int_obj.image_status_text.showMessage('Status: Loading Images. Loading Image Num: '+str(par_obj.file_array.__len__()))
-        elif par_obj.file_ext =='tiff' or par_obj.file_ext =='tif':
-            if par_obj.max_zslices>1:
-                for i in range(0,par_obj.file_array.__len__()):
-                    par_obj.left_2_calc.append(i)
-                    for b in range(0, par_obj.max_zslices):
-                        par_obj.frames_2_load[i] = [0]
-                self.int_obj.image_status_text.showMessage('Status: Loading Images.')
-            else:
-                for i in range(0,par_obj.file_array.__len__()):
-                    par_obj.left_2_calc.append(i)
-                    par_obj.frames_2_load[i] = [0]
-        elif par_obj.file_ext =='dv':
-            if par_obj.dv_file.maxFrames>1:
-                for i in range(0,par_obj.file_array.__len__()):
-                    par_obj.left_2_calc.append(i)
-                    for b in range(0, par_obj.dv_file.maxFrames):
-                        par_obj.frames_2_load[i] = [0]
-                self.int_obj.image_status_text.showMessage('Status: Loading Images.')
-            else:
-                for i in range(0,par_obj.file_array.__len__()):
-                    par_obj.left_2_calc.append(i)
-                    par_obj.frames_2_load[i] = [0]
-        elif par_obj.file_ext =='oib':
-            if par_obj.max_zslices>1:
-                for i in range(0,par_obj.file_array.__len__()):
-                    par_obj.left_2_calc.append(i)
-                    for b in range(0, par_obj.max_zslices):
-                        par_obj.frames_2_load[i] = [0]
-        
-                self.int_obj.image_status_text.showMessage('Status: Loading Images.')
-               
-            else:
-                for i in range(0,par_obj.file_array.__len__()):
-                    par_obj.left_2_calc.append(i)
-                    par_obj.frames_2_load[i] = [0]
-                
-                
-        count = 0
-        for b in par_obj.left_2_calc:
-            frames =par_obj.frames_2_load[b]
-            for i in frames:
-                count = count+1
-                
-        par_obj.test_im_start= 0
-        par_obj.test_im_end= count
-            
-            
+
     
         self.int_obj.image_status_text.showMessage('Status: Loading Images. ')                
         if self.type == 'im':
@@ -1163,66 +1034,6 @@ class removeImBtn(QtGui.QPushButton):
         self.par_obj.file_array.pop(self.modelNum)
         self.table.refreshTable()
  
-
-
-
-
-class Parameter_class:
-    def __init__(self):
-        store = True
-        
-        
-        self.evalLoadImWin_loaded = False
-        self.evalLoadModelWin_loaded = False
-        self.evalLoadImWin_loaded = False
-        self.evalDispImWin_evaluated = False
-        self.eval_load_im_win_eval = False
-        self.y_limit = 1024
-        self.x_limit = 1024
-        self.featArr ={}
-        self.pred_array={}
-        self.sum_pred={}
-        self.crop_x1 = 0
-        self.crop_x2 = 0
-        self.crop_y1 = 0
-        self.crop_y2 = 0
-        self.file_array =[]
-        self.curr_z = 0
-        
-        self.left2calc = 0
-        self.p_size = 1
-        self.file_array =[]
-        self.maxi_arr = {}
-        self.height = 0
-        self.width = 0
-        self.fresh_features = True
-        self.show_pts= 0
-        self.min_distance = [2,2,2]
-        self.abs_thr = 0
-        self.rel_thr = 0.5
-        self.npts = 100
-        self.resize_factor = 1
-        self.time_pt = 0
-        self.total_time_pt = 0
-        self.data_store ={}
-        self.to_crop = False
-        self.data_store[self.time_pt] ={}
-        self.forPath = os.path.expanduser('~')+'/.densitycount/models/'
-        
-        self.overlay=False
-        try:
-            os.makedirs(self.forPath)
-        except OSError as exception:
-            if exception.errno != errno.EEXIST:
-                raise
-
-        self.csvPath = os.path.expanduser('~')+'/'
-        self.cache_length=3
-        self.prev_img=[]
-        self.oldImg=[]
-        self.newImg=[]
-        self.max_det=[]
-
 #Creates win, an instance of QWidget
 class widgetSP(QtGui.QWidget):
     def __init__(self):
@@ -1259,7 +1070,7 @@ app.processEvents()
 win_tab = QtGui.QTabWidget()
 
 #Intialises counter object.
-par_obj = Parameter_class()
+par_obj = parameterClass()
 #Main widgets.
 evalLoadImWin = Eval_load_im_win(par_obj)
 evalLoadModelWin = Eval_load_model_win(par_obj)

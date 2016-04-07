@@ -34,15 +34,34 @@ def get_feature_lengths(feature_type):
         
     return feat_length,feat_func
 
-def feature_create_threadable(par_obj,imStr,imRGB):
+def feature_create_threadable(par_obj,imRGB):
     time1 = time.time()
     [feat_length,feat_func]=get_feature_lengths(par_obj.feature_type)
     feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),feat_length*par_obj.ch_active.__len__()))
 
     for b in range(0,par_obj.ch_active.__len__()):
-            imG = imRGB[:,:,par_obj.ch_active[b]].astype(np.float32)
+            imG = imRGB[:,:,b].astype(np.float32)
 
             feat[:,:,(b*feat_length):((b+1)*feat_length)] = feat_func(imG,par_obj.feature_scale)  
+    #TODO?? Investigate if this is really necessary
+    if par_obj.numCH==0:
+        imG = imRGB[:,:,0].astype(np.float32)
+
+        feat = feat_func(imG,par_obj.feature_scale)  
+
+    return feat
+    
+def feature_create_z(par_obj,imRGB):
+    import v2
+    #not currently intended to be threaded
+    time1 = time.time()
+    feat_length
+    feat = np.zeros(((int(par_obj.crop_y2)-int(par_obj.crop_y1)),(int(par_obj.crop_x2)-int(par_obj.crop_x1)),feat_length*par_obj.ch_active.__len__()))
+
+    for b in range(0,par_obj.ch_active.__len__()):
+            imG = imRGB[:,:,b].astype(np.float32)
+
+            feat[:,:,(b*feat_length):((b+1)*feat_length)] = local_shape_features_fine3(imG,par_obj.feature_scale)  
             
     if par_obj.numCH==0:
         imG = imRGB[:,:,0].astype(np.float32)
@@ -50,6 +69,7 @@ def feature_create_threadable(par_obj,imStr,imRGB):
         feat = feat_func(imG,par_obj.feature_scale)  
 
     return feat
+
 def local_shape_features_fine(im,scaleStart):
     #Exactly as in the Luca Fiaschi paper.
     s = scaleStart
@@ -85,10 +105,8 @@ def local_shape_features_fine(im,scaleStart):
     f[:,:, 18] =  st128[:,:,0]
     f[:,:, 19] =  st128[:,:,1]
     f[:,:, 20] = vigra.filters.laplacianOfGaussian(im, s*16 ,window_size=2.5)
-   
-    
-    
     return f
+    
 def local_shape_features_fine3_1(im,scaleStart):
     #Exactly as in the Luca Fiaschi paper.
     #FIXME normalisation. Broke comparing image, implement based on max datatype stored instead
@@ -124,6 +142,42 @@ def local_shape_features_fine3_1(im,scaleStart):
 
     return f
 def local_shape_features_fine3(im,scaleStart):
+    #Exactly as in the Luca Fiaschi paper.
+    #FIXME normalisation. Broke comparing image, implement based on max datatype stored instead
+    s = scaleStart
+    
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,26))
+    f[:,:, 0]  = im
+    
+    pyr=skimage.transform.pyramid_gaussian(im,sigma=1.5, max_layer=5, downscale=2)
+    a=im
+    for layer in range(0,5):
+        scale=[float(im.shape[0])/float(a.shape[0]),float(im.shape[1])/float(a.shape[1])]
+        lap=scipy.ndimage.filters.laplace(a)
+        lap=scipy.ndimage.interpolation.zoom(lap, scale,order=1)
+        
+        [m,n]=np.gradient(a)
+        ggm=np.hypot(m,n)
+        ggm=scipy.ndimage.interpolation.zoom(ggm, scale,order=1)
+
+        x,y,z=skfeat.structure_tensor(a,1)
+        st =skfeat.structure_tensor_eigvals(x,y,z)
+        st0=scipy.ndimage.interpolation.zoom(st[0], scale,order=1)
+        st1=scipy.ndimage.interpolation.zoom(st[1], scale,order=1)
+
+        #ent=entropy(a,skimage.morphology.disk(3))
+        #ent=scipy.ndimage.interpolation.zoom(ent, scale,order=1)
+        ent=scipy.ndimage.interpolation.zoom(a, scale,order=1,mode='nearest')
+        f[:,:, layer*5+1]  = lap
+        f[:,:, layer*5+2]  = ggm
+        f[:,:, layer*5+3]  = st0
+        f[:,:, layer*5+4]  = st1
+        f[:,:, layer*5+5]  = ent
+        a=pyr.next()
+    return f
+def local_shape_features_finez(im,scaleStart):
     #Exactly as in the Luca Fiaschi paper.
     #FIXME normalisation. Broke comparing image, implement based on max datatype stored instead
     s = scaleStart
