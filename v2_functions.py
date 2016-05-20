@@ -201,7 +201,10 @@ Original author: Lee Kamentstky
 
 def count_maxima(par_obj,time_pt,fileno):
     #count maxima won't work properly if have selected a random set of Z
-    predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.frames2load(-1)))
+    if par_obj.min_distance[2]==0 or len(par_obj.frames_2_load)==1:
+        count_maxima_2d(par_obj,time_pt,fileno)
+        return
+    predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.frames_2_load[-1]+1))
     for i in par_obj.frames_2_load:
         predMtx[:,:,i]= par_obj.data_store['pred_arr'][fileno][time_pt][i]
 
@@ -251,7 +254,58 @@ def count_maxima(par_obj,time_pt,fileno):
                             pts2keep.append(pt2d)
         pts = pts2keep
     par_obj.data_store['pts'][fileno][time_pt] = pts
+def count_maxima_2d(par_obj,time_pt,fileno):
+    #count maxima won't work properly if have selected a random set of Z
+    par_obj.min_distance[2]=0
+    det=gau_stk = predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.frames_2_load[-1]+1))
+    for i in par_obj.frames_2_load:
+        predMtx[:,:,i]= par_obj.data_store['pred_arr'][fileno][time_pt][i]
+        gau_stk[:,:,i] = filters.gaussian_filter(predMtx[:,:,i],(par_obj.min_distance[0],par_obj.min_distance[1]))
+        y,x = np.gradient(gau_stk[:,:,i],1)
+        xy,xx = np.gradient(x)
+        yy,yx = np.gradient(y)
+        det[:,:,i] = xx*yy-xy*yx
+    #detl = -1*np.min(det)+det
+    #det[np.where(det<0)]=0
+    # if not already set, create. This is then used for the entire image and all subsequent training. A little hacky, but otherwise the normalisation screws everything up
+    if not par_obj.max_det:
+        par_obj.max_det=np.max(det)
         
+    detn = det/par_obj.max_det
+    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
+    for i in par_obj.frames_2_load:
+        #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
+        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = detn[:,:,i]
+    
+
+    pts = peak_local_max(detn, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
+
+    #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
+
+    par_obj.show_pts = 1
+
+    #Filter those which are not inside the region.
+    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() >0:
+        pts2keep = []
+        
+        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
+             for pt2d in pts:
+
+
+                if pt2d[2] == i:
+                    #Find the region of interest.
+                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
+                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
+                    #Reformat to make the path object.
+                    pot = []
+                    for b in range(0,ppt_x.__len__()):
+                        pot.append([ppt_x[b],ppt_y[b]])
+                    p = Path(pot)
+                    if p.contains_point([pt2d[1],pt2d[0]]) == True:
+                            pts2keep.append(pt2d)
+        pts = pts2keep
+    par_obj.data_store['pts'][fileno][time_pt] = pts
+    
 def rank_order(image):
     """Return an image of the same shape where each pixel is the
     index of the pixel value in the ascending order of the unique
