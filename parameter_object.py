@@ -150,7 +150,14 @@ class parameterClass:
                 self.data_store[dataname][fileno]={}
                 for time_pt in self.time_pt_list:
                     self.data_store[dataname][fileno][time_pt]={}
-
+    class serialdict(shelve.Shelf):
+        def __init__(self, *args):
+            shelve.Shelf.__init__(self, args)
+        def __getitem__(self, key):
+            val = shelve.Shelf.__getitem__(self, str(key))
+            return val
+        def __setitem__(self, key, val):
+            shelve.Shelf.__setitem__(self, str(key), val)
     def reset_parameters(self): #TODO a better way to integrate this with init
         self.frames_2_load ={}
         self.left_2_calc =[]
