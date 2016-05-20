@@ -1175,6 +1175,47 @@ class Win_fn(QtGui.QWidget):
         self.save_model_btn.setEnabled(True)
         self.count_maxima_btn.setEnabled(True)
         self.evaluate_btn.setEnabled(True)
+        if par_obj.double_train==True:
+            self.double_train_model_btn_fn()
+    def double_train_model_btn_fn(self):
+        self.image_status_text.showMessage('Training Ensemble of Decision Trees. ')
+        #added to make sure current timepoint has all features precalculated
+        for i in range(0,par_obj.saved_ROI.__len__()):
+            zslice = par_obj.saved_ROI[i][0]
+            tpt =par_obj.saved_ROI[i][5]
+            imno =par_obj.saved_ROI[i][6]
+            v2.evaluate_forest_new(par_obj,self, False,0,[zslice],[tpt],[imno])
+
+        v2.im_pred_inline_fn_new(par_obj, self,par_obj.frames_2_load,[par_obj.time_pt],[par_obj.curr_file],'auto')
+
+        for i in range(0,par_obj.saved_ROI.__len__()):
+            zslice = par_obj.saved_ROI[i][0]
+            tpt =par_obj.saved_ROI[i][5]
+            imno =par_obj.saved_ROI[i][6]
+            print 'calculating features, time point',tpt+1,' image slice ',zslice+1
+            v2.im_pred_inline_fn_new(par_obj, self,[zslice],[tpt],[imno],threaded='auto')
+  
+        par_obj.f_matrix=[]
+        par_obj.o_patches=[]
+        t0=time.time()   
+        print
+        for i in par_obj.saved_ROI:
+            v2.update_training_samples_fn_new_only(par_obj,self,i,'double_feat_arr')
+        print time.time()-t0 
+        t0=time.time()       
+        self.image_status_text.showMessage('Training Model')
+        v2.train_forest(par_obj,self,1)
+        self.image_status_text.showMessage('Evaluating Images with the Trained Model. ')
+        app.processEvents()
+        v2.evaluate_forest_auto(par_obj,self, False,1,par_obj.frames_2_load,[par_obj.time_pt],[par_obj.curr_file])
+        #v2.make_correction(par_obj, 0)
+        self.image_status_text.showMessage('Model Trained. Continue adding samples, or click \'Save Training Model\'. ')
+        par_obj.eval_load_im_win_eval = True
+        par_obj.show_pts= 0
+        self.kernel_btn_fn()
+        self.save_model_btn.setEnabled(True)
+        self.count_maxima_btn.setEnabled(True)
+        self.evaluate_btn.setEnabled(True)
     def sigmaOnChange(self,text):
         if (text != ""):
             par_obj.sigma_data = float(text)
