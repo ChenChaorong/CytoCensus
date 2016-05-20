@@ -10,6 +10,7 @@ import time
 from sklearn.ensemble import *
 import sklearn
 from scipy.ndimage import filters
+from scipy.ndimage import distance_transform_edt
 import cPickle as pickle
 
 from oiffile import OifFile
@@ -27,7 +28,7 @@ from multiprocessing import Pool
 from multiprocessing.dummy import Pool as ThreadPool 
 import modest_image
 import pdb
-
+import numpy as np
 from local_features import *
 
 """QuantiFly3d Software v0.1
@@ -196,7 +197,7 @@ Copyright (c) 2009-2011 Broad Institute
 All rights reserved.
 Original author: Lee Kamentstky
 """
-import numpy as np
+
 
 def count_maxima(par_obj,time_pt,fileno):
     #count maxima won't work properly if have selected a random set of Z
