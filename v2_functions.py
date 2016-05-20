@@ -1005,15 +1005,6 @@ def evaluate_forest_new(par_obj,int_obj,withGT,model_num,zsliceList,tptList,curr
                         gt_im =  pylab.imread(par_obj.data_store['gt_array'][imno][tpt][zslice])[:,:,0]
                         par_obj.data_store['gt_sum'][imno][tpt][zslice] = np.sum(gt_im)
 
-'''
-def channels_for_display(par_obj, int_obj,imRGB):
-    'deals with displaying different channels''
-    count = 0
-    CH = [0]*5 #up to 5 channels-get checkbox values
-    for c in range(0,par_obj.numCH):
-        if int_obj.CH_cbx[c].isChecked():
-            count = count + 1
-            CH[c] = 1
 def evaluate_forest_auto(par_obj,int_obj,withGT,model_num,zsliceList,tptList,curr_file,threaded=False,b=0):
 
     #Finds the current frame and file.
@@ -1170,7 +1161,7 @@ def goto_img_fn_new(par_obj, int_obj):
         pt_y = []
         pts = par_obj.data_store['pts'][imno][tpt]
         
-        ind = np.where(np.array(par_obj.frames_2_load[0]) == zslice)
+        ind = np.where(np.array(par_obj.frames_2_load) == zslice)
         #print 'ind',ind
         for pt2d in pts:
             if pt2d[2] == ind:
@@ -1375,7 +1366,7 @@ def import_data_fn(par_obj,file_array):
             n = str(imno)
             imStr = str(file_array[imno])
             par_obj.file_ext = imStr.split(".")[-1]
-            par_obj.file_name = imStr.split(".")[0].split("/")[-1]
+            par_obj.file_name[imno] = imStr.split(".")[0].split("/")[-1]
             if prevExt != [] and prevExt !=par_obj.file_ext:
                 statusText = 'More than one file format present. Different number of image channels in the selected images'
                 return False, statusText
@@ -1527,45 +1518,65 @@ def import_data_fn(par_obj,file_array):
             #If the size of the third dimenion is just 1, this is invalid for imshow show we have to adapt.
             par_obj.ex_img = imRGB[:,:,0]
     elif imRGB.shape.__len__() ==2:
-        par_obj.ex_img = imRGB
+        par_obj.ex_img = imRGB.astype('float32')
 
     statusText= str(file_array.__len__())+' Files Loaded.'
     return True, statusText
 def save_output_prediction_fn(par_obj,int_obj):
     #funky ordering TZCYX
 
-    image = np.zeros([par_obj.total_time_pt,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'float32')
-    for tpt in par_obj.time_pt_list:
-
-        #for i in range(0,par_obj.data_store[tpt]['pts'].__len__()):
-        for zslice in range(0,par_obj.max_zslices):
-                image[tpt,zslice,0,:,:]=par_obj.data_store['pred_arr'][imno][tpt][zslice].astype(np.float32)
-    print 'Prediction written to disk'
-    imsave(par_obj.csvPath+par_obj.file_name+'_'+par_obj.modelName+'_Prediction.tif',image, imagej=True)
-    int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
-def save_output_mask_fn(par_obj,int_obj):
+    for fileno in range(par_obj.max_file):
+        image = np.zeros([par_obj.total_time_pt,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'float32')
+        for tpt in par_obj.time_pt_list:
+            for zslice in range(0,par_obj.max_zslices):
+                    image[tpt,zslice,0,:,:]=par_obj.data_store['pred_arr'][fileno][tpt][zslice].astype(np.float32)
+        imsave(par_obj.csvPath+par_obj.file_name[fileno]+'_'+par_obj.modelName+'_Prediction.tif',image, imagej=True)
+         
+        print 'Prediction written to disk'
+        int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
+def save_output_hess_fn(par_obj,int_obj):
     #funky ordering TZCYX
 
-    image = np.zeros([par_obj.total_time_pt,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'uint8')
-    for tpt in par_obj.time_pt_list:
+    for fileno in range(par_obj.max_file):
+        image = np.zeros([par_obj.total_time_pt,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'float32')
+        for tpt in par_obj.time_pt_list:
+            for zslice in range(0,par_obj.max_zslices):
+                    image[tpt,zslice,0,:,:]=par_obj.data_store['maxi_arr'][fileno][tpt][zslice].astype(np.float32)
+        print 'Prediction written to disk'
+        imsave(par_obj.csvPath+par_obj.file_name[fileno]+'_'+par_obj.modelName+'_Hess.tif',image, imagej=True)
+        int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
+
+def save_output_mask_fn(par_obj,int_obj):
+    #funky ordering TZCYX
+    for fileno in range(par_obj.max_file):
+        image = np.zeros([par_obj.total_time_pt,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'bool')
+        for tpt in par_obj.time_pt_list:
+            
+            for i in range(0,par_obj.data_store['pts'][fileno][tpt].__len__()):
+                [x,y,z]=par_obj.data_store['pts'][fileno][tpt][i]
+                image[tpt,z,0,x,y]=255
+        dist=list(par_obj.min_distance)
+        selem=skimage.morphology.ball(np.round(dist[0],0)).astype('bool')
+        if dist[2] is not 0:
+            drange=range(selem.shape[0]/2,selem.shape[0],np.round(dist[0]/dist[2],0).astype('uint8'))
+            lrange=range(0,selem.shape[0]/2,np.round(dist[0]/dist[2],0).astype('uint8'))
+            selem2=selem[np.newaxis,lrange+drange,np.newaxis,:,:]
+
+        image=scipy.ndimage.binary_dilation(image,selem2).astype('uint8')
+        int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
         
-        for i in range(0,par_obj.data_store['pts'][imno][tpt].__len__()):
-            [x,y,z]=par_obj.data_store['pts'][imno][tpt][i]
-            image[tpt,z,0,x,y]=255
-    imsave(par_obj.csvPath+par_obj.file_name+'_'+par_obj.modelName+'Mask.tif',image, imagej=True)
-    int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
 def save_output_data_fn(par_obj,int_obj):
     local_time = time.asctime( time.localtime(time.time()) )
 
-    with open(par_obj.csvPath+'outputData.csv', 'a') as csvfile:
+    with open(par_obj.csvPath+str(par_obj.file_name[0])+'_'+par_obj.modelName+'outputData.csv', 'a') as csvfile:
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('Predicted count: ')])
     
     count = -1
-    for tpt in par_obj.time_pt_list:
-        for b in par_obj.left_2_calc:
-            frames =par_obj.frames_2_load[b]
-            imStr = str(par_obj.file_array[count])
+    for fileno in range(par_obj.max_file):
+        for tpt in par_obj.time_pt_list:
+            frames =par_obj.frames_2_load
+            imStr = str(par_obj.file_array[fileno])
             
                 #count = count+1
                 #n = str(count)
@@ -1573,19 +1584,20 @@ def save_output_data_fn(par_obj,int_obj):
                 #im_to_save= PIL.Image.fromarray(par_obj.data_store[par_obj.time_pt]['dense_arr'][count].astype(np.float32))
                 #im_to_save.save(string)
                    
-            with open(par_obj.csvPath+'outputData.csv', 'a') as csvfile:
+            with open(par_obj.csvPath+str(par_obj.file_name[0])+'outputData.csv', 'a') as csvfile:
                 spamwriter = csv.writer(csvfile,  dialect='excel')
-                spamwriter.writerow([local_time]+[str(imStr)]+[tpt+1]+[par_obj.data_store[tpt]['pts'].__len__()])
+                spamwriter.writerow([local_time]+[str(imStr)]+[tpt+1]+[par_obj.data_store['pts'][fileno][tpt].__len__()])
                 
 
     int_obj.report_progress('Data exported to '+ par_obj.csvPath)
-    with open(par_obj.csvPath+'outputPoints.csv', 'a') as csvfile:
+    with open(par_obj.csvPath+str(par_obj.file_name[0])+'_'+par_obj.modelName+'_outputPoints.csv', 'a') as csvfile:
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('X: ')]+[str('Y: ')]+[str('Z: ')])
-        for tpt in par_obj.time_pt_list:
-            pts = par_obj.data_store['pts'][imno][tpt]
-            for i in range(0,par_obj.data_store['pts'][imno][tpt].__len__()):
-                spamwriter.writerow([local_time]+[str(imStr)]+[tpt+1]+[par_obj.data_store['pts'][imno][tpt][i][0]]+[par_obj.data_store[tpt]['pts'][i][1]]+[par_obj.data_store[tpt]['pts'][i][2]])
+        for fileno in range(par_obj.max_file):
+            for tpt in par_obj.time_pt_list:
+                pts = par_obj.data_store['pts'][fileno][tpt]
+                for i in range(0,par_obj.data_store['pts'][fileno][tpt].__len__()):
+                    spamwriter.writerow([local_time]+[str(imStr)]+[tpt+1]+[pts[i][0]]+[pts[i][1]]+[pts[i][2]])
 
 
 class ROI:
