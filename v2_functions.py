@@ -741,8 +741,95 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
         par_obj.crop_y2=par_obj.height
     par_obj.height = par_obj.crop_y2-par_obj.crop_y1
     par_obj.width = par_obj.crop_x2-par_obj.crop_x1
-    #threaded=False
-    if threaded == False:
+    if par_obj.FORCE_nothreading is not False:
+        threaded=par_obj.FORCE_nothreading
+    if threaded=='Z':
+        imRGBlist=[]
+        for tpt in tptList:
+            for imno in imnoList:
+                for zslice in zsliceList:
+                    if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
+                        #imRGB=return_imRGB_slice_new(par_obj,zslice,tpt,imno)
+                        imRGB = get_tiff_slice(par_obj,[tpt],[zslice],range(0,par_obj.ori_width,int(par_obj.resize_factor)),range(0,par_obj.ori_height,int(par_obj.resize_factor)),par_obj.ch_active,imno)
+
+                        #imRGBlist.append(imRGB)
+                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarraymax)    
+                #initiate pool and start caclulating features
+                int_obj.report_progress('Calculating Features for Timepoint: '+str(tpt+1) +' All  Frames'+' File: '+str(tpt+1))
+                featlist=[]
+                tee1=time.time()
+                pool = ThreadPool(8) 
+                featlist=pool.map(functools.partial(feature_create_threadable,par_obj),imRGBlist)
+                pool.close() 
+                pool.join() 
+                tee2=time.time()
+                #feat =feature_create(par_obj,imRGB,imStr,i)
+                print tee2-tee1
+                lcount=-1
+
+                for zslice in zsliceList:
+                    if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
+                        lcount=lcount+1
+                        if zslice == zsliceList[0]:
+                            feat=np.concatenate((featlist[lcount],featlist[lcount],featlist[lcount],featlist[lcount+1],featlist[lcount+2]),axis=2)
+                        elif zslice == zsliceList[-1]:
+                            feat=np.concatenate((featlist[lcount-2],featlist[lcount-1],featlist[lcount],featlist[lcount],featlist[lcount]),axis=2)
+                        elif zslice == zsliceList[1]:
+                            feat=np.concatenate((featlist[lcount],featlist[lcount-1],featlist[lcount],featlist[lcount+1],featlist[lcount+2]),axis=2)
+                        elif zslice == zsliceList[-2]:
+                            feat=np.concatenate((featlist[lcount-2],featlist[lcount-1],featlist[lcount],featlist[lcount+1],featlist[lcount+1]),axis=2)
+
+                        else:
+                            feat=np.concatenate((featlist[lcount-2],featlist[lcount-1],featlist[lcount],featlist[lcount+1],featlist[lcount+2]),axis=2)
+                        int_obj.report_progress('Calculating Features for Z: '+str(zslice+1)+' Timepoint: '+str(tpt+1)+' File: '+str(imno+1))
+    
+                        par_obj.num_of_feat[0] = feat.shape[2]
+    
+                        par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat  
+        imRGBlist=[]
+        for tpt in tptList:
+            for imno in imnoList:
+                for zslice in zsliceList:
+                    if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
+                        #imRGB=return_imRGB_slice_new(par_obj,zslice,tpt,imno)
+                        imRGB = get_tiff_slice(par_obj,[tpt],[zslice],range(0,par_obj.ori_width,int(par_obj.resize_factor)),range(0,par_obj.ori_height,int(par_obj.resize_factor)),par_obj.ch_active,imno)
+
+                        #imRGBlist.append(imRGB)
+                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarraymax)    
+                #initiate pool and start caclulating features
+                int_obj.report_progress('Calculating Features for Timepoint: '+str(tpt+1) +' All  Frames'+' File: '+str(tpt+1))
+                featlist=[]
+                tee1=time.time()
+                pool = ThreadPool(8) 
+                featlist=pool.map(functools.partial(feature_create_threadable,par_obj),imRGBlist)
+                pool.close() 
+                pool.join() 
+                tee2=time.time()
+                #feat =feature_create(par_obj,imRGB,imStr,i)
+                print tee2-tee1
+                lcount=-1
+
+                for zslice in zsliceList:
+                    if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
+                        lcount=lcount+1
+                        if zslice == zsliceList[0]:
+                            feat=np.concatenate((featlist[lcount],featlist[lcount],featlist[lcount],featlist[lcount+1],featlist[lcount+2]),axis=2)
+                        elif zslice == zsliceList[-1]:
+                            feat=np.concatenate((featlist[lcount-2],featlist[lcount-1],featlist[lcount],featlist[lcount],featlist[lcount]),axis=2)
+                        elif zslice == zsliceList[1]:
+                            feat=np.concatenate((featlist[lcount],featlist[lcount-1],featlist[lcount],featlist[lcount+1],featlist[lcount+2]),axis=2)
+                        elif zslice == zsliceList[-2]:
+                            feat=np.concatenate((featlist[lcount-2],featlist[lcount-1],featlist[lcount],featlist[lcount+1],featlist[lcount+1]),axis=2)
+
+                        else:
+                            feat=np.concatenate((featlist[lcount-2],featlist[lcount-1],featlist[lcount],featlist[lcount+1],featlist[lcount+2]),axis=2)
+                        int_obj.report_progress('Calculating Features for Z: '+str(zslice+1)+' Timepoint: '+str(tpt+1)+' File: '+str(imno+1))
+    
+                        par_obj.num_of_feat[0] = feat.shape[2]
+    
+                        par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat  
+
+    elif threaded == False:
         for imno in imnoList:
             for tpt in tptList:
                 for zslice in zsliceList:
