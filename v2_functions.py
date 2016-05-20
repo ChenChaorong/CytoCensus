@@ -599,7 +599,10 @@ def train_forest(par_obj,int_obj,model_num):
     
     for f in range(X.shape[1]):
         print("%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]]))
-    
+    '''    if f>par_obj.max_features: #retrain model with fewer features (for faster evaluation)
+            X[:,f]=0
+    par_obj.RF[model_num] = ExtraTreesRegressor(par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features= None, bootstrap=True, n_jobs=-1)
+    par_obj.RF[model_num].fit(X, Y)'''
     t4 = time.time()
     print 'actual training',t4-t3 
     
