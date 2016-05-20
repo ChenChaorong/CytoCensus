@@ -163,11 +163,13 @@ class checkBoxCH(QtGui.QCheckBox):
                 Win.canvas1.draw()
 
         else: #set visible channels
-            if self.ID not in par_obj.ch_display:
-                par_obj.ch_display.append(self.ID)
-                par_obj.ch_display.sort()
-            else:
-                if self.ID in par_obj.ch_active:
+            #if self.ID not in par_obj.ch_display:
+            if self.isChecked():
+                if self.ID not in par_obj.ch_display:
+                    par_obj.ch_display.append(self.ID)
+                    par_obj.ch_display.sort()
+            else:#removes channel when unticked
+                if self.ID in par_obj.ch_display:
                     del par_obj.ch_display[par_obj.ch_display.index(self.ID)]
             Win.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
 def create_channel_objects(self,par_obj,num,feature_select=False,parent=None):
