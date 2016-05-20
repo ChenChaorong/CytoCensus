@@ -875,7 +875,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         par_obj.eval_load_im_win_eval = True
         par_obj.time_pt = 0
         #TODO check why this is not using the local version of goto_img
-        v2.goto_img_fn_new(par_obj, self,par_obj.curr_z,par_obj.time_pt)
+        v2.goto_img_fn_new(par_obj, self)
         
         #v2.eval_pred_show_fn(par_obj,self,par_obj.curr_z,par_obj.time_pt)
     def save_output_data(self):
@@ -919,11 +919,11 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.cursor.complete = False
         self.cursor.flag = False
         try: #TODO not really sure what went wrong here, fix later
-            for bt in par_obj.data_store[imno][tpt]['roi_stk_x']:
+            for bt in par_obj.data_store['roi_stk_x'][imno][tpt]:
                 if bt == zslice:
                     self.cursor.complete = True
-                    self.cursor.ppt_x = copy.deepcopy(par_obj.data_store[imno][tpt]['roi_stk_x'][bt])
-                    self.cursor.ppt_y = copy.deepcopy(par_obj.data_store[imno][tpt]['roi_stk_y'][bt])
+                    self.cursor.ppt_x = copy.deepcopy(par_obj.data_store['roi_stk_x'][imno][tpt][bt])
+                    self.cursor.ppt_y = copy.deepcopy(par_obj.data_store['roi_stk_y'][imno][tpt][bt])
                     
                     break;
         except KeyError:
