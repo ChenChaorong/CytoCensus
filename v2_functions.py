@@ -445,7 +445,7 @@ def stratified_sample(par_obj,binlength,samples_indices,imhist,samples_at_tiers,
                 stratified_sampled_indices=[]
             indices[range(samples_indices[it],samples_indices[it+1])] = stratified_sampled_indices
     return indices
-def update_training_samples_fn_new_only(par_obj,int_obj,rects):
+def update_training_samples_fn_new_only(par_obj,int_obj,rects,arr='feat_arr'):
     """Collects the pixels or patches which will be used for training and 
     trains the forest."""
     #Makes sure everything is refreshed for the training, encase any regions
@@ -482,7 +482,7 @@ def update_training_samples_fn_new_only(par_obj,int_obj,rects):
         #if rects[5] == tpt and rects[0] == zslice and rects[6] == imno:
             print rects
             #Finds and extracts the features and output density for the specific regions.
-            mImRegion = par_obj.data_store['feat_arr'][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3],:]
+            mImRegion = par_obj.data_store[arr][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3],:]
             denseRegion = par_obj.data_store['dense_arr'][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3]]
             #Find the linear form of the selected feature representation
             mimg_lin = np.reshape(mImRegion, (mImRegion.shape[0]*mImRegion.shape[1],mImRegion.shape[2]))
@@ -508,30 +508,95 @@ def update_training_samples_fn_new_only(par_obj,int_obj,rects):
                 par_obj.f_matrix.extend(mimg_lin)
                 #And the the output matrix, output patches
                 par_obj.o_patches.extend(dense_lin)
-        
-
-def update_training_samples_fn_train_only(par_obj,int_obj,model_num):
+def update_training_samples_fn_auto(par_obj,int_obj,rects):
+    """Collects the pixels or patches which will be used for training and 
+    trains the forest."""
+    #Makes sure everything is refreshed for the training, encase any regions
+    #were changed. May have to be rethinked for speed later on.
+    region_size = 0
+    '''
+    for b in range(0,par_obj.saved_ROI.__len__()):
+        rects = par_obj.saved_ROI[b]
+        region_size += rects[4]*rects[3]       
+    '''
+    calc_ratio = par_obj.limit_ratio_size
+    #print 'calcratio',calc_ratio
+    STRATIFY=False
+    dot_im=np.pad(np.ones((1,1)),(int(par_obj.sigma_data)*6,int(par_obj.sigma_data)*4),mode='constant')
+    dot_im=filters.gaussian_filter(dot_im,float(par_obj.sigma_data),mode='constant',cval=0)
+    dot_im/=dot_im.max()
+    binlength=10
+    imhist=np.histogram(dot_im,bins=binlength,range=(0,1),density=True)
+    imhist[1][binlength]=5 # adjust top bin to make sure we include everthing if we have overlapping gaussians-try to avoid though-if very common will distort bins
+    samples_at_tiers=(imhist[0]/binlength*par_obj.limit_size).astype('int')
+    #print samples_at_tiers
+    samples_indices = [0]+(np.cumsum(samples_at_tiers)).tolist() #to allow preallocation of array
+    
+    
+    #for b in range(0,par_obj.saved_ROI.__len__()):
+        #TODO check this works for edge cases- with very sparse sampling, and with v small bin sizes
+        #Iterates through saved ROI.
+        #rects = par_obj.saved_ROI[b]
+    
+    zslice = rects[0]
+    tpt =rects[5]
+    imno =rects[6]
+    if(par_obj.p_size == 1):
+        #if rects[5] == tpt and rects[0] == zslice and rects[6] == imno:
+            print rects
+            #Finds and extracts the features and output density for the specific regions.
+            mImRegion = par_obj.data_store['double_feat_arr'][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3],:]
+            denseRegion = par_obj.data_store['dense_arr'][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3]]
+            #Find the linear form of the selected feature representation
+            mimg_lin = np.reshape(mImRegion, (mImRegion.shape[0]*mImRegion.shape[1],mImRegion.shape[2]))
+            #Find the linear form of the complementatory output region.
+            dense_lin = np.reshape(denseRegion, (denseRegion.shape[0]*denseRegion.shape[1]))
+            #Sample the input pixels sparsely or densely.
+            if(par_obj.limit_sample == True):
+                if(par_obj.limit_ratio == True):
+                    par_obj.limit_size = round(mImRegion.shape[0]*mImRegion.shape[1]/calc_ratio,0)
+                    print mImRegion.shape[0]*mImRegion.shape[1]
+                    if STRATIFY==True:
+                        indices =stratified_sample(par_obj,binlength,samples_indices,imhist,samples_at_tiers,mImRegion,denseRegion)
+                    else:
+                        indices =  np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
+                else:
+                    #this works because the first n indices refer to the full first two dimensions, and np indexing takes slices
+                    indices =  np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
+                #Add to feature vector and output vector.
+                par_obj.f_matrix.extend(mimg_lin[indices])
+                par_obj.o_patches.extend(dense_lin[indices])
+            else:
+                #Add these to the end of the feature Matrix, input patches
+                par_obj.f_matrix.extend(mimg_lin)
+                #And the the output matrix, output patches
+                par_obj.o_patches.extend(dense_lin)
+                
+def train_forest(par_obj,int_obj,model_num):
             
     
     
-    if par_obj.max_features>par_obj.num_of_feat:
-        par_obj.max_features=par_obj.num_of_feat
-    par_obj.RF[model_num] = ExtraTreesRegressor(par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features, bootstrap=True, n_jobs=-1)
+    if par_obj.max_features>par_obj.num_of_feat[model_num]:
+        par_obj.max_features=par_obj.num_of_feat[model_num]
+    #par_obj.RF[model_num]=sklearn.ensemble.AdaBoostRegressor(base_estimator=sklearn.ensemble.ExtraTreesRegressor(20, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features, bootstrap=True, n_jobs=-1), n_estimators=3, learning_rate=1.0, loss='linear')
+    #par_obj.RF[model_num] = sklearn.ensemble.ExtraTreesClassifier(par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features, bootstrap=True, n_jobs=-1,class_weight='balanced')
+    par_obj.RF[model_num] = sklearn.ensemble.ExtraTreesRegressor(par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features, bootstrap=True, n_jobs=-1)
     #par_obj.RF[model_num] = sklearn.ensemble.GradientBoostingRegressor(loss='ls', learning_rate=0.1, n_estimators=par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features)    
     #par_obj.RF[model_num] = sklearn.linear_model.BayesianRidge(par_obj.n_iter, par_obj.tol, par_obj.alpha_1, par_obj.alpha_2, par_obj.lambda_1, par_obj.lambda_2)    
     #Fits the data.
     t3 = time.time()
-    print 'fmatrix',np.array(par_obj.f_matrix).shape
-    print 'o_patches',np.array(par_obj.o_patches).shape
+    X=np.asfortranarray(par_obj.f_matrix)
+    Y=np.asfortranarray(par_obj.o_patches)
+    print 'fmatrix',X.shape
+    print 'o_patches',Y.shape
     
-    par_obj.RF[model_num].fit(par_obj.f_matrix, par_obj.o_patches)
+    par_obj.RF[model_num].fit(X, Y)
 
-    
     importances = par_obj.RF[model_num].feature_importances_
     indices = np.argsort(importances)[::-1]
     print("Feature ranking:")
     
-    X=np.asfortranarray(par_obj.f_matrix)
+    
     for f in range(X.shape[1]):
         print("%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]]))
     
@@ -540,7 +605,7 @@ def update_training_samples_fn_train_only(par_obj,int_obj,model_num):
     
     par_obj.o_patches=[]
     par_obj.f_matrix=[]    
-    
+
 def refresh_all_density(par_obj):
     number_of_saved_roi=range(0,len(par_obj.saved_ROI))
 
@@ -758,32 +823,55 @@ def channels_for_display(par_obj, int_obj,imRGB):
         if int_obj.CH_cbx[c].isChecked():
             count = count + 1
             CH[c] = 1
+def evaluate_forest_auto(par_obj,int_obj,withGT,model_num,zsliceList,tptList,curr_file,threaded=False,b=0):
 
-    newImg =np.zeros((par_obj.height,par_obj.width,3))
+    #Finds the current frame and file.
+    par_obj.maxPred=0 #resets scaling for display between models
+    par_obj.minPred=100
+    for imno in curr_file:
+        for tpt in tptList:
+            for zslice in zsliceList:
+                if(par_obj.p_size >1):
+                    
+                    mimg_lin,dense_linPatch, pos = extractPatch(par_obj.p_size, par_obj.feat_arr[zslice], None, 'dense')
+                    tree_pred = par_obj.RF[model_num].predict(mimg_lin)
+                    
+                    linPred = v2.regenerateImg(par_obj.p_size, tree_pred, pos)
+                        
+                else:
+                    
+                    mimg_lin = np.reshape(par_obj.data_store['double_feat_arr'][imno][tpt][zslice], (par_obj.height * par_obj.width, par_obj.data_store['double_feat_arr'][imno][tpt][zslice].shape[2]))
+                    t2 = time.time()
+                    linPred = par_obj.RF[model_num].predict(mimg_lin)
+
+
+                    t1 = time.time()
+                    
     
-    if count == 0 and par_obj.numCH==0: #deals with the none-ticked case
-        newImg = imRGB
-    elif count == 1: #only one channel selected-display in grayscale
-        
-        if imRGB.shape> 2: #has colour channels
-            ch = par_obj.ch_active[np.where(np.array(CH)==1)[0]]
-            newImg[:,:,0]=imRGB[:,:,ch]
-            newImg[:,:,1]=imRGB[:,:,ch]
-            newImg[:,:,2]=imRGB[:,:,ch]
-        else:
-            newImg[:,:,0] = imRGB
-            newImg[:,:,1] = imRGB
-            newImg[:,:,2] = imRGB
-    else:
-        if CH[0] == 1:
-            newImg[:,:,0] = imRGB[:,:,0]
-        if CH[1] == 1:
-            newImg[:,:,1] = imRGB[:,:,1]
-        if CH[2] == 1:
-            newImg[:,:,2] = imRGB[:,:,2]
+    
+                par_obj.data_store['pred_arr'][imno][tpt][zslice] = linPred.reshape(par_obj.height, par_obj.width)
+    
+                maxPred = np.max(linPred)
+                minPred = np.min(linPred)
+                par_obj.maxPred=max([par_obj.maxPred,maxPred])
+                par_obj.minPred=min([par_obj.minPred,minPred])
+                sum_pred =np.sum(linPred/255)
+                par_obj.data_store['sum_pred'][imno][tpt][zslice] = sum_pred
+                
+                print 'prediction time taken',t1 - t2
+                print 'Predicted i:',par_obj.data_store['sum_pred'][imno][tpt][zslice]
+                int_obj.report_progress('Making Prediction for Image: '+str(b+1)+' Frame: ' +str(zslice+1)+' Timepoint: '+str(tpt+1))
+                        
+    
+                if withGT == True:
+                    try:
+                        #If it has already been opened.
+                        a = par_obj.data_store['gt_sum'][imno][tpt][zslice]
+                    except:
+                        #Else find the file.
+                        gt_im =  pylab.imread(par_obj.data_store['gt_array'][imno][tpt][zslice])[:,:,0]
+                        par_obj.data_store['gt_sum'][imno][tpt][zslice] = np.sum(gt_im)
 
-    return newImg
-'''
 def channels_for_display2(par_obj, int_obj,imRGB):
     '''deals with displaying different channels'''
     count = 0
