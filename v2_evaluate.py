@@ -813,10 +813,11 @@ class Eval_disp_im_win(QtGui.QWidget):
 
         
     def evaluate_images(self):
+        par_obj.double_feat_arr = {}
         par_obj.feat_arr = {}
         par_obj.pred_arr = {}
         par_obj.sum_pred = {}
-        
+        '''
         for fileno in range(par_obj.max_file):
             for tpt in par_obj.time_pt_list:
                 count = -1
@@ -829,9 +830,34 @@ class Eval_disp_im_win(QtGui.QWidget):
                     #v2.evaluate_forest(par_obj,self, False, 0,inline=True,outer_loop=b,inner_loop=i,count=count)
                     v2.evaluate_forest_new(par_obj,self,False,0,[i],[tpt],[fileno],False)
                     count = count+1
-            par_obj.data_store[fileno][tpt]['feat_arr'] = {}
-            v2.count_maxima(par_obj,tpt)
+                par_obj.data_store['feat_arr'][fileno][tpt] = {}
+                v2.count_maxima(par_obj,tpt,fileno)
+                time.sleep(0.001)
+        '''
+        for fileno in range(par_obj.max_file):
+            for tpt in par_obj.time_pt_list:
 
+                frames =par_obj.frames_2_load
+                #try to make it threadable
+                #v2.im_pred_inline_fn_eval(par_obj, self,outer_loop=b,inner_loop=frames,threaded=True)
+                v2.im_pred_inline_fn_new(par_obj, self,frames,[tpt],[fileno],True)
+                
+                for i in frames:
+                    v2.evaluate_forest_new(par_obj,self,False,0,[i],[tpt],[fileno],False)
+
+
+
+                if par_obj.double_train==True:
+                    v2.im_pred_inline_fn_new(par_obj, self,frames,[tpt],[fileno],threaded='auto')
+                    par_obj.data_store['feat_arr'][fileno][tpt] = {}
+                    for i in frames:
+                        v2.evaluate_forest_new(par_obj,self,False,1,[i],[tpt],[fileno],False,arr='double_feat_arr')
+                    par_obj.data_store['double_feat_arr'][fileno][tpt] = {}
+                else:
+                    par_obj.data_store['feat_arr'][fileno][tpt] = {}
+                v2.count_maxima(par_obj,tpt,fileno)
+                time.sleep(0.001)
+        #set count maxima parameters from model
         self.count_txt_1.setText(str(par_obj.min_distance[0]))
         self.count_txt_2.setText(str(par_obj.min_distance[1]))
         self.count_txt_3.setText(str(par_obj.min_distance[2]))
