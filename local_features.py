@@ -10,13 +10,40 @@ import scipy
 import PIL.Image
 from skimage.filters.rank import entropy
 from skimage import feature as skfeat
+from skimage import exposure
 from skimage import morphology
 from sklearn import linear_model
+from sklearn import preprocessing
 import scipy.ndimage as ndimage
 import skimage
 import time
 import numpy as np
+import threading
+#from v2_functions import get_tiff_slice
+from scipy.ndimage.interpolation import shift
 
+
+def feature_create_threadable_auto(par_obj,imno,tpt,zslice):
+    [feat_length,feat_func]=get_feature_lengths(par_obj.feature_type)
+    feat=feat_func(par_obj.data_store['pred_arr'][imno][tpt][zslice],par_obj.feature_scale)
+    return feat
+def auto_context_features(feat_array):
+    #pattern=[1,2,3,5,7,10,12,15,20,25,30,35,40,45,50,60,70,80,90,100]
+    pattern=[1,2,4,8,16,32,64,128]
+    feat_list=[]
+    for xshift in pattern:
+        for yshift in pattern:
+            a=shift(feat_array, (xshift,0),order=0, cval=0)
+            b=shift(feat_array, (-xshift,0),order=0, cval=0)
+            c=shift(feat_array, (yshift,0),order=0, cval=0)
+            d=shift(feat_array, (-yshift,0),order=0, cval=0)
+            feat_list.append(a)
+            feat_list.append(b)
+            feat_list.append(c)
+            feat_list.append(d)
+    return feat_list
+
+    
 def get_feature_lengths(feature_type):
     #dictionary of feature sets
     #can add arbitrary feature sets by defining a name, length, and function that accepts two arguments
