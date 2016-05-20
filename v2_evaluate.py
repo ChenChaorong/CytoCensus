@@ -506,7 +506,9 @@ class Eval_load_model_win(QtGui.QWidget):
     def gotoEvalButton_fn(self):
         for i in range(par_obj.file_array.__len__()):
             par_obj.frames_2_load = range(0,par_obj.max_zslices) #TODO make max_zslices  a list
-            par_obj.time_pt_list = range(0,par_obj.total_time_pt)
+            if par_obj.total_time_pt==[]:
+                par_obj.total_time_pt=1
+            par_obj.time_pt_list = range(0,par_obj.total_time_pt) #TODO make sure this matches up and don't have a +1 error
 
         v2.processImgs(self,par_obj)
         par_obj.eval_load_im_win_eval = False
@@ -769,8 +771,10 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.goto_img_fn()
         #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
     def count_all_fn(self):
-        for tpt in par_obj.time_pt_list:
-            v2.count_maxima(par_obj,tpt)
+        print '1'
+        for fileno in range(par_obj.max_file):
+            for tpt in par_obj.time_pt_list:
+                v2.count_maxima(par_obj,tpt,fileno)
         par_obj.show_pts = 1
         self.kernel_btn_fn()
     def kernel_btn_fn(self):
