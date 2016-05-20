@@ -1667,8 +1667,8 @@ class ROI:
                             self.ppt_y.append(y)
                             self.int_obj.plt1.add_line(self.line[-1])
                             self.int_obj.canvas1.draw()
-                        self.par_obj.data_store['roi_stk_x'][imno][self.par_obj.time_pt][self.par_obj.curr_z] = copy.deepcopy(self.ppt_x)
-                        self.par_obj.data_store['roi_stk_y'][imno][self.par_obj.time_pt][self.par_obj.curr_z] = copy.deepcopy(self.ppt_y)
+                        self.par_obj.data_store['roi_stk_x'][self.par_obj.curr_file][self.par_obj.time_pt][self.par_obj.curr_z] = copy.deepcopy(self.ppt_x)
+                        self.par_obj.data_store['roi_stk_y'][self.par_obj.curr_file][self.par_obj.time_pt][self.par_obj.curr_z] = copy.deepcopy(self.ppt_y)
                         
     def button_release_callback(self, event):
         self.flag = False
@@ -1725,20 +1725,20 @@ class ROI:
         #And then we resample at specific intervals across the whole outline
         to_approve = []
         #Iterate the list of all the interpolations
-        for bt in self.par_obj.data_store['roi_stkint_x'][imno][self.par_obj.time_pt]:
+        for bt in self.par_obj.data_store['roi_stkint_x'][self.par_obj.curr_file][self.par_obj.time_pt]:
             #If there is a matching hand-drawn one we 
             to_approve.append(bt)
                 
         
         for cv in to_approve:
-            del self.par_obj.data_store['roi_stkint_x'][imno][self.par_obj.time_pt][cv]
-            del self.par_obj.data_store['roi_stkint_y'][imno][self.par_obj.time_pt][cv]
+            del self.par_obj.data_store['roi_stkint_x'][self.par_obj.curr_file][self.par_obj.time_pt][cv]
+            del self.par_obj.data_store['roi_stkint_y'][self.par_obj.curr_file][self.par_obj.time_pt][cv]
 
-        for cd in self.par_obj.data_store['roi_stk_x'][imno][self.par_obj.time_pt]:
+        for cd in self.par_obj.data_store['roi_stk_x'][self.par_obj.curr_file][self.par_obj.time_pt]:
                 
             #First we make a local copy. We make a deep copy because python uses pointers and we don't want to change the original.
-            cppt_x = copy.deepcopy(self.par_obj.data_store['roi_stk_x'][imno][self.par_obj.time_pt][cd])
-            cppt_y = copy.deepcopy(self.par_obj.data_store['roi_stk_y'][imno][self.par_obj.time_pt][cd])
+            cppt_x = copy.deepcopy(self.par_obj.data_store['roi_stk_x'][self.par_obj.curr_file][self.par_obj.time_pt][cd])
+            cppt_y = copy.deepcopy(self.par_obj.data_store['roi_stk_y'][self.par_obj.curr_file][self.par_obj.time_pt][cd])
 
             dist = []
             #This is where we measure the distance between each of the defined points. 
@@ -1785,8 +1785,8 @@ class ROI:
                 #if(l0+l1) > 0.001:
                 nppt_x.append(((pt0x*l1) + (pt1x*l0))/(l0+l1))
                 nppt_y.append(((pt0y*l1) + (pt1y*l0))/(l0+l1))
-            self.par_obj.data_store['roi_stkint_x'][imno][self.par_obj.time_pt][cd] = nppt_x
-            self.par_obj.data_store['roi_stkint_y'][imno][self.par_obj.time_pt][cd] = nppt_y
+            self.par_obj.data_store['roi_stkint_x'][self.par_obj.curr_file][self.par_obj.time_pt][cd] = nppt_x
+            self.par_obj.data_store['roi_stkint_y'][self.par_obj.curr_file][self.par_obj.time_pt][cd] = nppt_y
             
 
         
@@ -1794,6 +1794,7 @@ class ROI:
         #self.int_obj.canvas1.draw()
 
     def interpolate_ROI(self):
+        imno=self.par_obj.curr_file
         #We want to interpolate between frames. So we make sure the frames are in order.
         tosort = []
         for bt in self.par_obj.data_store['roi_stkint_x'][imno][self.par_obj.time_pt]:
@@ -1886,8 +1887,10 @@ class ROI:
                     
             self.int_obj.canvas1.draw()
     def interpolate_ROI_in_time(self):
+        imno=self.par_obj.curr_file
+
         time_pts_with_roi = []
-        for it_time_pt in self.par_obj.data_store:
+        for it_time_pt in self.par_obj.time_pt_list:
             if self.par_obj.data_store['roi_stkint_x'][imno][it_time_pt].__len__() > 0:
                 time_pts_with_roi.append(it_time_pt)
 
@@ -2085,7 +2088,9 @@ def processImgs(self,par_obj):
     par_obj.width = par_obj.ori_width/par_obj.resize_factor
 
     par_obj.initiate_data_store()
-
+    par_obj.time_pt = par_obj.time_pt_list[0]
+    par_obj.curr_z = par_obj.frames_2_load[0]
+    par_obj.curr_file = 0
     '''
     #Now we commit our options to our imported files.
     if par_obj.file_ext == 'png':
@@ -2116,7 +2121,7 @@ def processImgs(self,par_obj):
                 par_obj.frames_2_load[i] = [0]
             v2.im_pred_inline_fn(par_obj, self)
     '''
-    par_obj.curr_z = par_obj.frames_2_load[0]
+
 
 
           
