@@ -89,8 +89,10 @@ class fileDialog(QtGui.QMainWindow):
         #filepath = QtGui.QFileDialog.getOpenFileName(self, 'Open file', '/home')
         #for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file',self.parent.filepath,'Images(*.tif *.tiff *.png *.oib *.oif);;'):
         par_obj.file_array =[]
+        path =None
         for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file',self.parent.filepath,'Images(*.tif *.tiff);;'):        
             par_obj.file_array.append(path)
+        if path==None:return
         self.parent.config['filepath'] = str(QtCore.QFileInfo(path).absolutePath())+'/'
         pickle.dump(self.parent.config, open(str(os.path.expanduser('~')+'/.densitycount/config.p'), "w" ))
 
@@ -399,7 +401,7 @@ class Load_win_fn(QtGui.QWidget):
         for x in s.split(','):
             elem = x.split('-')
             if len(elem) == 1: # a number
-                s_list.append(int(elem)-1)
+                s_list.append(int(elem[0])-1)
             elif len(elem) == 2: # a range inclusive
                 start, end = map(int, elem)
                 for i in xrange(start, end+1):
@@ -414,8 +416,13 @@ class Load_win_fn(QtGui.QWidget):
             par_obj.time_pt_list= self.hyphen_range(tmStr)
         else:
             par_obj.time_pt_list = [0]
-        fmStr = self.linEdit_Frm.text()
-        par_obj.frames_2_load = self.hyphen_range(fmStr)
+        if par_obj.max_zslices> 0:
+            fmStr = self.linEdit_Frm.text()
+            par_obj.frames_2_load = self.hyphen_range(fmStr)
+        else:
+            par_obj.frames_2_load = [0]
+
+        
         self.image_status_text.showMessage('Status: Images loaded. Click \'Goto Training\'')
         self.selIntButton.setEnabled(True)
         v2.processImgs(self,par_obj)
@@ -425,7 +432,7 @@ class Load_win_fn(QtGui.QWidget):
             par_obj.feature_type = 'fine'
         if self.r2.isChecked():
             par_obj.feature_type = 'fine3'
-
+        print par_obj.feature_type
     def report_progress(self,message):
         self.image_status_text.showMessage('Status: '+message)
         app.processEvents()
@@ -667,7 +674,7 @@ class Win_fn(QtGui.QWidget):
         self.bpe =self.canvas1.mpl_connect('button_press_event', self.on_click)
         self.bre =self.canvas1.mpl_connect('button_release_event', self.on_unclick)
         self.ome =self.canvas1.mpl_connect('motion_notify_event', self.on_motion)
-
+        self.okp =self.canvas1.mpl_connect('key_press_event', self.on_key)
         #Splitter which separates the controls at the top and the images below.
         splitter = QtGui.QSplitter(QtCore.Qt.Vertical)
         hbox1 = QtGui.QWidget()
@@ -719,10 +726,9 @@ class Win_fn(QtGui.QWidget):
 
     def evaluate_forest_fn(self):
         #Don't want to train for all the images so we select them.
+        v2.im_pred_inline_fn_new(par_obj, self,par_obj.frames_2_load,[par_obj.time_pt],[par_obj.curr_file],threaded=True)
 
-        v2.im_pred_inline_fn_new(par_obj, self,par_obj.frames_2_load[0],[par_obj.time_pt],[par_obj.curr_file],threaded=True)
-
-        v2.evaluate_forest_new(par_obj,self, False,0,par_obj.frames_2_load[0],[par_obj.time_pt],par_obj.curr_file)
+        v2.evaluate_forest_new(par_obj,self, False,0,par_obj.frames_2_load,[par_obj.time_pt],[par_obj.curr_file])
         par_obj.show_pts= 0
         self.kernel_btn_fn()
         print 'evaluating'
@@ -757,7 +763,7 @@ class Win_fn(QtGui.QWidget):
 
     def count_maxima_btn_fn(self):
         t0=time.time()
-
+        par_obj.max_det=[]
         par_obj.min_distance = [float(self.count_txt_1.text()),float(self.count_txt_2.text()),float(self.count_txt_3.text())]
         par_obj.abs_thr =float(self.abs_thr_txt.text())
         par_obj.rel_thr =float(self.rel_thr_txt.text())
@@ -800,6 +806,12 @@ class Win_fn(QtGui.QWidget):
         app.processEvents()
         self.checkChange()
         
+    def on_key(self,event):
+        if event.key==' ':
+            if par_obj.draw_dots==True:
+                self.save_dots_fn()
+            else:
+                self.save_roi_fn()
 
     def on_click(self,event):
         """When the image is clicked"""
@@ -992,6 +1004,7 @@ class Win_fn(QtGui.QWidget):
     def on_enter(self,ev):
         #Changes cursor to the special crosshair on entering image pane.
         QtGui.QApplication.setOverrideCursor(self.m_Cursor)
+        self.canvas1.setFocus()
     def on_leave(self,ev):
         QtGui.QApplication.restoreOverrideCursor()
     def save_roi_fn(self):
@@ -1053,9 +1066,8 @@ class Win_fn(QtGui.QWidget):
         #Construct empty array for current image.
         tpt=par_obj.time_pt
         zslice=par_obj.curr_z
-        imno=par_obj.curr_file
-        
-        v2.update_density_fn_new(par_obj,tpt,zslice,imno)
+        fileno=par_obj.curr_file
+        v2.update_com_fn(par_obj,tpt,zslice,fileno)
         
         self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
         '''
@@ -1134,7 +1146,10 @@ class Win_fn(QtGui.QWidget):
     def clear_dots_fn(self):
         par_obj.saved_dots = []
         par_obj.saved_ROI = []
-        par_obj.data_store['dense_arr'][imno][range(par_obj.total_time_pt)] = {}
+        for fileno in par_obj.data_store['dense_arr']:
+            for tpt in par_obj.data_store['dense_arr'][fileno]:
+                par_obj.data_store['dense_arr'][fileno][tpt]={}
+        #par_obj.data_store['dense_arr'][imno].clear()
         self.goto_img_fn(par_obj.curr_z)
         self.update_density_fn()
         self.train_model_btn.setEnabled(False)
@@ -1143,14 +1158,14 @@ class Win_fn(QtGui.QWidget):
         self.image_status_text.showMessage('Training Ensemble of Decision Trees. ')
         #added to make sure current timepoint has all features precalculated
         v2.im_pred_inline_fn_new(par_obj, self,par_obj.frames_2_load,[par_obj.time_pt],[par_obj.curr_file],True)
-        
+
         for i in range(0,par_obj.saved_ROI.__len__()):
             zslice = par_obj.saved_ROI[i][0]
             tpt =par_obj.saved_ROI[i][5]
             imno =par_obj.saved_ROI[i][6]
             print 'calculating features, time point',tpt+1,' image slice ',zslice+1
             v2.im_pred_inline_fn_new(par_obj, self,[zslice],[tpt],[imno],threaded=False)
-                
+  
         par_obj.f_matrix=[]
         par_obj.o_patches=[]
         t0=time.time()   
@@ -1163,7 +1178,7 @@ class Win_fn(QtGui.QWidget):
         print time.time()-t0 
         t0=time.time()       
         self.image_status_text.showMessage('Training Model')
-        v2.update_training_samples_fn_train_only(par_obj,self,0)
+        v2.train_forest(par_obj,self,0)
         self.image_status_text.showMessage('Evaluating Images with the Trained Model. ')
         app.processEvents()
         v2.evaluate_forest_new(par_obj,self, False,0,par_obj.frames_2_load,[par_obj.time_pt],[par_obj.curr_file])
@@ -1233,7 +1248,7 @@ class Win_fn(QtGui.QWidget):
         self.feat_scale_change_btn.setEnabled(False)
         print('Training Features')
         v2.processImgs()
-        v2.update_density_fn()
+        v2.refresh_all_density()
         self.feat_scale_change_btn.setEnabled(True)
         self.image_status_text.showMessage('Model Trained. Continue adding samples, or click \'Save Training Model\'. ')
         self.save_model_btn.setEnabled(True)
@@ -1292,9 +1307,9 @@ class Win_fn(QtGui.QWidget):
             cent_y = np.floor(par_obj.save_im.shape[0]/2).astype(np.int32)
             cent_x = np.floor(par_obj.save_im.shape[1]/2).astype(np.int32)
             if par_obj.save_im.shape[2]> 2:
-                save_im[:,:,0] =  par_obj.save_im[cent_y-150:cent_y+150, cent_x-150:cent_x+150,2]
+                save_im[:,:,0] =  par_obj.save_im[cent_y-150:cent_y+150, cent_x-150:cent_x+150,0]
                 save_im[:,:,1] =  par_obj.save_im[cent_y-150:cent_y+150, cent_x-150:cent_x+150,1]
-                save_im[:,:,2] =  par_obj.save_im[cent_y-150:cent_y+150, cent_x-150:cent_x+150,0]
+                save_im[:,:,2] =  par_obj.save_im[cent_y-150:cent_y+150, cent_x-150:cent_x+150,2]
             else:
                 save_im[:,:,0] =  par_obj.save_im[cent_y-150:cent_y+150, cent_x-150:cent_x+150,0]
                 save_im[:,:,1] =  par_obj.save_im[cent_y-150:cent_y+150, cent_x-150:cent_x+150,0]
@@ -1302,9 +1317,9 @@ class Win_fn(QtGui.QWidget):
         else:
             save_im = np.zeros((par_obj.save_im.shape[0], par_obj.save_im.shape[1], 3))
             if par_obj.save_im.shape[2]> 2:
-                save_im[:,:,0] = par_obj.save_im[:, :, 2]
+                save_im[:,:,0] = par_obj.save_im[:, :, 0]
                 save_im[:,:,1] = par_obj.save_im[:, :, 1]
-                save_im[:,:,2] = par_obj.save_im[:, :, 0]
+                save_im[:,:,2] = par_obj.save_im[:, :, 2]
             else:
                 save_im[:,:,0] = par_obj.save_im[:, :,0]
                 save_im[:,:,1] = par_obj.save_im[:, :,0]
@@ -1315,7 +1330,7 @@ class Win_fn(QtGui.QWidget):
         "feature_scale":par_obj.feature_scale, "ch_active":par_obj.ch_active, "limit_ratio_size":par_obj.limit_ratio_size, \
         "max_depth":par_obj.max_depth, "min_samples":par_obj.min_samples_split, "min_samples_leaf":par_obj.min_samples_leaf,\
         "max_features":par_obj.max_features, "num_of_tree":par_obj.num_of_tree, "file_ext":par_obj.file_ext, "imFile":save_im,\
-        "resize_factor":par_obj.resize_factor, "min_distance":par_obj.min_distance, "abs_thr":par_obj.abs_thr,"rel_thr":par_obj.rel_thr};
+        "resize_factor":par_obj.resize_factor, "min_distance":par_obj.min_distance, "abs_thr":par_obj.abs_thr,"rel_thr":par_obj.rel_thr,"max_det": par_obj.max_det};
 
         pickle.dump(save_file, open(filename, "wb"))
         self.save_model_btn.setEnabled(False)
@@ -1327,39 +1342,37 @@ class Win_fn(QtGui.QWidget):
         self.sigmaOnChange(par_obj.sigma_data) #makes sure Z_calibration is set
 
 
-
-#generate layout
-app = QtGui.QApplication([])
-
-# Create and display the splash screen
-splash_pix = QtGui.QPixmap('splash_loading.png')
-splash = QtGui.QSplashScreen(splash_pix, QtCore.Qt.WindowStaysOnTopHint)
-splash.setMask(splash_pix.mask())
-splash.show()
-app.processEvents()
-#Creates tab widget.
-win_tab = QtGui.QTabWidget()
-#Creates win, an instance of QWidget
-par_obj  = parameterClass()
-win = Win_fn(par_obj)
-loadWin= Load_win_fn(par_obj,win)
-
-#Adds win tab and places button in par_obj.
-win_tab.addTab(loadWin, "Load Images")
-win_tab.addTab(win, "Train Model")
-
-#Defines size of the widget.
-win_tab.resize(1000,600)
-
-time.sleep(0.2)
-splash.finish(win_tab)
-win_tab.showMaximized()
-win_tab.activateWindow()
-#Automates the loading for testing.
-
-
 # Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
+    #generate layout
+    app = QtGui.QApplication([])
+    QtGui.QApplication.setQuitOnLastWindowClosed(True)
+    # Create and display the splash screen
+    splash_pix = QtGui.QPixmap('splash_loading.png')
+    splash = QtGui.QSplashScreen(splash_pix, QtCore.Qt.WindowStaysOnTopHint)
+    splash.setMask(splash_pix.mask())
+    splash.show()
+    app.processEvents()
+    #Creates tab widget.
+    win_tab = QtGui.QTabWidget()
+    #Creates win, an instance of QWidget
+    par_obj  = parameterClass()
+    win = Win_fn(par_obj)
+    loadWin= Load_win_fn(par_obj,win)
     
+    #Adds win tab and places button in par_obj.
+    win_tab.addTab(loadWin, "Load Images")
+    win_tab.addTab(win, "Train Model")
+    
+    #Defines size of the widget.
+    win_tab.resize(1000,600)
+    
+    time.sleep(0.2)
+    splash.finish(win_tab)
+    
+    win_tab.showMaximized()
+    win_tab.activateWindow()
+    #Automates the loading for testing.
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
+
