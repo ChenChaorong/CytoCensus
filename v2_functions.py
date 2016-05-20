@@ -847,11 +847,35 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
                         int_obj.report_progress('Calculating Features for Z:' +str(zslice+1) +' Timepoint: '+str(tpt+1)+' File: '+str(imno+1))
                         feat =feature_create_threadable(par_obj,imRGB)
                         
-                        par_obj.num_of_feat = feat.shape[2]
+                        par_obj.num_of_feat[0] = feat.shape[2]
                         par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat
+    elif threaded == 'auto':
+        #threaded version
+        imRGBlist=[]
+        for tpt in tptList:
+            for imno in imnoList:
+                featlist=[]
+                tee1=time.time()
+                pool = ThreadPool(8) 
+                featlist=pool.map(functools.partial(feature_create_threadable_auto,par_obj,imno,tpt),zsliceList)
+                pool.close() 
+                pool.join() 
+                tee2=time.time()
+                #feat =feature_create(par_obj,imRGB,imStr,i)
+                print tee2-tee1
+                lcount=-1
+    
+                for zslice in zsliceList:
+                        lcount=lcount+1
+                        feat=featlist[lcount]
+                        int_obj.report_progress('Calculating Features for Z: '+str(zslice+1)+' Timepoint: '+str(tpt+1)+' File: '+str(imno+1))
+    
+                        par_obj.num_of_feat[1] = feat.shape[2]+par_obj.num_of_feat[0]
+    
+                        par_obj.data_store['double_feat_arr'][imno][tpt][zslice] = np.concatenate((feat,par_obj.data_store['feat_arr'][imno][tpt][zslice]),axis=2)
+
     else:
         #threaded version
-
         imRGBlist=[]
         for tpt in tptList:
             for imno in imnoList:
@@ -881,12 +905,11 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
                         feat=featlist[lcount]
                         int_obj.report_progress('Calculating Features for Z: '+str(zslice+1)+' Timepoint: '+str(tpt+1)+' File: '+str(imno+1))
     
-                        par_obj.num_of_feat = feat.shape[2]
+                        par_obj.num_of_feat[0] = feat.shape[2]
     
                         par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat  
         int_obj.report_progress('Features calculated')
     return
-    
 
 def return_imRGB_slice_new(par_obj,zslice,tpt,imno):
     '''Fetches slice zslice of timepoint tpt and puts in RGB format for display'''
@@ -934,7 +957,7 @@ def return_imRGB_slice_new(par_obj,zslice,tpt,imno):
     return imRGB
 
 
-def evaluate_forest_new(par_obj,int_obj,withGT,model_num,zsliceList,tptList,curr_file,threaded=False,b=0):
+def evaluate_forest_new(par_obj,int_obj,withGT,model_num,zsliceList,tptList,curr_file,threaded=False,b=0,arr='feat_arr'):
 
     #Finds the current frame and file.
     par_obj.maxPred=0 #resets scaling for display between models
@@ -946,14 +969,15 @@ def evaluate_forest_new(par_obj,int_obj,withGT,model_num,zsliceList,tptList,curr
                     
                     mimg_lin,dense_linPatch, pos = extractPatch(par_obj.p_size, par_obj.feat_arr[zslice], None, 'dense')
                     tree_pred = par_obj.RF[model_num].predict(mimg_lin)
+                    
                     linPred = v2.regenerateImg(par_obj.p_size, tree_pred, pos)
                         
                 else:
                     
-                    mimg_lin = np.reshape(par_obj.data_store['feat_arr'][imno][tpt][zslice], (par_obj.height * par_obj.width, par_obj.data_store['feat_arr'][imno][tpt][zslice].shape[2]))
+                    mimg_lin = np.reshape(par_obj.data_store[arr][imno][tpt][zslice], (par_obj.height * par_obj.width, par_obj.data_store[arr][imno][tpt][zslice].shape[2]))
                     t2 = time.time()
                     linPred = par_obj.RF[model_num].predict(mimg_lin)
-    
+                    #linPred=linPred[:,1]-linPred[:,0]
                     t1 = time.time()
                     
     
