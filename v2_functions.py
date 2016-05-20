@@ -615,9 +615,86 @@ def refresh_all_density(par_obj):
     for it in number_of_saved_roi:
         tpt=int(par_obj.saved_ROI[it][5])
         zslice=int(par_obj.saved_ROI[it][0])
-        imno=int(par_obj.saved_ROI[it][6])
-        update_density_fn_new(par_obj,tpt,zslice,imno)
-
+        fileno=int(par_obj.saved_ROI[it][6])
+        update_com_fn(par_obj,tpt,zslice,fileno)
+def update_com_fn(par_obj,tpt,zslice,fileno):
+    
+    #Construct empty array for current image.
+    dots_im = np.zeros((par_obj.height,par_obj.width))
+    #In array of all saved dots.
+    for i in range(0,par_obj.saved_dots.__len__()):
+        #Any ROI in the present image.
+        #print 'iiiii',win.saved_dots.__len__()
+        if(par_obj.saved_ROI[i][0] == zslice and par_obj.saved_ROI[i][5] == tpt and par_obj.saved_ROI[i][6] == fileno):
+            #Save the corresponding dots.
+            dots = par_obj.saved_dots[i]
+            #Scan through the dots
+            for b in range(0,dots.__len__()):
+               
+                #save the column and row 
+                c_dot = dots[b][2]
+                r_dot = dots[b][1]
+                #Set it to register as dot.
+                dots_im[c_dot, r_dot] = 1 #change from 255
+    #Convolve the dots to represent density estimation.
+    print 'Using template matching to generate C-O-M representation'
+    dense_im = np.zeros(dots_im.shape).astype(np.float64)
+    
+    size_of_kernel = np.ceil(par_obj.sigma_data * 6) #At least the 3-sigma rule.
+    if size_of_kernel % 2 ==0:
+        size_of_kernel = int(size_of_kernel + 1)
+    
+    patch = np.zeros((size_of_kernel,size_of_kernel))
+    m_p = int((size_of_kernel-1)/2)
+    patch[m_p,m_p] = 1
+    
+    kernel = filters.gaussian_filter(patch.astype(np.float32),   float(par_obj.sigma_data), order=0, output=None, mode='reflect', cval=0.0)
+    #kernel = distance_transform_edt(patch==0).astype(np.float32)
+    #kernel=kernel/np.max(kernel)    
+    #kernel=(kernel>0.5).astype('float32')
+    #kernel=-kernel+np.max(kernel)
+    #kernel=kernel/np.max(kernel)
+    #Replace member of dense_array with new image.
+    r_arr, c_arr = np.where(dots_im > 0)
+    for r, c in zip(r_arr,c_arr):
+        p1 = 0
+        p2 = patch.shape[0]
+        p3 = 0
+        p4 = patch.shape[1]
+        
+        r1 = int(r-m_p);
+        r2 = int(r+m_p+1);
+        c1 = int(c-m_p);
+        c2 = int(c+m_p+1);
+        
+        if r1 <0:
+            p1 = abs(r1-0)
+            r1 =0
+        if r2 > dots_im.shape[0]:
+            p2 = (patch.shape[0]-1)- (abs(r2-dots_im.shape[0]))+1
+            r2 = dots_im.shape[0]       
+        if c1 <0:
+            p3 = abs(c1-0)
+            c1 =0
+        if c2 > dots_im.shape[1]:
+            p4 = (patch.shape[1]-1)- (abs(c2-dots_im.shape[1]))+1
+            c2 = dots_im.shape[1]
+        
+        
+        
+        dense_im[r1:r2,c1:c2] =  np.max([kernel[p1:p2,p3:p4],dense_im[r1:r2,c1:c2]],0)
+    
+    par_obj.data_store['dense_arr'][fileno][tpt][zslice] = dense_im
+    '''NORMALISE GAUSSIANS. THIS MAKES IT USELESS FOR DOING 2D DENSITY ESTIMATION,
+ but super useful if you want a probability output between 0 and 1 at the end of the day
+for thresholding and the like'''
+    dense_im=dense_im/kernel.max()*1
+    par_obj.gaussian_im_max=kernel.max()
+    #TODO? Possibly we could make the density counting assumption in 3D and use it for counting, but at the end of the day, I think we really want to know where they are
+    #TODO Now that I'm normalising at this step, probably should check everything else to make sure that I only normalise here -suspect that there is a normalisation step somewhere in the processing of the probability output
+    #Replace member of dense_array with new image.
+    par_obj.data_store['dense_arr'][fileno][tpt][zslice] = dense_im
+    
 def update_density_fn_new(par_obj,tpt,zslice,imno):
     #Construct empty array for current image.
     dots_im = np.zeros((par_obj.height,par_obj.width))
