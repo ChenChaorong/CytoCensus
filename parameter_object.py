@@ -6,8 +6,12 @@ Created on Tue Apr  5 15:06:33 2016
 """
 import os
 import errno
+import shelve
+import UserDict
 class parameterClass:
     def __init__(self):
+        #debugging
+        self.FORCE_nothreading=False
         #window related- should these really be in this object??
         self.evalLoadImWin_loaded = False
         self.evalLoadModelWin_loaded = False
@@ -43,13 +47,14 @@ class parameterClass:
         
 
         #store high level file data and metadata
+        self.file_name={}
         self.file_array =[]
         self.tiffarray=[] #memmap object list
         self.order={} #ordering of tiff objects
         #file extents
         self.max_file=0
-        self.total_time_pt = 0
-        self.max_zslices =0
+        self.total_time_pt = []
+        self.max_zslices =[]
 
         self.curr_file=0
         self.curr_z = 0
@@ -92,6 +97,7 @@ class parameterClass:
         self.limit_ratio_size =21/4 #Gives 3000 patches for 255*255 image.
         self.limit_size = 3000 #patches per image or ROI. # overridden by limit ratio
         self.roi_tolerance = 10
+        self.double_train = False
         #Random Forest parameters
         self.RF ={} #possibility to apply multiple models efficiently. Not implemented
         self.max_depth=10
@@ -100,6 +106,7 @@ class parameterClass:
         self.max_features = 14#7
         self.num_of_tree = 75#50#30
         self.feature_type=[]
+        self.num_of_feat=[0,0]
         # default parameters
         self.sigma_data = 2.0
         self.feature_scale = 1.2
@@ -129,10 +136,15 @@ class parameterClass:
 #        for fileno in range(par_obj.max_file):
 #            par_obj.data_store[dataname][fileno]={}
 #            par_obj.data_store[dataname][fileno][0]={}
-    def initiate_data_store(self):
-            #initiate datastructures
-        self.data_store.clear()
-        for dataname in ['dense_arr','feat_arr','pred_arr','sum_pred','maxi_arr','pts','roi_stk_x','roi_stk_y','roi_stkint_x','roi_stkint_y']:
+    def initiate_data_store(self,datasets=None):
+        if datasets==None:
+            datasets=['dense_arr','feat_arr','double_feat_arr','pred_arr','sum_pred','maxi_arr','pts','roi_stk_x','roi_stk_y','roi_stkint_x','roi_stkint_y']
+        #initiate datastructures
+        del self.data_store
+        #self.data_store=shelve.open('datastore.temp','n',writeback=True)
+        self.data_store={}
+        #self.data_store.clear()
+        for dataname in datasets:
             self.data_store[dataname]={}
             for fileno in range(self.max_file):
                 self.data_store[dataname][fileno]={}
@@ -144,6 +156,3 @@ class parameterClass:
         self.left_2_calc =[]
         self.saved_ROI =[]
         self.saved_dots=[]
-
-
-        
