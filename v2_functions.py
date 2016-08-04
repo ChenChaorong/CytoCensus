@@ -445,6 +445,7 @@ def stratified_sample(par_obj,binlength,samples_indices,imhist,samples_at_tiers,
                 stratified_sampled_indices=[]
             indices[range(samples_indices[it],samples_indices[it+1])] = stratified_sampled_indices
     return indices
+
 def update_training_samples_fn_new_only(par_obj,int_obj,rects,arr='feat_arr'):
     """Collects the pixels or patches which will be used for training and 
     trains the forest."""
@@ -654,6 +655,7 @@ def update_com_fn(par_obj,tpt,zslice,fileno):
     #kernel=(kernel>0.5).astype('float32')
     #kernel=-kernel+np.max(kernel)
     #kernel=kernel/np.max(kernel)
+    #kernel=np.log(kernel*1000+1)
     #Replace member of dense_array with new image.
     r_arr, c_arr = np.where(dots_im > 0)
     for r, c in zip(r_arr,c_arr):
@@ -688,7 +690,7 @@ def update_com_fn(par_obj,tpt,zslice,fileno):
     '''NORMALISE GAUSSIANS. THIS MAKES IT USELESS FOR DOING 2D DENSITY ESTIMATION,
  but super useful if you want a probability output between 0 and 1 at the end of the day
 for thresholding and the like'''
-    dense_im=dense_im/kernel.max()*1
+    dense_im=dense_im/kernel.max()*1000
     par_obj.gaussian_im_max=kernel.max()
     #TODO? Possibly we could make the density counting assumption in 3D and use it for counting, but at the end of the day, I think we really want to know where they are
     #TODO Now that I'm normalising at this step, probably should check everything else to make sure that I only normalise here -suspect that there is a normalisation step somewhere in the processing of the probability output
@@ -1561,44 +1563,34 @@ def save_output_mask_fn(par_obj,int_obj):
             drange=range(selem.shape[0]/2,selem.shape[0],np.round(dist[0]/dist[2],0).astype('uint8'))
             lrange=range(0,selem.shape[0]/2,np.round(dist[0]/dist[2],0).astype('uint8'))
             selem2=selem[np.newaxis,lrange+drange,np.newaxis,:,:]
-
         image=scipy.ndimage.binary_dilation(image,selem2).astype('uint8')
+        imsave(par_obj.csvPath+par_obj.file_name[fileno]+'_'+par_obj.modelName+'_Hess.tif',image, imagej=True)
         int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
         
 def save_output_data_fn(par_obj,int_obj):
     local_time = time.asctime( time.localtime(time.time()) )
-
-    with open(par_obj.csvPath+str(par_obj.file_name[0])+'_'+par_obj.modelName+'outputData.csv', 'a') as csvfile:
-        spamwriter = csv.writer(csvfile)
-        spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('Predicted count: ')])
     
-    count = -1
-    for fileno in range(par_obj.max_file):
-        for tpt in par_obj.time_pt_list:
-            frames =par_obj.frames_2_load
-            imStr = str(par_obj.file_array[fileno])
-            
-                #count = count+1
-                #n = str(count)
-                #string = par_obj.csvPath+'output' + n.zfill(3)+'.tif'
-                #im_to_save= PIL.Image.fromarray(par_obj.data_store[par_obj.time_pt]['dense_arr'][count].astype(np.float32))
-                #im_to_save.save(string)
-                   
-            with open(par_obj.csvPath+str(par_obj.file_name[0])+'outputData.csv', 'a') as csvfile:
-                spamwriter = csv.writer(csvfile,  dialect='excel')
+    with open(par_obj.csvPath+str(par_obj.file_name[0])+'_'+par_obj.modelName+'outputData.csv', 'a') as csvfile:
+        spamwriter = csv.writer(csvfile,  dialect='excel')
+        spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('Predicted count: ')])
+
+        for fileno in range(par_obj.max_file):
+                
+            for tpt in par_obj.time_pt_list:
+                imStr = str(par_obj.file_array[fileno])
                 spamwriter.writerow([local_time]+[str(imStr)]+[tpt+1]+[par_obj.data_store['pts'][fileno][tpt].__len__()])
                 
 
-    int_obj.report_progress('Data exported to '+ par_obj.csvPath)
-    with open(par_obj.csvPath+str(par_obj.file_name[0])+'_'+par_obj.modelName+'_outputPoints.csv', 'a') as csvfile:
-        spamwriter = csv.writer(csvfile)
-        spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('X: ')]+[str('Y: ')]+[str('Z: ')])
-        for fileno in range(par_obj.max_file):
+    for fileno in range(par_obj.max_file):
+        with open(par_obj.csvPath+str(par_obj.file_name[fileno])+'_'+par_obj.modelName+'_outputPoints.csv', 'a') as csvfile:
+            spamwriter = csv.writer(csvfile)
+            spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('X: ')]+[str('Y: ')]+[str('Z: ')])
+
             for tpt in par_obj.time_pt_list:
                 pts = par_obj.data_store['pts'][fileno][tpt]
                 for i in range(0,par_obj.data_store['pts'][fileno][tpt].__len__()):
                     spamwriter.writerow([local_time]+[str(imStr)]+[tpt+1]+[pts[i][0]]+[pts[i][1]]+[pts[i][2]])
-
+    int_obj.report_progress('Data exported to '+ par_obj.csvPath)
 
 class ROI:
     
