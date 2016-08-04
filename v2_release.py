@@ -743,24 +743,71 @@ class Win_fn(QtGui.QWidget):
         pickle.dump( file_to_save, open( fileName+".quantiROI", "wb" ) )
     def load_gt_fn(self):
         print 'load the gt'
-        fileName = QtGui.QFileDialog.getOpenFileName(self, "Save dots and regions", "~/Documents", "QuantiFly ROI files (*.quantiROI)");
+        fileName = QtGui.QFileDialog.getOpenFileName(self, "Load dots and regions", "~/Documents", "QuantiFly ROI files (*.quantiROI),MTrackJ Data Format (*.mdf)")
+        filename, file_ext = os.path.splitext(fileName)        
         print 'load the file', fileName
-        the_file = pickle.load( open( fileName, "rb" ) )
-        par_obj.saved_dots = the_file['dots']
-        par_obj.saved_ROI = the_file['rect']
-        self.clear_dots_btn.setEnabled(True)
-        
+        if file_ext=='.quantiROI':
+            with open( fileName, "rb" ) as open_file:
+                the_file = pickle.load(open_file)
+            par_obj.saved_dots = the_file['dots']
+            par_obj.saved_ROI = the_file['rect']
+            self.clear_dots_btn.setEnabled(True)
+            
+        elif file_ext=='.mdf':
+            lines_list = list(open(fileName, 'rb').read().split('\n'))
+            par_obj.saved_ROI=[]
+            par_obj.saved_dots=[]
+            for i in lines_list:
+                i=i.split(' ')
+                if len(i)>0:
+                    if i[0]=='Point':
+                        #trim point and convert to int
+                        i=[int(float(num)) for num in i[1:-1]]
+                        #order ID x y t z c from mdf
+                        #order in save_dots: txyz
+                        #mdf is 1 indexed
+                        rects = (i[4]-1, 0, 0, int(abs(par_obj.ori_width)), abs(par_obj.ori_height),i[3]-1,par_obj.curr_file)
+                        #append if dots already in roi, otherwise create roi and append
+                        if rects in par_obj.saved_ROI:
+                            idx=par_obj.saved_ROI.index(rects)
+                            par_obj.saved_dots[idx].append((i[4]-1,i[1]-1,i[2]-1))
+                        else:
+                            par_obj.saved_dots.append([(i[4]-1,i[1]-1,i[2]-1)])
+                            par_obj.saved_ROI.append(rects)
+        #check if have loaded points and update
         if par_obj.saved_ROI !=[]:
             v2.refresh_all_density(par_obj)
             self.train_model_btn.setEnabled(True)
         self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
+        
+    def load_gt_mdf(self):
+        fileName = QtGui.QFileDialog.getOpenFileName(self, "Load dots", "~/Documents", "MTrackJ Data Format (*.mdf)");
+        filename, file_extension = os.path.splitext(fileName)        
+        print 'load the file', fileName
+        lines_list = list(open(fileName, 'rb').read().split('\n'))
+        for i in lines_list:
+            i=i.split(' ')
+            if len(i)>0:
+                if i[0]=='Point':
+                    #trim point and convert to int
+                    i=[int(float(num)) for num in i[1:-1]]
+                    #order ID x y t z c from mdf
+                    #order in save_dots: txyz
+                    #mdf is 1 indexed
+                    rects = (i[4]-1, 0, 0, int(abs(par_obj.ori_width)), abs(par_obj.ori_height),i[3]-1,par_obj.curr_file)
+                    #append if dots already in roi, otherwise create roi and append
+                    if rects in par_obj.saved_ROI:
+                        idx=par_obj.saved_ROI.index(rects)
+                        par_obj.saved_dots[idx].append((i[4]-1,i[1]-1,i[2]-1))
+                    else:
+                        par_obj.saved_dots.append([(i[4]-1,i[1]-1,i[2]-1)])
+                        par_obj.saved_ROI.append(rects)
     def overlay_prediction_btn_fn(self):
         par_obj.overlay=not par_obj.overlay
         self.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
     def replot_fn(self):
             v2.eval_pred_show_fn(par_obj.curr_z,par_obj,self)
             
-
     def count_maxima_btn_fn(self):
         t0=time.time()
         par_obj.max_det=[]
