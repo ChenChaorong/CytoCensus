@@ -3,6 +3,10 @@
 Created on Tue Apr  5 15:06:33 2016
 
 @author: martin
+
+Common parameterObject from Evaluate and Release
+ Includes defaults
+ May still be missing one or two parameters
 """
 import os
 import errno
@@ -11,7 +15,7 @@ import UserDict
 class parameterClass:
     def __init__(self):
         #debugging
-        self.FORCE_nothreading=False
+        self.FORCE_nothreading=False # confusingly, set to 0 for debugging, fix later
         #window related- should these really be in this object??
         self.evalLoadImWin_loaded = False
         self.evalLoadModelWin_loaded = False
@@ -50,11 +54,13 @@ class parameterClass:
         self.file_name={}
         self.file_array =[]
         self.tiffarray=[] #memmap object list
+        self.z_calibration=1
+        
         self.order={} #ordering of tiff objects
-        #file extents
+        #default file extents
         self.max_file=0
-        self.total_time_pt = []
-        self.max_zslices =[]
+        self.total_time_pt = 0
+        self.max_zslices =0
 
         self.curr_file=0
         self.curr_z = 0
@@ -110,7 +116,6 @@ class parameterClass:
         # default parameters
         self.sigma_data = 2.0
         self.feature_scale = 1.2
-        self.z_calibration=1
         #TODO check how necessary these are now that gaussians are scaled
         self.maxPred=0
         self.minPred=100
@@ -150,6 +155,7 @@ class parameterClass:
                 self.data_store[dataname][fileno]={}
                 for time_pt in self.time_pt_list:
                     self.data_store[dataname][fileno][time_pt]={}
+                    
     class serialdict(shelve.Shelf):
         def __init__(self, *args):
             shelve.Shelf.__init__(self, args)
@@ -158,6 +164,7 @@ class parameterClass:
             return val
         def __setitem__(self, key, val):
             shelve.Shelf.__setitem__(self, str(key), val)
+            
     def reset_parameters(self): #TODO a better way to integrate this with init
         self.frames_2_load ={}
         self.left_2_calc =[]
