@@ -3,6 +3,10 @@
 Created on Tue Apr 26 17:07:48 2016
 
 @author: martin
+
+#Create graphs of dividing cells
+    Includes some rudimentary tracking
+    Currently very  much a work-in-progress
 """
 import numpy as np
 import imp
