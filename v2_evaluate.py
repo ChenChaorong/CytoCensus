@@ -48,7 +48,7 @@ except:
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import v2_functions as v2
-"""QuantiFly3d Software v0.1
+"""QBrain Software v0.1
 
     Copyright (C) 2016  Dominic Waithe Martin Hailstone
 
@@ -77,10 +77,6 @@ class Eval_load_im_win(QtGui.QWidget):
         #if par_obj.evalLoadImWin_loaded !=True:
         vbox0 = QtGui.QVBoxLayout()
         self.setLayout(vbox0)
-
-
-        
-       
 
         #Load images button
         self.loadImages_button_panel = QtGui.QHBoxLayout()

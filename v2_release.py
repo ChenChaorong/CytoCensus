@@ -24,8 +24,7 @@ import numdifftools as ndt
 import pdb
 from common_navigation import *
 from parameter_object import parameterClass
-
-"""QuantiFly3d Software v0.1
+"""QBrain Software v0.1
 
     Copyright (C) 2016  Dominic Waithe Martin Hailstone
 

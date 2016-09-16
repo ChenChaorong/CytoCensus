@@ -3,6 +3,9 @@
 Created on Sat Apr  2 18:03:50 2016
 
 @author: martin
+
+Common colour checkboxes and 4D navigation functions
+ Currently must import directly, need to tidy this up later
 """
 from PyQt4 import QtGui
 from gnu import return_license
