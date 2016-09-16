@@ -365,7 +365,7 @@ class Eval_load_model_win(QtGui.QWidget):
             success = True
 
             #Some basic image checking.
-            if par_obj.numCH <par_obj.ch_active.__len__():
+            if 1==0:#par_obj.numCH <par_obj.ch_active.__len__():
                 success = False
                 self.image_status_text.showMessage('Status: Model is incompatible. There were more channels in the original images on which the training was performed than in the loaded images. ')
             if par_obj.file_ext != save_file["file_ext"]:
