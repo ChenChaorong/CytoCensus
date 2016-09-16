@@ -1,2 +1,14 @@
 
 *.pyc
+
+*.pyc
+
+.DS_Store
+
+*.pyc
+
+gnu.pyc
+
+oiffile.pyc
+
+v2_functions.pyc
