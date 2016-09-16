@@ -1363,6 +1363,7 @@ def import_data_fn(par_obj,file_array):
     #par_obj.total_time_pt = 0
     
     par_obj.max_file= par_obj.file_array.__len__()    
+        
     
     for imno in range(0,par_obj.max_file):
             n = str(imno)
@@ -1385,8 +1386,8 @@ def import_data_fn(par_obj,file_array):
                     x_res=float(x[1])/float(x[0])
                     
                     z=par_obj.tiff_file.pages[0].imagej_tags['spacing']
-                    par_obj.z_calibration = z/x_res
-                    par_obj.min_distance[2]=par_obj.min_distance[2]/par_obj.z_calibration
+                    par_obj.z_calibration[imno] = z/x_res
+                    #TODO report Z-scale factor in an (editable) field
                     print('z_scale_factor', par_obj.z_calibration)
                 except:
                     #might need to modify this to work with OME-TIFFs
