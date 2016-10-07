@@ -151,6 +151,7 @@ class parameterClass:
         #self.data_store.clear()
         for dataname in datasets:
             self.data_store[dataname]={}
+            
             for fileno in range(self.max_file):
                 self.data_store[dataname][fileno]={}
                 for time_pt in self.time_pt_list:

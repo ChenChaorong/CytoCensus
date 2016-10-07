@@ -20,7 +20,7 @@ from matplotlib.figure import Figure
 from scipy.ndimage import filters
 import v2_functions as v2
 
-import numdifftools as ndt
+#import numdifftools as ndt
 import pdb
 from common_navigation import *
 from parameter_object import parameterClass

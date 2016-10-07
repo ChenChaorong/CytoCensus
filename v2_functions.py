@@ -832,25 +832,32 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
                         par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat  
 
     elif threaded == False:
+        
+        print imnoList
+        print tptList
+        print zsliceList
         for imno in imnoList:
             for tpt in tptList:
                 for zslice in zsliceList:
                     #checks if features already in array
+                    
                     if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
                         #imRGB=return_imRGB_slice_new(par_obj,zslice,tpt,imno)
                         #imRGB/=par_obj.tiffarraymax
+                        
 
                         imRGB = get_tiff_slice(par_obj,[tpt],zslice,range(0,par_obj.ori_width,int(par_obj.resize_factor)),range(0,par_obj.ori_height,int(par_obj.resize_factor)),par_obj.ch_active,imno)
 
                         #imRGBlist.append(imRGB)
                         imRGB=imRGB.astype('float32')/ par_obj.tiffarraymax
-                        
                         #If you want to ignore previous features which have been saved.
                         int_obj.report_progress('Calculating Features for Z:' +str(zslice+1) +' Timepoint: '+str(tpt+1)+' File: '+str(imno+1))
+                        
                         feat =feature_create_threadable(par_obj,imRGB)
                         
                         par_obj.num_of_feat[0] = feat.shape[2]
                         par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat
+                        
     elif threaded == 'auto':
         #threaded version
         imRGBlist=[]
@@ -1339,6 +1346,7 @@ def get_tiff_slice(par_obj,tpt=[0],zslice=[0],x=[0],y=[0],c=[0],imno=0):
             blist.append(n)
     
     tiff2=par_obj.tiffarray[imno].transpose(blist)
+    print 'tiff',tiff2.shape
     if par_obj.order.__len__()==5:
         #tiff=np.squeeze(tiff2[alist[0],:,:,:,:][:,alist[1],:,:,:][:,:,alist[2],:,:][:,:,:,alist[3],:][:,:,:,:,alist[4]])
         tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1],alist[2],alist[3],alist[4])])
@@ -1352,6 +1360,7 @@ def get_tiff_slice(par_obj,tpt=[0],zslice=[0],x=[0],y=[0],c=[0],imno=0):
     elif par_obj.order.__len__()==2:
         #tiff=np.squeeze(tiff2[alist[0],:][:,alist[1]])
         tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1])])
+    print 'tiff2',tiff.shape
     return tiff
     
 def import_data_fn(par_obj,file_array):
@@ -1362,11 +1371,12 @@ def import_data_fn(par_obj,file_array):
     par_obj.numCH = 0
     #par_obj.total_time_pt = 0
     
-    par_obj.max_file= par_obj.file_array.__len__()    
+    par_obj.max_file= file_array.__len__()    
         
     
     for imno in range(0,par_obj.max_file):
             n = str(imno)
+            print imno
             imStr = str(file_array[imno])
             par_obj.file_ext = imStr.split(".")[-1]
             par_obj.file_name[imno] = imStr.split(".")[0].split("/")[-1]
