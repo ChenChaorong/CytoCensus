@@ -14,8 +14,8 @@ from scipy.ndimage import distance_transform_edt
 import cPickle as pickle
 
 from oiffile import OifFile
-from tifffile2 import TiffFile
-from tifffile2 import imsave
+from tifffile import TiffFile, imsave #Install with pip install tifffile.
+
 import itertools as itt
 import struct
 import copy
