@@ -87,7 +87,7 @@ from datetime import datetime
 
 import numpy
 
-from tifffile2 import TiffFile, TiffSequence, lazyattr, natural_sorted
+from tifffile import TiffFile, TiffSequence
 
 __version__ = '2015.08.17'
 __docformat__ = 'restructuredtext en'
@@ -170,7 +170,7 @@ class OifFile(object):
         pattern = re.compile(pattern)
         return (f for f in self._fs.files() if pattern.match(f))
 
-    @lazyattr
+    
     def tiffs(self):
         """Return TiffSequence of all Tiff files."""
         return TiffSequence(self.glob('*.tif'), imread=self.asarray)
