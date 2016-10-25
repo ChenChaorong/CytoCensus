@@ -481,7 +481,7 @@ def update_training_samples_fn_new_only(par_obj,int_obj,rects,arr='feat_arr'):
     imno =rects[6]
     if(par_obj.p_size == 1):
         #if rects[5] == tpt and rects[0] == zslice and rects[6] == imno:
-            print rects
+            
             #Finds and extracts the features and output density for the specific regions.
             mImRegion = par_obj.data_store[arr][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3],:]
             denseRegion = par_obj.data_store['dense_arr'][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3]]
@@ -493,7 +493,7 @@ def update_training_samples_fn_new_only(par_obj,int_obj,rects,arr='feat_arr'):
             if(par_obj.limit_sample == True):
                 if(par_obj.limit_ratio == True):
                     par_obj.limit_size = round(mImRegion.shape[0]*mImRegion.shape[1]/calc_ratio,0)
-                    print mImRegion.shape[0]*mImRegion.shape[1]
+
                     if STRATIFY==True:
                         indices =stratified_sample(par_obj,binlength,samples_indices,imhist,samples_at_tiers,mImRegion,denseRegion)
                     else:
@@ -544,7 +544,7 @@ def update_training_samples_fn_auto(par_obj,int_obj,rects):
     imno =rects[6]
     if(par_obj.p_size == 1):
         #if rects[5] == tpt and rects[0] == zslice and rects[6] == imno:
-            print rects
+            
             #Finds and extracts the features and output density for the specific regions.
             mImRegion = par_obj.data_store['double_feat_arr'][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3],:]
             denseRegion = par_obj.data_store['dense_arr'][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4],rects[1]+1:rects[1]+rects[3]]
@@ -556,7 +556,7 @@ def update_training_samples_fn_auto(par_obj,int_obj,rects):
             if(par_obj.limit_sample == True):
                 if(par_obj.limit_ratio == True):
                     par_obj.limit_size = round(mImRegion.shape[0]*mImRegion.shape[1]/calc_ratio,0)
-                    print mImRegion.shape[0]*mImRegion.shape[1]
+                    
                     if STRATIFY==True:
                         indices =stratified_sample(par_obj,binlength,samples_indices,imhist,samples_at_tiers,mImRegion,denseRegion)
                     else:
@@ -588,8 +588,7 @@ def train_forest(par_obj,int_obj,model_num):
     t3 = time.time()
     X=np.asfortranarray(par_obj.f_matrix)
     Y=np.asfortranarray(par_obj.o_patches)
-    print 'fmatrix',X.shape
-    print 'o_patches',Y.shape
+    
     
     par_obj.RF[model_num].fit(X, Y)
 
@@ -638,7 +637,7 @@ def update_com_fn(par_obj,tpt,zslice,fileno):
                 #Set it to register as dot.
                 dots_im[c_dot, r_dot] = 1 #change from 255
     #Convolve the dots to represent density estimation.
-    print 'Using template matching to generate C-O-M representation'
+    #print 'Using template matching to generate C-O-M representation'
     dense_im = np.zeros(dots_im.shape).astype(np.float64)
     
     size_of_kernel = np.ceil(par_obj.sigma_data * 6) #At least the 3-sigma rule.
@@ -766,7 +765,7 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
                 pool.join() 
                 tee2=time.time()
                 #feat =feature_create(par_obj,imRGB,imStr,i)
-                print tee2-tee1
+                
                 lcount=-1
 
                 for zslice in zsliceList:
@@ -783,7 +782,7 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
 
                         else:
                             feat=np.concatenate((featlist[lcount-2],featlist[lcount-1],featlist[lcount],featlist[lcount+1],featlist[lcount+2]),axis=2)
-                        int_obj.report_progress('Calculating Features for Z: '+str(zslice+1)+' Timepoint: '+str(tpt+1)+' File: '+str(imno+1))
+                        #int_obj.report_progress('Calculating Features for Z: '+str(zslice+1)+' Timepoint: '+str(tpt+1)+' File: '+str(imno+1))
     
                         par_obj.num_of_feat[0] = feat.shape[2]
     
@@ -808,7 +807,7 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
                 pool.join() 
                 tee2=time.time()
                 #feat =feature_create(par_obj,imRGB,imStr,i)
-                print tee2-tee1
+                
                 lcount=-1
 
                 for zslice in zsliceList:
@@ -833,9 +832,7 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
 
     elif threaded == False:
         
-        print imnoList
-        print tptList
-        print zsliceList
+        
         for imno in imnoList:
             for tpt in tptList:
                 for zslice in zsliceList:
@@ -1294,7 +1291,7 @@ def eval_pred_show_fn(par_obj,int_obj,zslice,tpt):
             pts = par_obj.data_store['pts'][imno][tpt]
             
             ind = np.where(np.array(par_obj.frames_2_load[0]) == zslice)
-            print 'ind',ind
+            
             for pt2d in pts:
                 if pt2d[2] == ind:
                         pt_x.append(pt2d[1])
@@ -1346,7 +1343,7 @@ def get_tiff_slice(par_obj,tpt=[0],zslice=[0],x=[0],y=[0],c=[0],imno=0):
             blist.append(n)
     
     tiff2=par_obj.tiffarray[imno].transpose(blist)
-    print 'tiff',tiff2.shape
+    
     if par_obj.order.__len__()==5:
         #tiff=np.squeeze(tiff2[alist[0],:,:,:,:][:,alist[1],:,:,:][:,:,alist[2],:,:][:,:,:,alist[3],:][:,:,:,:,alist[4]])
         tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1],alist[2],alist[3],alist[4])])
@@ -1360,7 +1357,7 @@ def get_tiff_slice(par_obj,tpt=[0],zslice=[0],x=[0],y=[0],c=[0],imno=0):
     elif par_obj.order.__len__()==2:
         #tiff=np.squeeze(tiff2[alist[0],:][:,alist[1]])
         tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1])])
-    print 'tiff2',tiff.shape
+    
     return tiff
     
 def import_data_fn(par_obj,file_array):
@@ -1376,7 +1373,7 @@ def import_data_fn(par_obj,file_array):
     
     for imno in range(0,par_obj.max_file):
             n = str(imno)
-            print imno
+            
             imStr = str(file_array[imno])
             par_obj.file_ext = imStr.split(".")[-1]
             par_obj.file_name[imno] = imStr.split(".")[0].split("/")[-1]
@@ -1805,7 +1802,6 @@ class ROI:
         sortd = np.sort(np.array(tosort))
 
         #For each of the slices which have been drawn in
-        print 'sortd',sortd
         for b in range(0,sortd.shape[0]-1):
             ab = sortd[b]
             ac = sortd[b+1]
