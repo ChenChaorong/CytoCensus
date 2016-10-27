@@ -323,7 +323,7 @@ class Load_win_fn(QtGui.QWidget):
             par_obj.feature_scale = float(text)
 
             for fileno in range(0,par_obj.max_file):
-                for tp in range(0,par_obj.total_time_pt+1):
+                for tp in range(0,par_obj.total_time_pt):
                     par_obj.data_store['feat_arr'][fileno][tp] = {}
     def updateAfterImport(self):
         """Specific to ui updates"""
@@ -333,7 +333,7 @@ class Load_win_fn(QtGui.QWidget):
 
                 self.linEdit_Frm.setText('1-'+str(par_obj.max_zslices))
                 self.Text_FrmOpt2.setText('There are '+str(par_obj.max_zslices)+' z-slices in total. The image has dimensions x: '+str(par_obj.ori_width)+' and y: '+str(par_obj.ori_height))
-                if par_obj.total_time_pt != 0:
+                if par_obj.total_time_pt > 1:
                     self.linEdit_Frm2.setText('1-'+str(par_obj.total_time_pt))
                     self.Text_FrmOpt4.setText('There are '+str(par_obj.total_time_pt)+' timepoints in total.')
                     self.linEdit_Frm2.show()
@@ -347,7 +347,7 @@ class Load_win_fn(QtGui.QWidget):
             if par_obj.max_zslices >1:
                 self.linEdit_Frm.setText('1-'+str(par_obj.uploadLimit))
                 self.Text_FrmOpt2.setText('There are '+str(par_obj.max_zslices)+' frames in total. The image has dimensions x: '+str(par_obj.ori_width)+' and y: '+str(par_obj.ori_height))
-                if par_obj.total_time_pt != 0:
+                if par_obj.total_time_pt >1:
                     self.linEdit_Frm2.setText('1-'+str(par_obj.total_time_pt))
                     self.Text_FrmOpt4.setText('There are '+str(par_obj.total_time_pt)+' timepoints in total.')
                     self.linEdit_Frm2.show()
@@ -411,7 +411,7 @@ class Load_win_fn(QtGui.QWidget):
         return s_list
 
     def confirmImages_btn_fn(self):
-        if par_obj.total_time_pt> 0:
+        if par_obj.total_time_pt> 1:
             tmStr = self.linEdit_Frm2.text()
             par_obj.time_pt_list= self.hyphen_range(tmStr)
         else:

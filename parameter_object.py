@@ -59,7 +59,7 @@ class parameterClass:
         self.order={} #ordering of tiff objects
         #default file extents
         self.max_file=0
-        self.total_time_pt = 0
+        self.total_time_pt = 1
         self.max_zslices =0
 
         self.curr_file=0

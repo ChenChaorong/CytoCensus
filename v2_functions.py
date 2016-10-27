@@ -7,10 +7,11 @@ import pylab
 import csv
 import time
 
-from sklearn.ensemble import *
+from sklearn import ensemble
 import sklearn
 from scipy.ndimage import filters
 from scipy.ndimage import distance_transform_edt
+from scipy.spatial import distance
 import cPickle as pickle
 
 from oiffile import OifFile
@@ -214,6 +215,8 @@ def count_maxima(par_obj,time_pt,fileno):
     yy,yx,yz = np.gradient(y)
     zy,zx,zz = np.gradient(z)
     det = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
+    det2 = xx*yy-xy*yx
+    det3 = xx
     #detl = -1*np.min(det)+det
     #det[np.where(det<0)]=0
     # if not already set, create. This is then used for the entire image and all subsequent training. A little hacky, but otherwise the normalisation screws everything up
@@ -228,9 +231,62 @@ def count_maxima(par_obj,time_pt,fileno):
     
 
     pts = peak_local_max(detn, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
-
     #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-
+    par_obj.TEST=4
+    if par_obj.TEST==1:
+        pts2keep = []
+        for pt2d in pts:
+            ptuple=tuple(pt2d)
+            #positive definite it is a minimum
+            if det[ptuple]>0 and det2[ptuple]>0 and det3[ptuple]>0:
+                print 'point removed'
+            else:
+                pts2keep.append(pt2d)
+        pts=pts2keep
+    if par_obj.TEST==2:
+        pts2keep = []
+        for pt2d in pts:
+            ptuple=tuple(pt2d)
+            #negative definite it is a maximum
+            if det[ptuple]<=0 and det2[ptuple]<=0 and det3[ptuple]<=0:
+                #print 'point removed'
+                pts2keep.append(pt2d)
+            else:
+                print 'point removed', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
+        pts=pts2keep
+    if par_obj.TEST==3:
+        pts2keep = []
+        for pt2d in pts:
+            ptuple=tuple(pt2d)
+            #positive definite it is a minimum
+            dp = det[ptuple]
+            dp2 = det2[ptuple]
+            dp3 = det3[ptuple]
+            if dp>=0 and dp2<=0 and dp3>=0: #empirically not useful
+                print 'point removed', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
+            elif det[ptuple]>0 and det2[ptuple]>0 and det3[ptuple]>0: #positive definite and therefore is a minimum
+                print 'point removed', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
+                
+            else:
+                print 'point retained', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
+                pts2keep.append(pt2d)
+    if par_obj.TEST==4:
+        pts2keep = []
+        for pt2d in pts:
+            ptuple=tuple(pt2d)
+            #positive definite it is a minimum
+            dp = det[ptuple]
+            dp2 = det2[ptuple]
+            dp3 = det3[ptuple]
+            if dp>=0 and dp2<=0 and dp3>=0: #empirically not useful
+                print 'point removed', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
+            elif det[ptuple]>0 and det2[ptuple]>0 and det3[ptuple]>0: #positive definite and therefore is a minimum
+                print 'point removed', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
+            elif dp>=0 and dp2>=0 and dp3<=0:
+                print 'point retained', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
+                pts2keep.append(pt2d)
+        pts=pts2keep
+        
     par_obj.show_pts = 1
 
     #Filter those which are not inside the region.
@@ -257,16 +313,20 @@ def count_maxima(par_obj,time_pt,fileno):
 def count_maxima_2d(par_obj,time_pt,fileno):
     #count maxima won't work properly if have selected a random set of Z
     par_obj.min_distance[2]=0
-    det=gau_stk = predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.frames_2_load[-1]+1))
+    det=np.zeros((par_obj.height,par_obj.width,par_obj.frames_2_load[-1]+1))
+    gau_stk = np.zeros((par_obj.height,par_obj.width,par_obj.frames_2_load[-1]+1))
+    predMtx = np.zeros((par_obj.height,par_obj.width,par_obj.frames_2_load[-1]+1))
+    xxi= np.zeros((par_obj.height,par_obj.width,par_obj.frames_2_load[-1]+1))
     for i in par_obj.frames_2_load:
         predMtx[:,:,i]= par_obj.data_store['pred_arr'][fileno][time_pt][i]
         gau_stk[:,:,i] = filters.gaussian_filter(predMtx[:,:,i],(par_obj.min_distance[0],par_obj.min_distance[1]))
         y,x = np.gradient(gau_stk[:,:,i],1)
         xy,xx = np.gradient(x)
+        xxi[:,:,i]=xx
         yy,yx = np.gradient(y)
         det[:,:,i] = xx*yy-xy*yx
     #detl = -1*np.min(det)+det
-    #det[np.where(det<0)]=0
+        #det[np.where(det<0)]=0
     # if not already set, create. This is then used for the entire image and all subsequent training. A little hacky, but otherwise the normalisation screws everything up
     if not par_obj.max_det:
         par_obj.max_det=np.max(det)
@@ -275,14 +335,75 @@ def count_maxima_2d(par_obj,time_pt,fileno):
     par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
     for i in par_obj.frames_2_load:
         #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = detn[:,:,i]
-    
+        par_obj.data_store['maxi_arr'][fileno][time_pt][i] =gau_stk[:,:,i]/np.max(gau_stk[:,:,i])
 
     pts = peak_local_max(detn, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
-
+    gpts = peak_local_max(gau_stk, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
+    gmpts = peak_local_max(-gau_stk+np.max(gau_stk), min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
     #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-
+    par_obj.TEST=1
     par_obj.show_pts = 1
+
+    if par_obj.TEST==1.5:
+        pts2keep = []
+        for pt2d in pts:
+            ref=gau_stk[pt2d[1],pt2d[0],pt2d[2]]
+            count=0
+            if gau_stk[pt2d[0]-1,pt2d[1],pt2d[2]]>ref:
+                count+=1
+            if gau_stk[pt2d[0]+1,pt2d[1],pt2d[2]]>ref:
+                count+=1
+            if gau_stk[pt2d[0],pt2d[1]+1,pt2d[2]]>ref:
+                count+=1
+            if gau_stk[pt2d[0],pt2d[1]+1,pt2d[2]]>ref:
+                count+=1
+            if count<3: # more than 2 points indicate it is a minimum
+                pts2keep.append(pt2d)
+            else:
+                print 'point removed'
+    elif par_obj.TEST==1:
+        pts2keep = []
+        for pt2d in pts:
+            
+            T=xxi[pt2d[0],pt2d[1],pt2d[2]]
+            D=det[pt2d[0],pt2d[1],pt2d[2]]
+                
+            #if count<3: # more than 2 points indicate it is a minimum
+            if T>0 and D>0:
+                print 'point removed'
+            else:
+                pts2keep.append(pt2d)
+            #else:
+                #print 'point removed'
+        pts = pts2keep
+    elif par_obj.TEST==2:
+        pts2keep=[]
+        for pt2d in pts:
+            #pt2d_new=scipy.spatial.distance.cdist([node], nodes).min()
+            g=scipy.spatial.distance.cdist([pt2d], gpts).min()
+            gm= scipy.spatial.distance.cdist([pt2d], gmpts).min()
+            if g<gm:
+                pts2keep.append(pt2d)
+            #print [pt2d_new-pt2d]
+            #else:
+                #print 'point removed'
+        pts = pts2keep
+    elif par_obj.TEST==3:
+        gpts = peak_local_max(gau_stk, min_distance=par_obj.min_distance)
+        gmpts = peak_local_max(-gau_stk+np.max(gau_stk), min_distance=par_obj.min_distance)
+        pts2keep=[]
+        for pt2d in pts:
+
+            #pt2d_new=scipy.spatial.distance.cdist([node], nodes).min()
+            g=scipy.spatial.distance.cdist([pt2d], gpts).min()
+            gm= scipy.spatial.distance.cdist([pt2d], gmpts).min()
+            if g<gm:
+                pts2keep.append(pt2d)
+            #print [pt2d_new-pt2d]
+            #else:
+                #print 'point removed'
+        pts = pts2keep
+        
 
     #Filter those which are not inside the region.
     if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() >0:
@@ -291,18 +412,19 @@ def count_maxima_2d(par_obj,time_pt,fileno):
         for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
              for pt2d in pts:
 
+                    if pt2d[2] == i:
+                        #Find the region of interest.
+                        ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
+                        ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
+                        #Reformat to make the path object.
+                        pot = []
+                        for b in range(0,ppt_x.__len__()):
+                            pot.append([ppt_x[b],ppt_y[b]])
+                        p = Path(pot)
+                        if p.contains_point([pt2d[1],pt2d[0]]) == True:
+                                pts2keep.append(pt2d)
 
-                if pt2d[2] == i:
-                    #Find the region of interest.
-                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
-                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
-                    #Reformat to make the path object.
-                    pot = []
-                    for b in range(0,ppt_x.__len__()):
-                        pot.append([ppt_x[b],ppt_y[b]])
-                    p = Path(pot)
-                    if p.contains_point([pt2d[1],pt2d[0]]) == True:
-                            pts2keep.append(pt2d)
+
         pts = pts2keep
     par_obj.data_store['pts'][fileno][time_pt] = pts
     
@@ -754,7 +876,7 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
                         imRGB = get_tiff_slice(par_obj,[tpt],[zslice],range(0,par_obj.ori_width,int(par_obj.resize_factor)),range(0,par_obj.ori_height,int(par_obj.resize_factor)),par_obj.ch_active,imno)
 
                         #imRGBlist.append(imRGB)
-                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarraymax)    
+                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarray_typemax)    
                 #initiate pool and start caclulating features
                 int_obj.report_progress('Calculating Features for Timepoint: '+str(tpt+1) +' All  Frames'+' File: '+str(tpt+1))
                 featlist=[]
@@ -796,7 +918,7 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
                         imRGB = get_tiff_slice(par_obj,[tpt],[zslice],range(0,par_obj.ori_width,int(par_obj.resize_factor)),range(0,par_obj.ori_height,int(par_obj.resize_factor)),par_obj.ch_active,imno)
 
                         #imRGBlist.append(imRGB)
-                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarraymax)    
+                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarray_typemax)    
                 #initiate pool and start caclulating features
                 int_obj.report_progress('Calculating Features for Timepoint: '+str(tpt+1) +' All  Frames'+' File: '+str(tpt+1))
                 featlist=[]
@@ -891,7 +1013,7 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
                         imRGB = get_tiff_slice(par_obj,[tpt],[zslice],range(0,par_obj.ori_width,int(par_obj.resize_factor)),range(0,par_obj.ori_height,int(par_obj.resize_factor)),par_obj.ch_active,imno)
 
                         #imRGBlist.append(imRGB)
-                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarraymax)    
+                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarray_typemax)    
                 #initiate pool and start caclulating features
                 int_obj.report_progress('Calculating Features for Timepoint: '+str(tpt+1) +' All  Frames'+' File: '+str(tpt+1))
                 featlist=[]
@@ -955,7 +1077,7 @@ def return_imRGB_slice_new(par_obj,zslice,tpt,imno):
         for c in range(0,par_obj.ch_active.__len__()):
             
             f  = par_obj.oib_prefix+'/s_C'+str(par_obj.ch_active[c]+1).zfill(3)+'Z'+str(zslice+1).zfill(3)
-            if par_obj.total_time_pt>0:
+            if par_obj.total_time_pt>1:
                 f = f+'T'+str(tpt+1).zfill(3)
             f = f+'.tif'
             
@@ -1223,7 +1345,7 @@ def load_and_initiate_plots(par_obj, int_obj):
         imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3))
         for c in range(0,par_obj.numCH):
             f  = par_obj.oib_prefix+'/s_C'+str(c+1).zfill(3)+'Z'+str(zslice+1).zfill(3)
-            if par_obj.total_time_pt>0:
+            if par_obj.total_time_pt>1:
                 f = f+'T'+str(tpt+1).zfill(3)
             f = f+'.tif'
             imRGB[:,:,c] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
@@ -1437,14 +1559,18 @@ def import_data_fn(par_obj,file_array):
                 if imno>0:
                     assert(par_obj.bitDepth == meta.dtype)
                 par_obj.bitDepth = meta.dtype
-
+                
+                par_obj.tiffarray.append(par_obj.tiff_file.asarray(memmap=True))
+                par_obj.tiffarraymax = max(par_obj.tiffarray[imno].max(),par_obj.tiffarraymax)
+                
                 if par_obj.bitDepth in ['uint8','uint16','uint32']:
                     par_obj.tiffarray_typemax=np.iinfo(par_obj.bitDepth).max
+                    if par_obj.bitDepth in ['uint16'] and par_obj.tiffarraymax<4096:
+                        par_obj.tiffarray_typemax=4095
                 else:
                     par_obj.tiffarray_typemax=np.finfo(par_obj.bitDepth).max
 
-                par_obj.tiffarray.append(par_obj.tiff_file.asarray(memmap=True))
-                par_obj.tiffarraymax = max(par_obj.tiffarray[imno].max(),par_obj.tiffarraymax)
+
 
                 imRGB = get_tiff_slice(par_obj,[0],[0],range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor),range(par_obj.numCH))
                 #imRGB = par_obj.tiffarray[0,0,::par_obj.resize_factor,::par_obj.resize_factor]
@@ -1474,7 +1600,7 @@ def import_data_fn(par_obj,file_array):
                 imRGB = np.zeros((par_obj.ori_height/par_obj.resize_factor,par_obj.ori_width/par_obj.resize_factor,3))
                 for c in range(0,par_obj.numCH):
                     f  = par_obj.oib_prefix+'/s_C'+str(c+1).zfill(3)+'Z'+str(1).zfill(3)
-                    if par_obj.total_time_pt>0:
+                    if par_obj.total_time_pt>1:
                         f = f+'T'+str(par_obj.time_pt+1).zfill(3)
                     f = f+'.tif'
                     imRGB[:,:,c] = (par_obj.oib_file.asarray(f)[::int(par_obj.resize_factor),::int(par_obj.resize_factor)])/16
@@ -2087,6 +2213,7 @@ def processImgs(self,par_obj):
     par_obj.width = par_obj.ori_width/par_obj.resize_factor
 
     par_obj.initiate_data_store()
+    
     par_obj.time_pt = par_obj.time_pt_list[0]
     par_obj.curr_z = par_obj.frames_2_load[0]
     par_obj.curr_file = 0
