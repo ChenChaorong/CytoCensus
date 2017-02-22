@@ -745,7 +745,7 @@ class Win_fn(QtGui.QWidget):
         pickle.dump( file_to_save, open( fileName+".quantiROI", "wb" ) )
     def load_gt_fn(self):
         print 'load the gt'
-        fileName = QtGui.QFileDialog.getOpenFileName(self, "Load dots and regions", "~/Documents", "QuantiFly ROI files (*.quantiROI),MTrackJ Data Format (*.mdf)")
+        fileName = QtGui.QFileDialog.getOpenFileName(self, "Load dots and regions", "~/Documents", "QuantiFly ROI files (*.quantiROI) ;;MTrackJ Data Format (*.mdf)")
         filename, file_ext = os.path.splitext(fileName)
         print 'load the file', fileName
         if file_ext=='.quantiROI':
@@ -1282,14 +1282,14 @@ class Win_fn(QtGui.QWidget):
         self.save_model_btn.setEnabled(True)
         self.count_maxima_btn.setEnabled(True)
         self.evaluate_btn.setEnabled(True)
-    def sigmaOnChange(self,text):
+    def sigmaOnChange(self,text,imno=0):
         if (text != ""):
             par_obj.sigma_data = float(text)
             par_obj.gaussian_im_max=[]
             v2.refresh_all_density(par_obj)
             par_obj.min_distance[0]= int(round(par_obj.sigma_data))
             par_obj.min_distance[1]= int(round(par_obj.sigma_data))
-            par_obj.min_distance[2]= int(round(par_obj.sigma_data/par_obj.z_calibration))
+            par_obj.min_distance[2]= int(round(par_obj.sigma_data/par_obj.z_calibration[imno]))
             self.count_txt_1.setText(str(par_obj.min_distance[0]))
             self.count_txt_2.setText(str(par_obj.min_distance[1]))
             self.count_txt_3.setText(str(par_obj.min_distance[2]))

@@ -793,13 +793,13 @@ class Eval_disp_im_win(QtGui.QWidget):
             #v2.goto_img_fn(par_obj, int_obj,par_obj.curr_z,par_obj.time_pt)
             #v2.eval_goto_img_fn(par_obj.curr_z,par_obj,self)
     def count_maxima_btn_fn(self):
-        par_obj.min_distance[0]= int(self.count_txt_1.text())
-        par_obj.min_distance[1]= int(self.count_txt_2.text())
-        par_obj.min_distance[2]= int(self.count_txt_3.text())
+        par_obj.min_distance[0]= float(self.count_txt_1.text())
+        par_obj.min_distance[1]= float(self.count_txt_2.text())
+        par_obj.min_distance[2]= float(self.count_txt_3.text())
         par_obj.abs_thr =float(self.abs_thr_txt.text())
         par_obj.rel_thr =float(self.rel_thr_txt.text())
         
-        v2.count_maxima(par_obj,par_obj.time_pt)
+        v2.count_maxima(par_obj,par_obj.time_pt,par_obj.curr_file)
         par_obj.show_pts= 1
         self.kernel_btn_fn()
         #v2.eval_pred_show_fn(par_obj.curr_z, par_obj,self)
@@ -871,6 +871,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         par_obj.eval_load_im_win_eval = True
         par_obj.time_pt = 0
         #TODO check why this is not using the local version of goto_img
+        par_obj.show_pts=1
         v2.goto_img_fn_new(par_obj, self)
         
         #v2.eval_pred_show_fn(par_obj,self,par_obj.curr_z,par_obj.time_pt)

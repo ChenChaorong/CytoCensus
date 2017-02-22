@@ -54,8 +54,8 @@ class parameterClass:
         self.file_name={}
         self.file_array =[]
         self.tiffarray=[] #memmap object list
-        self.z_calibration=1
-        
+        self.z_calibration={}
+        self.z_calibration[0]=1
         self.order={} #ordering of tiff objects
         #default file extents
         self.max_file=0
@@ -76,6 +76,7 @@ class parameterClass:
         
         #hessian defaults
         self.min_distance = [2,2,2]
+        self.min_distance_old=[]
         self.abs_thr = 0.05
         self.rel_thr = 0
         self.max_det=[]
@@ -145,11 +146,13 @@ class parameterClass:
         if datasets==None:
             datasets=['dense_arr','feat_arr','double_feat_arr','pred_arr','sum_pred','maxi_arr','pts','roi_stk_x','roi_stk_y','roi_stkint_x','roi_stkint_y']
         #initiate datastructures
-        del self.data_store
+        
         #self.data_store=shelve.open('datastore.temp','n',writeback=True)
-        self.data_store={}
         #self.data_store.clear()
+        current_sets=self.data_store.keys()
         for dataname in datasets:
+            if dataname in current_sets:
+                del self.data_store[dataname]
             self.data_store[dataname]={}
             
             for fileno in range(self.max_file):
