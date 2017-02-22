@@ -199,9 +199,9 @@ All rights reserved.
 Original author: Lee Kamentstky
 """
 
-
 def count_maxima(par_obj,time_pt,fileno):
     #count maxima won't work properly if have selected a random set of Z
+    #TODO check that mazi arr is cleared when forest trained
     if par_obj.min_distance[2]==0 or len(par_obj.frames_2_load)==1:
         count_maxima_2d(par_obj,time_pt,fileno)
         return
@@ -214,79 +214,35 @@ def count_maxima(par_obj,time_pt,fileno):
     xy,xx,xz = np.gradient(x)
     yy,yx,yz = np.gradient(y)
     zy,zx,zz = np.gradient(z)
-    det = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
+    det3 = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
     det2 = xx*yy-xy*yx
-    det3 = xx
-    #detl = -1*np.min(det)+det
-    #det[np.where(det<0)]=0
+    det1 = -1*xx
+
     # if not already set, create. This is then used for the entire image and all subsequent training. A little hacky, but otherwise the normalisation screws everything up
     if not par_obj.max_det:
-        par_obj.max_det=np.max(det)
+        par_obj.max_det=np.max(det3)
         
-    detn = det/par_obj.max_det
+    detn = det3/par_obj.max_det
     par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
     for i in par_obj.frames_2_load:
         #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
         par_obj.data_store['maxi_arr'][fileno][time_pt][i] = detn[:,:,i]
-    
 
     pts = peak_local_max(detn, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
+ 
     #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-    par_obj.TEST=4
-    if par_obj.TEST==1:
-        pts2keep = []
-        for pt2d in pts:
-            ptuple=tuple(pt2d)
-            #positive definite it is a minimum
-            if det[ptuple]>0 and det2[ptuple]>0 and det3[ptuple]>0:
-                print 'point removed'
-            else:
-                pts2keep.append(pt2d)
-        pts=pts2keep
-    if par_obj.TEST==2:
-        pts2keep = []
-        for pt2d in pts:
-            ptuple=tuple(pt2d)
-            #negative definite it is a maximum
-            if det[ptuple]<=0 and det2[ptuple]<=0 and det3[ptuple]<=0:
-                #print 'point removed'
-                pts2keep.append(pt2d)
-            else:
-                print 'point removed', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
-        pts=pts2keep
-    if par_obj.TEST==3:
-        pts2keep = []
-        for pt2d in pts:
-            ptuple=tuple(pt2d)
-            #positive definite it is a minimum
-            dp = det[ptuple]
-            dp2 = det2[ptuple]
-            dp3 = det3[ptuple]
-            if dp>=0 and dp2<=0 and dp3>=0: #empirically not useful
-                print 'point removed', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
-            elif det[ptuple]>0 and det2[ptuple]>0 and det3[ptuple]>0: #positive definite and therefore is a minimum
-                print 'point removed', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
-                
-            else:
-                print 'point retained', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
-                pts2keep.append(pt2d)
-    if par_obj.TEST==4:
-        pts2keep = []
-        for pt2d in pts:
-            ptuple=tuple(pt2d)
-            #positive definite it is a minimum
-            dp = det[ptuple]
-            dp2 = det2[ptuple]
-            dp3 = det3[ptuple]
-            if dp>=0 and dp2<=0 and dp3>=0: #empirically not useful
-                print 'point removed', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
-            elif det[ptuple]>0 and det2[ptuple]>0 and det3[ptuple]>0: #positive definite and therefore is a minimum
-                print 'point removed', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
-            elif dp>=0 and dp2>=0 and dp3<=0:
-                print 'point retained', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
-                pts2keep.append(pt2d)
-        pts=pts2keep
-        
+    pts2keep = []
+    for pt2d in pts:
+        ptuple=tuple(pt2d)
+        #determinants of submatrices 
+        dp = det1[ptuple]
+        dp2 = det2[ptuple]
+        #dp3 = det3[ptuple]
+            #negative definite, therefore maximum (note signs in det calculation)
+        if dp>=par_obj.abs_thr and dp2>=par_obj.abs_thr: # and dp3>=par_obj.abs_thr:
+            #print 'point retained', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
+            pts2keep.append([pt2d[0],pt2d[1],pt2d[2],1])
+    pts=pts2keep
     par_obj.show_pts = 1
 
     #Filter those which are not inside the region.
@@ -309,7 +265,9 @@ def count_maxima(par_obj,time_pt,fileno):
                     if p.contains_point([pt2d[1],pt2d[0]]) == True:
                             pts2keep.append(pt2d)
         pts = pts2keep
+        
     par_obj.data_store['pts'][fileno][time_pt] = pts
+
 def count_maxima_2d(par_obj,time_pt,fileno):
     #count maxima won't work properly if have selected a random set of Z
     par_obj.min_distance[2]=0
@@ -335,75 +293,25 @@ def count_maxima_2d(par_obj,time_pt,fileno):
     par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
     for i in par_obj.frames_2_load:
         #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] =gau_stk[:,:,i]/np.max(gau_stk[:,:,i])
+        par_obj.data_store['maxi_arr'][fileno][time_pt][i] =detn[:,:,i]
 
     pts = peak_local_max(detn, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
-    gpts = peak_local_max(gau_stk, min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
-    gmpts = peak_local_max(-gau_stk+np.max(gau_stk), min_distance=par_obj.min_distance,threshold_abs=par_obj.abs_thr,threshold_rel=par_obj.rel_thr)
-    #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-    par_obj.TEST=1
-    par_obj.show_pts = 1
-
-    if par_obj.TEST==1.5:
-        pts2keep = []
-        for pt2d in pts:
-            ref=gau_stk[pt2d[1],pt2d[0],pt2d[2]]
-            count=0
-            if gau_stk[pt2d[0]-1,pt2d[1],pt2d[2]]>ref:
-                count+=1
-            if gau_stk[pt2d[0]+1,pt2d[1],pt2d[2]]>ref:
-                count+=1
-            if gau_stk[pt2d[0],pt2d[1]+1,pt2d[2]]>ref:
-                count+=1
-            if gau_stk[pt2d[0],pt2d[1]+1,pt2d[2]]>ref:
-                count+=1
-            if count<3: # more than 2 points indicate it is a minimum
-                pts2keep.append(pt2d)
-            else:
-                print 'point removed'
-    elif par_obj.TEST==1:
-        pts2keep = []
-        for pt2d in pts:
-            
-            T=xxi[pt2d[0],pt2d[1],pt2d[2]]
-            D=det[pt2d[0],pt2d[1],pt2d[2]]
-                
-            #if count<3: # more than 2 points indicate it is a minimum
-            if T>0 and D>0:
-                print 'point removed'
-            else:
-                pts2keep.append(pt2d)
-            #else:
-                #print 'point removed'
-        pts = pts2keep
-    elif par_obj.TEST==2:
-        pts2keep=[]
-        for pt2d in pts:
-            #pt2d_new=scipy.spatial.distance.cdist([node], nodes).min()
-            g=scipy.spatial.distance.cdist([pt2d], gpts).min()
-            gm= scipy.spatial.distance.cdist([pt2d], gmpts).min()
-            if g<gm:
-                pts2keep.append(pt2d)
-            #print [pt2d_new-pt2d]
-            #else:
-                #print 'point removed'
-        pts = pts2keep
-    elif par_obj.TEST==3:
-        gpts = peak_local_max(gau_stk, min_distance=par_obj.min_distance)
-        gmpts = peak_local_max(-gau_stk+np.max(gau_stk), min_distance=par_obj.min_distance)
-        pts2keep=[]
-        for pt2d in pts:
-
-            #pt2d_new=scipy.spatial.distance.cdist([node], nodes).min()
-            g=scipy.spatial.distance.cdist([pt2d], gpts).min()
-            gm= scipy.spatial.distance.cdist([pt2d], gmpts).min()
-            if g<gm:
-                pts2keep.append(pt2d)
-            #print [pt2d_new-pt2d]
-            #else:
-                #print 'point removed'
-        pts = pts2keep
+    
+    pts2keep = []
+    for pt2d in pts:
         
+        T=xxi[pt2d[0],pt2d[1],pt2d[2]]
+        #D=det[pt2d[0],pt2d[1],pt2d[2]]
+            
+        # Removes points that are positive definite and therefore minima
+        if T>0: # and D>0:
+            pass
+            #print 'point removed'
+        else:
+            pts2keep.append([pt2d[0],pt2d[1],pt2d[2],1])
+
+    pts = pts2keep
+
 
     #Filter those which are not inside the region.
     if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() >0:
@@ -426,6 +334,8 @@ def count_maxima_2d(par_obj,time_pt,fileno):
 
 
         pts = pts2keep
+
+    
     par_obj.data_store['pts'][fileno][time_pt] = pts
     
 def rank_order(image):
@@ -546,7 +456,7 @@ def save_roi_fn(par_obj):
             s_ori_y = par_obj.ori_y
 
         #Finds the current frame and file.
-        par_obj.rects = (par_obj.curr_z, int(s_ori_x), int(s_ori_y), int(abs(par_obj.rect_w)), int(abs(par_obj.rect_h)),par_obj.time_pt,par_obj.curr_file)
+        par_obj.rects = (par_obj.curr_z, int(s_ori_x), int(s_ori_y), int(abs(par_obj.rect_w)), int(abs(par_obj.rect_h)),par_obj.time_pt,par_obj.curr_file,par_obj.file_array[par_obj.curr_file])
         return True
     
     return False
@@ -747,6 +657,7 @@ def update_com_fn(par_obj,tpt,zslice,fileno):
     for i in range(0,par_obj.saved_dots.__len__()):
         #Any ROI in the present image.
         #print 'iiiii',win.saved_dots.__len__()
+        
         if(par_obj.saved_ROI[i][0] == zslice and par_obj.saved_ROI[i][5] == tpt and par_obj.saved_ROI[i][6] == fileno):
             #Save the corresponding dots.
             dots = par_obj.saved_dots[i]
@@ -854,7 +765,7 @@ for thresholding and the like'''
         par_obj.data_store['dense_arr'][imno][tpt][zslice] = dense_im
 
 def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=False):
-    """Accesses TIFF file slice or opens png. Calculates features to indices present in par_obj.left_2_calc"""
+    """Accesses TIFF file slice (from open tiffarray. Calculates features to slices specified"""
     print 'version1'    
     # consider cropping
     if par_obj.to_crop == False:
@@ -1289,10 +1200,13 @@ def goto_img_fn_new(par_obj, int_obj):
         pt_y = []
         pts = par_obj.data_store['pts'][imno][tpt]
         
-        ind = np.where(np.array(par_obj.frames_2_load) == zslice)
+        ind = np.where(np.array(par_obj.frames_2_load) == zslice)[0][0]
         #print 'ind',ind
         for pt2d in pts:
-            if pt2d[2] == ind:
+            if pt2d[3] == 0:
+                break
+                
+            elif pt2d[2] == ind:
                     pt_x.append(pt2d[1])
                     pt_y.append(pt2d[0])
         #int_obj.plt2.clear()
@@ -1412,12 +1326,14 @@ def eval_pred_show_fn(par_obj,int_obj,zslice,tpt):
             pt_y = []
             pts = par_obj.data_store['pts'][imno][tpt]
             
-            ind = np.where(np.array(par_obj.frames_2_load[0]) == zslice)
+            ind = np.where(np.array(par_obj.frames_2_load[0]) == zslice)[0][0]
             
-            for pt2d in pts:
-                if pt2d[2] == ind:
-                        pt_x.append(pt2d[1])
-                        pt_y.append(pt2d[0])
+        for pt2d in pts:
+            if pt2d[3] == 0:
+                break
+            elif pt2d[2] == ind:
+                    pt_x.append(pt2d[1])
+                    pt_y.append(pt2d[0])
 
 
             int_obj.plt1.plot(pt_x,pt_y, 'wo')
@@ -1482,17 +1398,18 @@ def get_tiff_slice(par_obj,tpt=[0],zslice=[0],x=[0],y=[0],c=[0],imno=0):
     
     return tiff
     
-def import_data_fn(par_obj,file_array):
+def import_data_fn(par_obj,file_array,file_array_offset=0):
     """Function which loads in Tiff stack or single png file to assess type."""
+    #careful with use of non-zero offset. Intended primarily for use in validation
     prevExt = [] 
     prevBitDepth=[] 
     prevNumCH =[]
     par_obj.numCH = 0
     #par_obj.total_time_pt = 0
     
-    par_obj.max_file= file_array.__len__()    
+    par_obj.max_file= file_array.__len__()
         
-    
+    par_obj.tiffarray=[None]*(par_obj.max_file+file_array_offset)
     for imno in range(0,par_obj.max_file):
             n = str(imno)
             
@@ -1509,6 +1426,7 @@ def import_data_fn(par_obj,file_array):
                 par_obj.tiffarraymax=0
                 meta = par_obj.tiff_file.series[0]
                 try: #if an imagej file, we know where, and can extract the x,y,z
+                #if 1==1:
                     x = par_obj.tiff_file.pages[0].tags.x_resolution.value
                     y = par_obj.tiff_file.pages[0].tags.x_resolution.value
                     if x!=y: raise Exception('x resolution different to y resolution')# if this isn't true then something is wrong
@@ -1560,8 +1478,10 @@ def import_data_fn(par_obj,file_array):
                     assert(par_obj.bitDepth == meta.dtype)
                 par_obj.bitDepth = meta.dtype
                 
-                par_obj.tiffarray.append(par_obj.tiff_file.asarray(memmap=True))
-                par_obj.tiffarraymax = max(par_obj.tiffarray[imno].max(),par_obj.tiffarraymax)
+                par_obj.tiffarray[imno+file_array_offset] = (par_obj.tiff_file.asarray(memmap=True))
+                
+                par_obj.tiffarraymax = max(par_obj.tiffarray[imno+file_array_offset].max(),par_obj.tiffarraymax)
+                
                 
                 if par_obj.bitDepth in ['uint8','uint16','uint32']:
                     par_obj.tiffarray_typemax=np.iinfo(par_obj.bitDepth).max
@@ -1572,7 +1492,8 @@ def import_data_fn(par_obj,file_array):
 
 
 
-                imRGB = get_tiff_slice(par_obj,[0],[0],range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor),range(par_obj.numCH))
+                imRGB = get_tiff_slice(par_obj,[0],[0],range(0,par_obj.ori_width,par_obj.resize_factor),range(0,par_obj.ori_height,par_obj.resize_factor),range(par_obj.numCH),0+file_array_offset)
+     
                 #imRGB = par_obj.tiffarray[0,0,::par_obj.resize_factor,::par_obj.resize_factor]
 #                if par_obj.tiff_reorder:
 #                    imRGB =np.swapaxes(np.swapaxes(imRGB,0,1),1,2)
@@ -1688,18 +1609,43 @@ def save_output_mask_fn(par_obj,int_obj):
         image = np.zeros([par_obj.total_time_pt,par_obj.max_zslices,1,par_obj.height,par_obj.width], 'bool')
         for tpt in par_obj.time_pt_list:
             
-            for i in range(0,par_obj.data_store['pts'][fileno][tpt].__len__()):
-                [x,y,z]=par_obj.data_store['pts'][fileno][tpt][i]
-                image[tpt,z,0,x,y]=255
+            for i in range(0,par_obj.data_store['pts'][fileno][tpt].__len__()):                
+                [x,y,z,W]=par_obj.data_store['pts'][fileno][tpt][i]
+                if W:
+                    image[tpt,z,0,x,y]=255
         dist=list(par_obj.min_distance)
         selem=skimage.morphology.ball(np.round(dist[0],0)).astype('bool')
         if dist[2] is not 0:
             drange=range(selem.shape[0]/2,selem.shape[0],np.round(dist[0]/dist[2],0).astype('uint8'))
             lrange=range(0,selem.shape[0]/2,np.round(dist[0]/dist[2],0).astype('uint8'))
             selem2=selem[np.newaxis,lrange+drange,np.newaxis,:,:]
+        else:
+            selem=skimage.morphology.disk(np.round(dist[0])).astype('bool')
+            selem2=selem[np.newaxis,np.newaxis,np.newaxis,:,:]
         image=scipy.ndimage.binary_dilation(image,selem2).astype('uint8')
         imsave(par_obj.csvPath+par_obj.file_name[fileno]+'_'+par_obj.modelName+'_Hess.tif',image, imagej=True)
         int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
+        
+def save_output_ROI(par_obj,int_obj):
+    #funky ordering TZCYX
+    for fileno in range(par_obj.max_file):
+        imStr = str(par_obj.file_array[fileno])
+        imStr = os.path.basename(imStr)
+        with open(par_obj.csvPath+imStr+'_outputROI.pickle', 'wb') as afile:
+            pickle.dump([par_obj.data_store['roi_stkint_x'][fileno],par_obj.data_store['roi_stkint_y'][fileno]],afile)
+        
+    with open(par_obj.csvPath+par_obj.modelName+'_outputROI.csv', 'wb') as csvfile:
+        spamwriter = csv.writer(csvfile)
+        spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Z: ')]+[str('Regions(x): ')]+[str('Regions(y): ')])
+
+        for fileno in range(par_obj.max_file):
+            imStr = str(par_obj.file_array[fileno])
+            for tpt in par_obj.time_pt_list:
+                ppt_x = par_obj.data_store['roi_stkint_x'][fileno][tpt]
+                ppt_y = par_obj.data_store['roi_stkint_y'][fileno][tpt]
+                for i in ppt_x.keys():
+                    spamwriter.writerow([str(imStr)]+[tpt+1]+[i]+[ppt_x[i]]+[ppt_y[i]])
+    int_obj.report_progress('Data exported to '+ par_obj.csvPath)
         
 def save_output_data_fn(par_obj,int_obj):
     local_time = time.asctime( time.localtime(time.time()) )
@@ -2215,6 +2161,8 @@ def processImgs(self,par_obj):
     par_obj.initiate_data_store()
     
     par_obj.time_pt = par_obj.time_pt_list[0]
+    if len(par_obj.frames_2_load)==0:
+        par_obj.frames_2_load=[0]
     par_obj.curr_z = par_obj.frames_2_load[0]
     par_obj.curr_file = 0
     '''
