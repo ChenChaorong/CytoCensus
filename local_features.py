@@ -19,6 +19,7 @@ from sklearn import linear_model
 from sklearn import preprocessing
 import scipy.ndimage as ndimage
 import scipy.signal as signal
+from scipy import special
 import skimage
 import time
 import numpy as np
@@ -211,26 +212,29 @@ def local_shape_features_fine3_median(im,scaleStart):
     a=im
     #median based scaling (inefficient to do this to every image)
     #TODO subsample whole file, then normalise
-    scaled=preprocessing.robust_scale(a)/1000
+    scaled=preprocessing.robust_scale(a,with_scaling=False)
+    mscaled=scaled.max()
+    scaled/=mscaled
+    mscaled=mscaled*100
     a=scaled.reshape(a.shape)
-    pyr=skimage.transform.pyramid_gaussian(a,sigma=1.5, max_layer=5, downscale=2)
-    f[:,:, 0]  = a
+    pyr=skimage.transform.pyramid_gaussian(a,sigma=1.5, max_layer=5, downscale=2,mode='constant',cval=0)
+    f[:,:, 0]  = a*mscaled
     for layer in range(0,5):
         scale=[float(im.shape[0])/float(a.shape[0]),float(im.shape[1])/float(a.shape[1])]
-        lap=scipy.ndimage.filters.laplace(a)
+        lap=scipy.ndimage.filters.laplace(a*mscaled,mode='nearest')
         lap=scipy.ndimage.interpolation.zoom(lap, scale,order=1)
         
-        [m,n]=np.gradient(a)
+        [m,n]=np.gradient(a*mscaled)
         ggm=np.hypot(m,n)
         ggm=scipy.ndimage.interpolation.zoom(ggm, scale,order=1)
 
-        x,y,z=skfeat.structure_tensor(a,1)
-        st =skfeat.structure_tensor_eigvals(x,y,z)
+        k=skfeat.structure_tensor(a,1,mode='nearest')
+        st =skfeat.structure_tensor_eigvals(k[0],k[1],k[2])*mscaled
         st0=scipy.ndimage.interpolation.zoom(st[0], scale,order=1)
         st1=scipy.ndimage.interpolation.zoom(st[1], scale,order=1)
 
         #ent=entropy(a,skimage.morphology.disk(3))
-        ent=scipy.ndimage.interpolation.zoom(a, scale,order=1)
+        ent=scipy.ndimage.interpolation.zoom(a, scale,order=1)*mscaled
         
         #hess=vigra.filters.hessianOfGaussianEigenvalues(a.astype('float32'),2)
         #hess0=scipy.ndimage.interpolation.zoom(hess[:,:,0], scale,order=1,mode='nearest')
