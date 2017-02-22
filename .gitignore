@@ -5,10 +5,12 @@
 
 .DS_Store
 
-*.pyc
-
 gnu.pyc
 
 oiffile.pyc
 
 v2_functions.pyc
+
+.ipynb_checkpoints/validation_scripts-checkpoint.ipynb
+
+.ipynb_checkpoints/*
