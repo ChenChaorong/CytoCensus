@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from tifffile import TiffFile, imsave #Install with pip install tifffile.
-
+import os
 """
 Created on Fri Feb 17 19:48:58 2017
 
@@ -49,24 +49,26 @@ would cause problems without some significant rewrites
 class File_handler(object):
     def __init__(self,file_path):
         #store high level file data and metadata
-        self.file_name=file_path
-        self.file_array = []
-        self.tiffarray = [] #memmap object list
-        self.z_calibration = 1
+        self.full_name=file_path
+        
+        self.base_name=os.path.basename(file_path)
+        self.path=os.path.dirname(file_path)
+        
+        self.ext = self.base_name.split(".")[-1]
+        self.name = self.base_name.split(".")[0]
+        
+        self.array = [] #memmap object l
+        self.z_calibration = 1 
         self.order={} #ordering of tiff objects
         #default file extents
 
-        self.total_time_pt = 1
-        self.max_zslices = 0
-
-        self.curr_file=0
-        self.curr_z = 0
-        self.time_pt = 0 #TODO make these names consistent
+        self.max_t = 0
+        self.max_z = 0
         self.numCH = 0
         
-        import_file(self, file_path)
+        self.import_file()
         
-    def get_tiff_slice(par_obj,tpt=[0],zslice=[0],x=[0],y=[0],c=[0]):
+    def get_tiff_slice(self,tpt=[0],zslice=[0],x=[0],y=[0],c=[0]):
         #deal with different TXYZC orderings. Always return TZYXC
         #handles lists and ints nicely
         if type(zslice) is not list: zslice = [zslice]
@@ -74,188 +76,112 @@ class File_handler(object):
 
         alist=[]
         blist=[]
-        for n,b in enumerate(par_obj.order):
+        for n,b in enumerate(self.order):
             if b=='T':
                 alist.append(tpt)
                 blist.append(n)
-        for n,b in enumerate(par_obj.order):
+        for n,b in enumerate(self.order):
             if b=='Z':
                 alist.append(zslice)
                 blist.append(n)
-        for n,b in enumerate(par_obj.order):
+        for n,b in enumerate(self.order):
             if b=='Y':
                 alist.append(y)
                 blist.append(n)
-        for n,b in enumerate(par_obj.order):
+        for n,b in enumerate(self.order):
             if b=='X':
                 alist.append(x)
                 blist.append(n)
     
-        for n,b in enumerate(par_obj.order):
+        for n,b in enumerate(self.order):
             if b=='C' or b=='S':
                 alist.append(c)
                 blist.append(n)
         
-        tiff2=par_obj.tiffarray.transpose(blist)
+        tiff2=self.array.transpose(blist)
         
-        if par_obj.order.__len__()==5:
+        if self.order.__len__()==5:
             #tiff=np.squeeze(tiff2[alist[0],:,:,:,:][:,alist[1],:,:,:][:,:,alist[2],:,:][:,:,:,alist[3],:][:,:,:,:,alist[4]])
             tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1],alist[2],alist[3],alist[4])])
-        elif par_obj.order.__len__()==4:
+        elif self.order.__len__()==4:
             #tiff=np.squeeze(tiff2[alist[0],:,:,:][:,alist[1],:,:][:,:,alist[2],:][:,:,:,alist[3]])
             tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1],alist[2],alist[3])])
     
-        elif par_obj.order.__len__()==3:
+        elif self.order.__len__()==3:
             #tiff=np.squeeze(tiff2[alist[0],:,:][:,alist[1],:][:,:,alist[2]])
             tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1],alist[2])])
-        elif par_obj.order.__len__()==2:
+        elif self.order.__len__()==2:
             #tiff=np.squeeze(tiff2[alist[0],:][:,alist[1]])
             tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1])])
-        
         return tiff
-    def close(self, file_path):
+    
+    def close(self):
         self.array =[]
         self.Tiff.close()
         
-    def import_file(self, file_path):
+    def import_file(self):
 
         #loads in Tiff image data for subsequent use
         #reworked to separate file logic from UI related logic
         #TODO add directory separation logic
-        self.path=file_path
-        self.ext = self.path.split(".")[-1]
-        self.name = self.path.split(".")[0].split("/")[-1]
 
-        if self.file_ext == 'tif' or self.file_ext == 'tiff':
-            self.import_file.import_tiff()
+
+        if self.ext == 'tif' or self.ext == 'tiff':
+            self.import_tiff()
             return True, 'Image loaded'
         else:
             statusText = 'Status: Image format not-recognised. Please choose either png or TIFF files.'
             return False, statusText
         
-        def import_tiff(self):
-                self.Tiff = TiffFile(self.path)
-                self.tiffarraymax
-                meta = self.Tiff.series[0]
-                
-                try: #if an imagej file, we know where, and can extract the x,y,z
-                #if 1==1:
-                    x = self.Tiff.pages[0].tags.x_resolution.value
-                    y = self.Tiff.pages[0].tags.y_resolution.value
-                    if x!=y: raise Exception('x resolution different to y resolution')# if this isn't true then something is wrong
-                    x_res=float(x[1])/float(x[0])
-                    
-                    z=self.Tiff.pages[0].imagej_tags['spacing']
-                    
-                    self.z_calibration = z/x_res
-                    
-                    print('z_scale_factor', self.z_calibration)
-                except:
-                    #might need to modify this to work with OME-TIFFs
-                    print 'tiff resolution not recognised'
-                
-                self.order = meta.axes
-                for n,b in enumerate(self.order):
-                        if b == 'T':
-                            self.total_time_pt = meta.shape[n]
-                        if b == 'Z':
-                            self.max_zslices = meta.shape[n]
-                        if b == 'Y':
-                            self.height = meta.shape[n]
-                        if b == 'X':
-                            self.width = meta.shape[n]
-                        if b == 'S':
-                            self.numCH = meta.shape[n]
-                            #par_obj.tiff_reorder=False
-                        if b == 'C':
-                            self.numCH = meta.shape[n]
-    
-                self.bitDepth = meta.dtype
-                
-                self.array=self.Tiff.asarray(memmap=True)
-                
-                self.tiffarraymax = self.array.max()
-                
-                if self.bitDepth in ['uint8','uint16','uint32']:
-                    self.tiffarray_typemax=np.iinfo(self.bitDepth).max
-                    if self.bitDepth in ['uint16'] and self.tiffarraymax<4096:
-                        self.tiffarray_typemax=4095
-                else:
-                    self.tiffarray_typemax=np.finfo(self.bitDepth).max
+    def import_tiff(self):
+            self.Tiff = TiffFile(self.full_name)
 
-                
-    def import_data_fn(par_obj,file_array,file_array_offset=0):
-        """Function which loads in Tiff stack or single png file to assess type."""
-        
-        #careful with use of non-zero offset. Intended primarily for use in validation
-        prevExt = [] 
-        prevBitDepth=[] 
-        prevNumCH =[]
-        par_obj.numCH = 0
-        #par_obj.total_time_pt = 0
-        
-        par_obj.max_file= file_array.__len__()
+            meta = self.Tiff.series[0]
             
-        par_obj.filehandlers=[None]*(par_obj.max_file+file_array_offset)
-        
-        for imno,imfile in enumerate(file_array):
+            try: #if an imagej file, we know where, and can extract the x,y,z
+            #if 1==1:
+                x = self.Tiff.pages[0].tags.x_resolution.value
+                y = self.Tiff.pages[0].tags.y_resolution.value
+                if x!=y: raise Exception('x resolution different to y resolution')# if this isn't true then something is wrong
+                x_res=float(x[1])/float(x[0])
                 
-            par_obj.filehandlers[imno] = File_handler(imfile)
-            #currently doesn't check if multiple filetypes, on the basis only loads tiffs
-            #check number of channels is consistent
-            if imno==0:
-                par_obj.numCH = par_obj.filehandlers[imno].numCH
-            elif par_obj.numCH == par_obj.filehandlers[imno].numCH:
-                pass
-            else:
-                statusText = 'Different number of image channels in the selected images'
-                raise Exception(statusText)# if this isn't true then something is wrong
-            #check height and width match
-            if imno==0:
-                par_obj.ori_height = par_obj.filehandlers[imno].height
-            elif par_obj.ori_height == par_obj.filehandlers[imno].height:
-                pass
-            else:
-                statusText = 'Different image size in the selected images'
-                raise Exception(statusText)# if this isn't true then something is wrong
+                z=self.Tiff.pages[0].imagej_tags['spacing']
                 
-            if imno==0:
-                par_obj.ori_width = par_obj.filehandlers[imno].width
-            elif par_obj.ori_width == par_obj.filehandlers[imno].width:
-                pass
-            else:
-                statusText = 'Different image size in the selected images'
-                raise Exception(statusText)# if this isn't true then something is wrong
-            #check bit depth matches
-            if imno==0:
-                par_obj.bitDepth = par_obj.filehandlers[imno].bitDepth
-                par_obj.tiffarray_typemax=par_obj.filehandlers[imno].tiffarray_typemax
-                                                  
-            elif par_obj.bitDepth == par_obj.filehandlers[imno].bitDepth:
-                pass
-            else:
-                statusText = 'Different image bit depth in the selected images'
-                raise Exception(statusText)# if this isn't true then something is wrong
+                self.z_calibration = z/x_res
+                
+                print('z_scale_factor', self.z_calibration)
+            except:
+                #might need to modify this to work with OME-TIFFs
+                print 'tiff resolution not recognised'
+            
+            self.order = meta.axes
+            for n,b in enumerate(self.order):
+                    if b == 'T':
+                        self.max_t = meta.shape[n]-1
+                    if b == 'Z':
+                        self.max_z = meta.shape[n]-1
+                    if b == 'Y':
+                        self.height = meta.shape[n]
+                    if b == 'X':
+                        self.width = meta.shape[n]
+                    if b == 'S':
+                        self.numCH = meta.shape[n]
+                        #par_obj.tiff_reorder=False
+                    if b == 'C':
+                        self.numCH = meta.shape[n]
 
-        #Prepare RGB example image
-        x = range(0,par_obj.ori_width,par_obj.resize_factor)
-        y = range(0,par_obj.ori_height,par_obj.resize_factor)
-        imRGB = par_obj.filehandlers[0].get_tiff_slice([0],[0],x,y,range(par_obj.numCH))
-        
-        if imRGB.shape.__len__() > 2:
-        #If images have more than three channels. 
-            if imRGB.shape[2]>2:
-                #three channels.
-                par_obj.ex_img = imRGB
-            elif imRGB.shape[2]==2:
-                #2 channels.
-                par_obj.ex_img=np.zeros((par_obj.ori_height,par_obj.ori_width,3))
-                par_obj.ex_img[:,:,0:2] = imRGB
+            self.bitDepth = meta.dtype
+            
+            self.array=self.Tiff.asarray(memmap=True)
+            
+            self.tiffarraymax = self.array.max()
+            
+            if self.bitDepth in ['uint8','uint16','uint32']:
+                self.tiffarray_typemax=np.iinfo(self.bitDepth).max
+                #12 bit depth
+                if self.bitDepth in ['uint16'] and self.tiffarraymax<4096:
+                    self.tiffarray_typemax=4095
             else:
-                #If the size of the third dimenion is just 1, this is invalid for imshow show we have to adapt.
-                par_obj.ex_img = imRGB[:,:,0]
-        elif imRGB.shape.__len__() ==2:
-            par_obj.ex_img = imRGB.astype('float32')
-    
-        statusText= str(file_array.__len__())+' Files Loaded.'
-        return True, statusText
+                self.tiffarray_typemax=np.finfo(self.bitDepth).max
+
+            
