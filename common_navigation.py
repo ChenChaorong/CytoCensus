@@ -10,22 +10,31 @@ Common colour checkboxes and 4D navigation functions
 from PyQt4 import QtGui
 from gnu import return_license
 import numpy as np
+
 def navigation_setup(self,par_obj):
     
     #Sets up the button which changes to the prev image
-    self.prev_im_btn = QtGui.QPushButton('Z-slice (<)')
+    self.prev_im_btn = QtGui.QPushButton('Z (<)')
     self.prev_im_btn.setEnabled(True)
     
     #Sets up the button which changes to the next Image.
-    self.next_im_btn = QtGui.QPushButton('Z-slice (>)')
+    self.next_im_btn = QtGui.QPushButton('Z (>)')
     self.next_im_btn.setEnabled(True)
     
+    #Sets up the button which changes to the prev image
+    self.first_im_btn = QtGui.QPushButton('Z (<<)')
+    self.first_im_btn.setEnabled(True)
+    
+    #Sets up the button which changes to the next Image.
+    self.last_im_btn = QtGui.QPushButton('Z (>>)')
+    self.last_im_btn.setEnabled(True)
+    
      #Sets up the button which changes to the prev image
-    self.prev_time_btn = QtGui.QPushButton('Time-pt (<)')
+    self.prev_time_btn = QtGui.QPushButton('Time (<)')
     self.prev_time_btn.setEnabled(True)
     
     #Sets up the button which changes to the next Image.
-    self.next_time_btn = QtGui.QPushButton('Time-pt (>)')
+    self.next_time_btn = QtGui.QPushButton('Time (>)')
     self.next_time_btn.setEnabled(True)
     
     #Sets up the button which changes to the next File.
@@ -41,67 +50,88 @@ def navigation_setup(self,par_obj):
     self.panel_buttons = QtGui.QHBoxLayout()
     self.panel_buttons.addWidget(self.prev_im_btn)
     self.panel_buttons.addWidget(self.next_im_btn)
+    self.panel_buttons.addWidget(self.first_im_btn)
+    self.panel_buttons.addWidget(self.last_im_btn)
     self.panel_buttons.addWidget(self.prev_time_btn)
     self.panel_buttons.addWidget(self.next_time_btn)
     self.panel_buttons.addWidget(self.prev_file_btn)
     self.panel_buttons.addWidget(self.next_file_btn)
 
-    self.prev_im_btn.clicked.connect(lambda: prev_im_btn_fn(self,par_obj))
-    self.next_im_btn.clicked.connect(lambda:next_im_btn_fn(self,par_obj))
-    self.prev_time_btn.clicked.connect(lambda:prev_time_btn_fn(self,par_obj))
-    self.next_time_btn.clicked.connect(lambda:next_time_btn_fn(self,par_obj))
+    self.prev_im_btn.clicked.connect(lambda: self.Btn_fns.prev_im(par_obj))
+    self.next_im_btn.clicked.connect(lambda: self.Btn_fns.next_im(par_obj))
+    self.first_im_btn.clicked.connect(lambda: self.Btn_fns.first_im(par_obj))
+    self.last_im_btn.clicked.connect(lambda: self.Btn_fns.last_im(par_obj))
     
-    self.prev_file_btn.clicked.connect(lambda:prev_file_btn_fn(self,par_obj))
-    self.next_file_btn.clicked.connect(lambda:next_file_btn_fn(self,par_obj))
-def prev_im_btn_fn(self,par_obj):
-    for ind, zim in enumerate(par_obj.frames_2_load):
-        if zim == par_obj.curr_z:
-            if ind > 0:
-                zslice  = par_obj.frames_2_load[ind-1]
-                self.goto_img_fn(zslice=zslice)
-                break;
+    self.prev_time_btn.clicked.connect(lambda: self.Btn_fns.prev_time(par_obj))
+    self.next_time_btn.clicked.connect(lambda: self.Btn_fns.next_time(par_obj))
+    
+    self.prev_file_btn.clicked.connect(lambda: self.Btn_fns.prev_file(par_obj))
+    self.next_file_btn.clicked.connect(lambda: self.Btn_fns.next_file(par_obj))
+    
+class btn_fn:
+    def __init__(self,win):
+        self.win=win
+        self.goto_img_fn=win.goto_img_fn
+    def prev_im(self,par_obj):
+        if par_obj.curr_z > 0:
+            zslice = par_obj.curr_z-1
+            self.goto_img_fn(zslice=zslice)
+            
+    def next_im(self,par_obj):
+        if par_obj.curr_z < par_obj.max_z:
+            zslice = par_obj.curr_z+1
+            self.goto_img_fn(zslice=zslice)
+            
+    def last_im(self,par_obj):
+        zslice = par_obj.max_z
+        self.goto_img_fn(zslice=zslice)
+                    
+    def first_im(self,par_obj):
+        zslice = 0
+        self.goto_img_fn(zslice=zslice)
+                    
+    def prev_time(self,par_obj):
+        for idx,tpt in enumerate(par_obj.tpt_list):
+            if par_obj.curr_t == tpt:
+                if idx>0:
+                    tpt = par_obj.tpt_list[idx-1]
+                    self.goto_img_fn(tpt=tpt)
+                    break
+    
+    def next_time(self,par_obj):
+        if par_obj.max_t>par_obj.curr_t:
+            for idx,tpt in enumerate(par_obj.tpt_list):
+                if par_obj.curr_t == tpt:
+                    if idx+1<len(par_obj.tpt_list):
+                        tpt = par_obj.tpt_list[idx+1]
+                        self.goto_img_fn(tpt=tpt)
+                        break
+                    
+    def prev_file(self,par_obj):
+        if par_obj.curr_file > 0:
+            par_obj.max_z = min(par_obj.filehandlers[par_obj.curr_file-1].max_z,par_obj.user_max_z)
+            par_obj.max_t = min(par_obj.filehandlers[par_obj.curr_file-1].max_t,par_obj.tpt_list[-1])
+            if par_obj.curr_z>par_obj.max_z: par_obj.curr_z = par_obj.max_z
+            if par_obj.curr_t>par_obj.max_t: par_obj.curr_t = par_obj.max_t
+            self.goto_img_fn(imno=par_obj.curr_file-1)
+            #limit z by user and file extent
+    
+    
+    def next_file(self,par_obj):
+        for fileno in range(par_obj.max_file):
+            if fileno == par_obj.curr_file:
+                if fileno < par_obj.max_file-1:
+                    par_obj.max_z = par_obj.filehandlers[par_obj.curr_file+1].max_z
+                    par_obj.max_t = par_obj.filehandlers[par_obj.curr_file+1].max_t
+                    if par_obj.curr_z>par_obj.max_z: par_obj.curr_z = par_obj.max_z
+                    if par_obj.curr_t>par_obj.max_t: par_obj.curr_t = par_obj.max_t
+                    self.goto_img_fn(imno=par_obj.curr_file+1)
+    
+                    break;
 
-def next_im_btn_fn(self,par_obj):
-     for ind, zim in enumerate(par_obj.frames_2_load):
-        if zim == par_obj.curr_z:
-            if ind < par_obj.frames_2_load.__len__()-1:
-                zslice  = par_obj.frames_2_load[ind+1]
-                self.goto_img_fn(zslice=zslice)
-                break;
-                
-def prev_time_btn_fn(self,par_obj):
-    for ind, tim in enumerate(par_obj.time_pt_list):
-        if tim == par_obj.time_pt:
-            if ind > 0:
-                tpt  = par_obj.time_pt_list[ind-1]
-                self.goto_img_fn(tpt=tpt)
-                break;
-def next_time_btn_fn(self,par_obj):
-
-    for ind, tim in enumerate(par_obj.time_pt_list):
-        if tim == par_obj.time_pt:
-            if ind < par_obj.time_pt_list.__len__()-1:
-                tpt  = par_obj.time_pt_list[ind+1]
-                self.goto_img_fn(tpt=tpt)
-                break;
-                
-def prev_file_btn_fn(self,par_obj):
-    for fileno in range(par_obj.max_file):
-        if fileno == par_obj.curr_file:
-            if fileno > 0:
-                self.goto_img_fn(imno=par_obj.curr_file-1)
-                break;
-
-def next_file_btn_fn(self,par_obj):
-    for fileno in range(par_obj.max_file):
-        if fileno == par_obj.curr_file:
-            if fileno < par_obj.max_file-1:
-                self.goto_img_fn(imno=par_obj.curr_file+1)
-                break;
-                
 def on_about(self):
     self.about_win = QtGui.QWidget()
-    self.about_win.setWindowTitle('About QuantiFly Software v2.0')
+    self.about_win.setWindowTitle('About QBrain Software v2.0')
 
     license = return_license()
     #with open (sys.path[0]+'/GNU GENERAL PUBLIC LICENSE.txt', "r") as myfile:
@@ -174,7 +204,7 @@ class checkBoxCH(QtGui.QCheckBox):
             else:#removes channel when unticked
                 if self.ID in par_obj.ch_display:
                     del par_obj.ch_display[par_obj.ch_display.index(self.ID)]
-            Win.goto_img_fn(par_obj.curr_z,par_obj.time_pt)
+            Win.goto_img_fn(par_obj.curr_z,par_obj.curr_t)
 def create_channel_objects(self,par_obj,num,feature_select=False,parent=None):
     #Object factory for channel selection.
     parent=[]
