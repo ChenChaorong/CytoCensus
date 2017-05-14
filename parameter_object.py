@@ -54,21 +54,20 @@ class parameterClass:
         self.file_name={}
         self.file_array =[]
         self.tiffarray=[] #memmap object list
-        self.z_calibration={}
-        self.z_calibration[0]=1
+        #self.z_calibration={}
+        #self.z_calibration[0]=1
         self.order={} #ordering of tiff objects
         #default file extents
         self.max_file=0
-        self.total_time_pt = 1
-        self.max_zslices =0
+        self.max_t = 0
+        self.max_z =0
 
         self.curr_file=0
         self.curr_z = 0
-        self.time_pt = 0 #TODO make these names consistent
-        #use these?
-        self.t={}
-        self.z={}
-        self.f={}
+        self.curr_t = 0 #TODO make these names consistent
+
+        self.user_max_z=[]
+        
         
         self.height = 0
         self.width = 0
@@ -79,6 +78,7 @@ class parameterClass:
         self.min_distance_old=[]
         self.abs_thr = 0.05
         self.rel_thr = 0
+        self.z_cal =1
         self.max_det=[]
         #ROI point
         self.npts = 100
@@ -105,6 +105,7 @@ class parameterClass:
         self.limit_size = 3000 #patches per image or ROI. # overridden by limit ratio
         self.roi_tolerance = 10
         self.double_train = False
+        self.count_maxima_small = False
         #Random Forest parameters
         self.RF ={} #possibility to apply multiple models efficiently. Not implemented
         self.max_depth=10
@@ -155,9 +156,9 @@ class parameterClass:
                 del self.data_store[dataname]
             self.data_store[dataname]={}
             
-            for fileno in range(self.max_file):
+            for fileno in range(self.max_file+1):
                 self.data_store[dataname][fileno]={}
-                for time_pt in self.time_pt_list:
+                for time_pt in self.tpt_list:
                     self.data_store[dataname][fileno][time_pt]={}
                     
     class serialdict(shelve.Shelf):
