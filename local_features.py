@@ -13,6 +13,7 @@ import scipy
 import PIL.Image
 from skimage.filters.rank import entropy
 from skimage import feature as skfeat
+
 from skimage import exposure
 from skimage import morphology
 from sklearn import linear_model
@@ -26,22 +27,63 @@ import numpy as np
 import threading
 #from v2_functions import get_tiff_slice
 from scipy.ndimage.interpolation import shift
+from skimage.feature import daisy
+from sklearn.decomposition import PCA,FastICA
+from sklearn import ensemble
+from sklearn import tree
+from sklearn.pipeline import Pipeline
+from scipy.ndimage.morphology import distance_transform_edt
 
+def RF(par_obj, RF_type='ETR'):
 
+    if RF_type== 'ETR':
+        method = ensemble.ExtraTreesRegressor(par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features, bootstrap=True, n_jobs=-1)
+    elif RF_type== 'GBR':
+        method = ensemble.GradientBoostingRegressor(loss='ls', learning_rate=0.01, n_estimators=par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features)  
+    elif RF_type== 'GBR2':
+        method = ensemble.GradientBoostingRegressor(loss='lad', learning_rate=0.1, n_estimators=par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features)  
 
+    elif RF_type== 'BR':
+        method =linear_model.BayesianRidge(par_obj.n_iter, par_obj.tol, par_obj.alpha_1, par_obj.alpha_2, par_obj.lambda_1, par_obj.lambda_2)    
+    elif RF_type== 'ABR':
+        method = ensemble.AdaBoostRegressor(base_estimator=ensemble.ExtraTreesRegressor(10, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features, bootstrap=True, n_jobs=-1), n_estimators=3, learning_rate=1.0, loss= 'square')
+  
+    return method
+'''
+        elif RF_type== 'ETC':
+            method = ensemble.ExtraTreesClassifier(par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features, bootstrap=True, n_jobs=-1,class_weight='balanced')
+            self.fit = self.method.fit
+            self.predict = self.method.predict_proba
+
+        elif RF_type== 'DRETR':
+            #self.method = ensemble.ExtraTreesRegressor(par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, max_features=par_obj.max_features, bootstrap=True, n_jobs=-1)
+            #self.method2 = PCA(n_components=0.9)
+            
+            self.method = Pipeline([
+                ('reduce_dim', FastICA(n_components=70)),
+                ('regress', ensemble.ExtraTreesRegressor(par_obj.num_of_tree, max_depth=par_obj.max_depth, min_samples_split=par_obj.min_samples_split, min_samples_leaf=par_obj.min_samples_leaf, bootstrap=True, n_jobs=-1))])
+            self.fit = self.method.fit
+            self.predict = self.method.predict
+            #self.fit = self.__DRETRfit__
+            #self.predict = self.__DRETRpredict__
+'''
 def get_feature_lengths(feature_type):
     #dictionary of feature sets
     #can add arbitrary feature sets by defining a name, length, and function that accepts two arguments
     feature_dict={'basic': [13,local_shape_features_basic],
                   'fine': [21,local_shape_features_fine],
-                  'daisy': [53,local_shape_features_daisy],
+                  'daisy': [101,local_shape_features_daisy],
                   'fine3': [26,local_shape_features_fine3],
+                  'imhist': [26,local_shape_features_fine_imhist],
                   'texton': [21,local_shape_features_texton],
                   'comb': [51, local_shape_features_fine_comb],
                   'dual': [36, local_shape_features_dual],
                   'normal': [26, local_shape_features_fine3_normal],
                   'median': [26, local_shape_features_fine3_median],
-                  'patch': [45,local_shape_features_patch] }
+                  'patch': [45,local_shape_features_patch],
+                  'key': [14,local_shape_features_key],
+                  'sharp': [8,local_shape_features_sharp],
+                  'canny': [7,local_shape_features_canny]}
     feat_length=None
     if feature_dict.has_key(feature_type):
         feat_length=feature_dict[feature_type][0]
@@ -343,22 +385,144 @@ def local_shape_features_fine3(im,scaleStart):
         f[:,:, layer*5+5]  = ent
         a=pyr.next()
     return f
+    
+def local_shape_features_fine_imhist(im,scaleStart):
+    
+    # Uses gaussian pyramid to calculate at multiple scales
+    # Smoothing and scale parameters chosen to approximate Luca Fiashi paper
+    #FIXME normalisation. Broke comparing image, implement based on max datatype stored instead
+    s = scaleStart
+    
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,26))
+    im=exposure.equalize_hist(im)
+    f[:,:, 0]  = im
+    #im=exposure.equalize_adapthist(im, kernel_size=5)
+    pyr=skimage.transform.pyramid_gaussian(im,sigma=1.5, max_layer=5, downscale=2)
+    a=im
+
+    for layer in range(0,5):
+        scale=[float(im.shape[0])/float(a.shape[0]),float(im.shape[1])/float(a.shape[1])]
+        lap=scipy.ndimage.filters.laplace(a)
+        lap=scipy.ndimage.interpolation.zoom(lap, scale,order=1)
+        
+        [m,n]=np.gradient(a)
+        ggm=np.hypot(m,n)
+        ggm=scipy.ndimage.interpolation.zoom(ggm, scale,order=1)
+
+        x,y,z=skfeat.structure_tensor(a,1)
+        st =skfeat.structure_tensor_eigvals(x,y,z)
+        st0=scipy.ndimage.interpolation.zoom(st[0], scale,order=1)
+        st1=scipy.ndimage.interpolation.zoom(st[1], scale,order=1)
+
+        #ent=entropy(a,skimage.morphology.disk(3))
+        ent=scipy.ndimage.interpolation.zoom(a, scale,order=1)
+        
+        #hess=vigra.filters.hessianOfGaussianEigenvalues(a.astype('float32'),2)
+        #hess0=scipy.ndimage.interpolation.zoom(hess[:,:,0], scale,order=1,mode='nearest')
+        #hess1=scipy.ndimage.interpolation.zoom(hess[:,:,1], scale,order=1,mode='nearest')
+        f[:,:, layer*5+1]  = lap
+        f[:,:, layer*5+2]  = ggm
+        f[:,:, layer*5+3]  = st0
+        f[:,:, layer*5+4]  = st1
+        f[:,:, layer*5+5]  = ent
+        a=pyr.next()
+    return f
+    
 def local_shape_features_daisy(im,scaleStart):
     # skiimage daisy
     # fast SIFT-like features
     # still slow
-    from skimage.feature import daisy
 
     imSizeC = im.shape[0]
     imSizeR = im.shape[1]
-    f = np.zeros((imSizeC,imSizeR,53))
-    f[:,:, 0]  = im
+    f = np.zeros((imSizeC,imSizeR,105))
     #im=exposure.equalize_adapthist(im, kernel_size=5)
     a=im
-    daisyfeat= daisy(a,histograms=4, orientations=4)
+    daisyfeat= daisy(a,radius=scaleStart*3 ,histograms=8,step=1, orientations=4,normalization='daisy')
     scale=[float(im.shape[0])/float(daisyfeat.shape[0]),float(im.shape[1])/float(daisyfeat.shape[1])]  
     for i in range(daisyfeat.shape[2]):
-        f[:,:, i+1]=scipy.ndimage.interpolation.zoom(daisyfeat[:,:,i],scale,order=1)
+        f[:,:, i+1]=scipy.ndimage.interpolation.zoom(daisyfeat[:,:,i],scale,order=0)
+    return f
+def local_shape_features_canny(im,scaleStart):
+    # skiimage daisy
+    # fast SIFT-like features
+    # still slow
+    
+
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,7))
+    #im=exposure.equalize_adapthist(im, kernel_size=5)
+    f[:,:, 1] = distance_transform_edt(1-skfeat.canny(im, sigma=1))
+    f[:,:, 1]=f[:,:, 1]/(f[:,:, 1].max()+1)
+    f[:,:, 2] = distance_transform_edt(1-skfeat.canny(im, sigma=3))
+    f[:,:, 2]=f[:,:, 2]/(f[:,:, 2].max()+1)
+    f[:,:, 3] = distance_transform_edt(1-skfeat.canny(im, sigma=5))
+    f[:,:, 3]=f[:,:, 3]/(f[:,:, 3].max()+1)
+    f[:,:, 4] = distance_transform_edt(1-skfeat.canny(im, sigma=9))
+    f[:,:, 4]=f[:,:, 4]/(f[:,:, 4].max()+1)
+    f[:,:, 5] = distance_transform_edt(1-skfeat.canny(im, sigma=17))
+    f[:,:, 5]=f[:,:, 5]/(f[:,:, 5].max()+1)
+    f[:,:, 6] = distance_transform_edt(1-skfeat.canny(im, sigma=33))
+    f[:,:, 6]=f[:,:, 6]/(f[:,:, 6].max()+1)
+    #f[:,:, 7] = distance_transform_edt(filters.canny(im, sigma=65))
+
+
+    return f
+def local_shape_features_key(im,scaleStart):
+    # skiimage daisy
+    # fast SIFT-like features
+    # still slow
+    
+
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,14))
+    #im=exposure.equalize_adapthist(im, kernel_size=5)
+    
+    f[:,:, 1] = distance_transform_edt(1-skfeat.peak_local_max(skfeat.corner_harris(im,sigma=1), indices=False))
+    #f[:,:, 1]=f[:,:, 1]/(f[:,:, 1].max()+1)
+    f[:,:, 2] = distance_transform_edt(1-skfeat.peak_local_max(skfeat.corner_harris(im,sigma=3), indices=False))
+    #f[:,:, 2]=f[:,:, 2]/(f[:,:, 2].max()+1)
+    f[:,:, 3] = distance_transform_edt(1-skfeat.peak_local_max(skfeat.corner_harris(im,sigma=5), indices=False))
+    #f[:,:, 3]=f[:,:, 3]/(f[:,:, 3].max()+1)
+    f[:,:, 4] = distance_transform_edt(1-skfeat.peak_local_max(skfeat.corner_harris(im,sigma=9), indices=False))
+    #f[:,:, 4]=f[:,:, 4]/(f[:,:, 4].max()+1)
+    f[:,:, 5] = distance_transform_edt(1-skfeat.peak_local_max(skfeat.corner_harris(im,sigma=17), indices=False))
+    #f[:,:, 5]=f[:,:, 5]/(f[:,:, 5].max()+1)
+    f[:,:, 6] = distance_transform_edt(1-skfeat.peak_local_max(skfeat.corner_harris(im,sigma=33), indices=False))
+    #f[:,:, 6]=f[:,:, 6]/(f[:,:, 6].max()+1)
+    f[:,:,7::]=distance_transform_edt(1-skfeat.peak_local_max(skfeat.corner_harris(im,sigma=65), indices=False))
+    #f[:,:, 7] = distance_transform_edt(filters.canny(im, sigma=65))
+    return f
+    
+def local_shape_features_sharp(im,scaleStart):
+    # skiimage daisy
+    # fast SIFT-like features
+    # still slow
+    
+
+    imSizeC = im.shape[0]
+    imSizeR = im.shape[1]
+    f = np.zeros((imSizeC,imSizeR,8))
+    #im=exposure.equalize_adapthist(im, kernel_size=5)
+    
+    f[:,:, 1] = im-ndimage.gaussian_filter(im,1)
+    #f[:,:, 1]=f[:,:, 1]/(f[:,:, 1].max()+1)
+    f[:,:, 2] = im-ndimage.gaussian_filter(im,3)
+    #f[:,:, 2]=f[:,:, 2]/(f[:,:, 2].max()+1)
+    f[:,:, 3] = im-ndimage.gaussian_filter(im,5)
+    #f[:,:, 3]=f[:,:, 3]/(f[:,:, 3].max()+1)
+    f[:,:, 4] = im-ndimage.gaussian_filter(im,9)
+    #f[:,:, 4]=f[:,:, 4]/(f[:,:, 4].max()+1)
+    f[:,:, 5] = im-ndimage.gaussian_filter(im,17)
+    #f[:,:, 5]=f[:,:, 5]/(f[:,:, 5].max()+1)
+    f[:,:, 6] = im-ndimage.gaussian_filter(im,33)
+    #f[:,:, 6]=f[:,:, 6]/(f[:,:, 6].max()+1)
+    f[:,:,7]= im-ndimage.gaussian_filter(im,65)
+    #f[:,:, 7] = distance_transform_edt(filters.canny(im, sigma=65))
     return f
     
 def local_shape_features_fine3_cust(im,scaleStart):
