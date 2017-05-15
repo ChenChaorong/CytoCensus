@@ -5,7 +5,9 @@ Software repository for QBrain.
 Software publication:
 
 MS ID#: BIORXIV/2017/137406
+
 MS TITLE: Brain Development: Machine Learning Analysis Of Individual Stem Cells In Live 3D Tissue
+
 Authors:
 Martin Hailstone, Lu Yang, Dominic Waithe, Tamsin J Samuels, Yoav Arava, Tomasz Dobrzycki, Richard M Parton and Ilan Davis
 
