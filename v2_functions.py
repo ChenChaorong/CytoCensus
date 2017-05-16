@@ -1630,7 +1630,7 @@ def import_data_fn(par_obj,file_array,file_array_offset=0):
     
     for imno,imfile in enumerate(file_array):
             
-        par_obj.filehandlers[imno] = File_handler(imfile)
+        par_obj.filehandlers[imno] = File_handler(str(imfile))
         #currently doesn't check if multiple filetypes, on the basis only loads tiffs
         #check number of channels is consistent
         if imno==0:
