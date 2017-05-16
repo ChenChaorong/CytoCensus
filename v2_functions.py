@@ -7,7 +7,7 @@ import pylab
 import csv
 import time
 
-import skimage
+import skimage.morphology
 
 #from sklearn import ensemble
 #import sklearn
