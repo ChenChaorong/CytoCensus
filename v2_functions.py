@@ -7,7 +7,8 @@ import pylab
 import csv
 import time
 
-import skimage.morphology
+from skimage.morphology import disk
+from skimage.morphology import ball
 
 #from sklearn import ensemble
 #import sklearn
@@ -1728,13 +1729,13 @@ def save_output_mask_fn(par_obj,int_obj):
                 if W:
                     image[tpt,z,0,x,y]=255
         dist=list(par_obj.min_distance)
-        selem=skimage.morphology.ball(np.round(dist[0],0)).astype('bool')
+        selem=ball(np.round(dist[0],0)).astype('bool')
         if dist[2] is not 0:
             drange=range(selem.shape[0]/2,selem.shape[0],np.round(dist[0]/dist[2],0).astype('uint8'))
             lrange=range(0,selem.shape[0]/2,np.round(dist[0]/dist[2],0).astype('uint8'))
             selem2=selem[np.newaxis,lrange+drange,np.newaxis,:,:]
         else:
-            selem=skimage.morphology.disk(np.round(dist[0])).astype('bool')
+            selem=disk(np.round(dist[0])).astype('bool')
             selem2=selem[np.newaxis,np.newaxis,np.newaxis,:,:]
         image=scipy.ndimage.binary_dilation(image,selem2).astype('uint8')
         imsave(par_obj.csvPath+par_obj.file_name[fileno]+'_'+par_obj.modelName+'_Hess.tif',image, imagej=True)
