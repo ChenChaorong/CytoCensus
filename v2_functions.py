@@ -9,11 +9,11 @@ import time
 
 import skimage
 
-from sklearn import ensemble
-import sklearn
+#from sklearn import ensemble
+#import sklearn
 
 from scipy.ndimage import filters
-from scipy.ndimage import distance_transform_edt
+#from scipy.ndimage import distance_transform_edt
 #from scipy.spatial import distance
 import cPickle as pickle
 
@@ -24,7 +24,7 @@ import itertools as itt
 
 import functools
 #import matplotlib
-from matplotlib.lines import Line2D
+#from matplotlib.lines import Line2D
 from matplotlib.path import Path
 
 #from multiprocessing import Pool
@@ -200,7 +200,7 @@ Copyright (c) 2009-2011 Broad Institute
 All rights reserved.
 Original author: Lee Kamentstky
 """
-import trackpy as tp
+#import trackpy as tp
 
 def quick_bandpass(image,sigma_l,threshold=None):
     

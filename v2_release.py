@@ -17,10 +17,8 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 
 from matplotlib.figure import Figure
-from scipy.ndimage import filters
 import v2_functions as v2
 #import numdifftools as ndt
-import pdb
 from common_navigation import navigation_setup,create_channel_objects,btn_fn, on_about
 from parameter_object import parameterClass
 from user_ROI import ROI
