@@ -3,7 +3,7 @@
 import numpy as np
 import os
 #import vigra
-import pylab
+import matplotlib.image as pylab
 import csv
 import time
 
