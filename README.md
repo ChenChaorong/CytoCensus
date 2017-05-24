@@ -26,4 +26,5 @@ Simply download the version for your operating system and run the software direc
 
 ## FAQ
 * Q: The software is slow to load A: It should only be slow the first time you run it on a particular computer. Subsequent usuage should be much faster.
-• Q: Which executable should I run first the train or the bulk software? A: The train software should be run first as this software allows you to train the software and produce models which can than be applied in bulk. The bulk software allows you to apply your previously trained model to one or more datasets.
+
+* Q: Which executable should I run first the train or the bulk software? A: The train software should be run first as this software allows you to train the software and produce models which can than be applied in bulk. The bulk software allows you to apply your previously trained model to one or more datasets.
