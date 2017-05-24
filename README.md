@@ -3,7 +3,7 @@
 Software repository for QBrain, machine learning software for identifying cells in 3-D tissue.
 
 
-Corresponding software publication:
+## Corresponding software publication:
 
 MS ID#: BIORXIV/2017/137406
 
@@ -14,11 +14,14 @@ Martin Hailstone, Lu Yang, Dominic Waithe, Tamsin J Samuels, Yoav Arava, Tomasz 
 
 http://biorxiv.org/content/early/2017/05/14/137406
 
-Installation instructions:
+## Installation instructions:
+
+### Run from Source
+
 If you are a capable Python user then  you can clone the above repository and run from source. Clone the repository and run "python v2_release.py" for the training interface to be loaded. Run "python v2_evaluate.py" to load the interface for the bulk running of files.
 Be aware the repository has a number of dependencies.
 
-Compiled software:
+### Compiled software:
 
 The latest compiled releases can be found here:
 https://github.com/dwaithe/QBrain/releases/
