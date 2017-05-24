@@ -25,7 +25,7 @@ Be aware the repository has a number of dependencies.
 
 The latest compiled releases can be found here:
 https://github.com/dwaithe/QBrain/releases/
-Simply download the version for your operating system and run the software directly
+Simply download the version for your operating system and run the software directly.
 
 ## FAQ
 * Q: The software is slow to load A: It should only be slow the first time you run it on a particular computer. Subsequent usuage should be much faster.
