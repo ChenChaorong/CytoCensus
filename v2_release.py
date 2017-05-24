@@ -9,13 +9,10 @@ import re
 import cPickle as pickle
 import sys
 
-#from scipy.special import _ufuncs_cxx
 import sklearn.utils.lgamma
-
 import matplotlib.lines as lines
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
-
 from matplotlib.figure import Figure
 import v2_functions as v2
 #import numdifftools as ndt
