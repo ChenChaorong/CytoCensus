@@ -7,7 +7,7 @@ Created on Sat Apr  2 18:03:50 2016
 Common colour checkboxes and 4D navigation functions
  Currently must import directly, need to tidy this up later
 """
-from PyQt4 import QtGui
+from PyQt4 import QtGui,QtCore
 from gnu import return_license
 import numpy as np
 
@@ -205,15 +205,80 @@ class checkBoxCH(QtGui.QCheckBox):
                 if self.ID in par_obj.ch_display:
                     del par_obj.ch_display[par_obj.ch_display.index(self.ID)]
             Win.goto_img_fn(par_obj.curr_z,par_obj.curr_t)
+            
+class contrast_controller(QtGui.QSlider):
+    def __init__(self,par_obj,Win,ID,brightness=False):
+        QtGui.QSlider.__init__(self)
+        self.ID=ID
+        self.Win=Win
+        self.par_obj=par_obj
+        
+        self.setTickInterval(1)
+        self.setMaximum(10)
+        self.setMinimum(1)
+        self.setOrientation(QtCore.Qt.Horizontal)
+        if brightness==True:
+            self.setToolTip('Adjust Brightness')
+            self.setValue(5)
+            self.setInvertedAppearance (True)
+            self.valueChanged.connect(self.change_brightness)
+        else:
+            self.setToolTip('Adjust Contrast')
+            self.valueChanged.connect(self.change_contrast)
+        
+    def change_contrast(self,value):
+        value = float(value)
+        for idx,ch in enumerate(self.par_obj.ch_display):
+            if self.ID==ch:
+                
+                self.par_obj.clim[ch][1]=value            
+                
+        self.Win.goto_img_fn()
+
+    def change_brightness(self,value):
+
+        value = float(value)/10-0.5
+        for idx,ch in enumerate(self.par_obj.ch_display):
+            if self.ID==ch:
+                self.par_obj.clim[ch][0]=value            
+                
+        self.Win.goto_img_fn()
+
+        
+
 def create_channel_objects(self,par_obj,num,feature_select=False,parent=None):
     #Object factory for channel selection.
     parent=[]
     self.CH_cbx = []
-    for i in range(0,num):
-        cbx=checkBoxCH(par_obj,self,i,feature_select,'CH '+str(i+1)+':')
-        parent.append(cbx)
+ 
+    for chID in range(0,num):
+        cbx=checkBoxCH(par_obj,self,chID,feature_select,'CH '+str(chID+1)+':')
+        
         self.CH_cbx.append(cbx)
-        self.CH_cbx[i].setChecked(True)
-        #self.CH_cbx[i].hide()
-        #self.CH_cbx[i].update()
+        self.CH_cbx[chID].setChecked(True)
+
+        if feature_select==False:
+            contrast=contrast_controller(par_obj,self,chID)
+            brightness=contrast_controller(par_obj,self,chID,brightness=True) 
+            parent.append([cbx,contrast,brightness])
+        else:
+            parent.append([cbx])
+
     return parent
+    
+
+    '''            brightness = QtGui.QSlider(self)
+            brightness.setTickInterval(1)
+            brightness.setMaximum(10)
+            brightness.setMinimum(-10)
+            brightness.valueChanged.connect(self.change_brightness)
+            brightness.setOrientation(QtCore.Qt.Horizontal)
+            self.toolbar.addWidget(brightness)
+            
+            contrast = QtGui.QSlider(self)
+            contrast.setTickInterval(1)
+            contrast.setMaximum(10)
+            contrast.setMinimum(1)
+            contrast.valueChanged.connect(self.change_contrast)
+            contrast.setOrientation(QtCore.Qt.Horizontal)
+            self.toolbar.addWidget(contrast)  '''
