@@ -20,7 +20,7 @@ from common_navigation import navigation_setup,create_channel_objects,btn_fn, on
 from parameter_object import parameterClass
 from user_ROI import ROI
 
-import pdb
+#import pdb
 """QBrain Software v0.1
 
     Copyright (C) 2017  Dominic Waithe Martin Hailstone
