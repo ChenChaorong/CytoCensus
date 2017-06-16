@@ -135,6 +135,8 @@ class parameterClass:
         self.draw_ROI = True #TODO one of these two should be true-consider making this one parameter
         self.select_ROI= False
         
+        self.clim = [[0,1],[0,1],[0,1]]
+        
         self.remove_dots = False
         self.draw_dots =False
 #        #initiate datastructures

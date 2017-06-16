@@ -19,6 +19,8 @@ import v2_functions as v2
 from common_navigation import navigation_setup,create_channel_objects,btn_fn, on_about
 from parameter_object import parameterClass
 from user_ROI import ROI
+
+import pdb
 """QBrain Software v0.1
 
     Copyright (C) 2017  Dominic Waithe Martin Hailstone
@@ -170,9 +172,9 @@ class Load_win_fn(QtGui.QWidget):
         self.Text_CHopt.hide()
         #Object factory for channel selection.
         ButtonGroup=create_channel_objects(self,par_obj,10,True)
-        for x in ButtonGroup:
-            x.hide()
-            Channel_button_lo.addWidget(x)
+        for cbx in ButtonGroup:
+            cbx[0].hide()
+            Channel_button_lo.addWidget(cbx[0])
         Channel_Select_lo.addLayout(Channel_button_lo)
         Channel_button_lo.addStretch()
         Channel_Select_lo.addStretch()
@@ -425,6 +427,8 @@ class Load_win_fn(QtGui.QWidget):
     def report_progress(self,message):
         self.image_status_text.showMessage('Status: '+message)
         app.processEvents()
+                
+        
 class Win_fn(QtGui.QWidget):
     """Class which houses main training functionality"""
     def __init__(self,par_obj):
@@ -442,7 +446,8 @@ class Win_fn(QtGui.QWidget):
 
         self.toolbar = NavigationToolbar(self.canvas1,self)
         self.toolbar.actionTriggered.connect(self.on_resize)
-
+        self.toolbar.actionTriggered.connect(self.on_resize)
+        
         self.plt1.imshow(im_RGB)
 
         #Removes the tick labels
@@ -710,6 +715,9 @@ class Win_fn(QtGui.QWidget):
         par_obj.subdivide_ROI = []
         self.m_Cursor = self.makeCursor()
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
+        
+
+        
     def evaluate_forest_fn(self):
         #Don't want to train for all the images so we select them.
         v2.im_pred_inline_fn_new(par_obj, self,range(par_obj.max_z+1),[par_obj.curr_t],[par_obj.curr_file],threaded=True)
@@ -853,12 +861,15 @@ class Win_fn(QtGui.QWidget):
         channel_wid.setLayout(channel_lay)
 
         win.top_left_grid.addWidget(channel_wid,1,0,1,3)
-
-        ButtonGroup=create_channel_objects(self,par_obj,par_obj.numCH)
-        for x in ButtonGroup:
-            channel_lay.addWidget(x)
-            x.show()
-            x.setChecked(True)
+        
+        ChannelGroup=create_channel_objects(self,par_obj,par_obj.numCH)
+        for chbx,contrast,brightness in ChannelGroup:
+            channel_lay.addWidget(chbx)
+            channel_lay.addWidget(contrast)
+            channel_lay.addWidget(brightness)
+            contrast.show()
+            chbx.show()
+            chbx.setChecked(True)
 
         channel_lay.addStretch()
 

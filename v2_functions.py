@@ -278,89 +278,6 @@ def count_maxima_trackpy(par_obj,time_pt,fileno):
         
     par_obj.data_store['pts'][fileno][time_pt] = pts
     
-def count_maxima_skimage(par_obj,time_pt,fileno):
-    #count maxima won't work properly if have selected a random set of Z
-    #TODO check that mazi arr is cleared when forest trained
-    imfile=par_obj.filehandlers[fileno]
-    if par_obj.min_distance[2]==0 or par_obj.max_z==0:
-        count_maxima_2d(par_obj,time_pt,fileno)
-        return
-    predMtx = np.zeros((par_obj.height,par_obj.width,imfile.max_z+1))
-    for i in range(imfile.max_z+1):
-        predMtx[:,:,i]= par_obj.data_store['pred_arr'][fileno][time_pt][i]
-    
-     
-    r0 = [(par_obj.min_distance[0]),(par_obj.min_distance[1]),0.5*(par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration)]
-    r1 = [(par_obj.min_distance[0]),(par_obj.min_distance[1]),1*(par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration)]
-    r2 = [(par_obj.min_distance[0]),(par_obj.min_distance[1]),2*(par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration)]
-    r3 = [(par_obj.min_distance[0]),(par_obj.min_distance[1]),4*(par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration)]
-    
-    min_radius = [par_obj.min_distance[0],par_obj.min_distance[1],par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration]
-    det3=np.zeros((par_obj.height,par_obj.width,imfile.max_z+1,4))
-    
-    for n,radius in enumerate([r0,r1,r2,r3]):
-        gau_stk = filters.gaussian_filter(predMtx,radius,mode='mirror')
-        y,x,z = np.gradient(gau_stk,1)
-        xy,xx,xz = np.gradient(x)
-        yy,yx,yz = np.gradient(y)
-        zy,zx,zz = np.gradient(z)
-        if n>0:
-            det3[:,:,:,n] = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
-            det2 = np.maximum(det2,xx*yy-xy*yx)
-            det1 = np.maximum(det1,-1*xx)
-        else:      
-            det3[:,:,:,n] = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
-            det2 = xx*yy-xy*yx
-            det1 = -1*xx
-    # if not already set, create. This is then used for the entire image and all subsequent training. A little hacky, but otherwise the normalisation screws everything up
-    if not par_obj.max_det:
-        par_obj.max_det=np.max(det3)
-        
-    det3 = det3/par_obj.max_det
-    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
-    for i in range(imfile.max_z+1):
-        #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = np.mean(det3,3)[:,:,i]
-
-    pts = peak_local_max(np.mean(det3,3), min_distance=min_radius,threshold_abs=par_obj.abs_thr)
- 
-    pts2keep = []
-    for pt2d in pts:
-        ptuple=tuple(pt2d[0:3])
-        #determinants of submatrices 
-        dp = det1[ptuple]
-        dp2 = det2[ptuple]
-        #dp3 = det3[ptuple]
-            #negative definite, therefore maximum (note signs in det calculation)
-        if dp>=0 and dp2>=0: # and dp3>=par_obj.abs_thr:
-            #print 'point retained', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
-            pts2keep.append([pt2d[0],pt2d[1],pt2d[2],1])
-    pts=pts2keep
-    par_obj.show_pts = 1
-
-    #Filter those which are not inside the region.
-    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() >0:
-        pts2keep = []
-        
-        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
-             for pt2d in pts:
-
-
-                if pt2d[2] == i:
-                    #Find the region of interest.
-                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
-                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
-                    #Reformat to make the path object.
-                    pot = []
-                    for b in range(0,ppt_x.__len__()):
-                        pot.append([ppt_x[b],ppt_y[b]])
-                    p = Path(pot)
-                    if p.contains_point([pt2d[1],pt2d[0]]) == True:
-                            pts2keep.append(pt2d)
-        pts = pts2keep
-        
-    par_obj.data_store['pts'][fileno][time_pt] = pts
-        
 def count_maxima(par_obj,time_pt,fileno):
 
     #count maxima won't work properly if have selected a random set of Z
@@ -409,150 +326,6 @@ def count_maxima(par_obj,time_pt,fileno):
         if dp>=0 and dp2>=0: # and dp3>=par_obj.abs_thr:
             #print 'point retained', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
             pts2keep.append([pt2d[0],pt2d[1],pt2d[2],1])
-    pts=pts2keep
-    par_obj.show_pts = 1
-
-    #Filter those which are not inside the region.
-    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() >0:
-        pts2keep = []
-        
-        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
-             for pt2d in pts:
-
-
-                if pt2d[2] == i:
-                    #Find the region of interest.
-                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
-                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
-                    #Reformat to make the path object.
-                    pot = []
-                    for b in range(0,ppt_x.__len__()):
-                        pot.append([ppt_x[b],ppt_y[b]])
-                    p = Path(pot)
-                    if p.contains_point([pt2d[1],pt2d[0]]) == True:
-                            pts2keep.append(pt2d)
-        pts = pts2keep
-        
-    par_obj.data_store['pts'][fileno][time_pt] = pts
-    
-def count_maxima_v3(par_obj,time_pt,fileno):
-    #count maxima won't work properly if have selected a random set of Z
-    #TODO check that mazi arr is cleared when forest trained
-    imfile=par_obj.filehandlers[fileno]
-    if par_obj.min_distance[2]==0 or par_obj.max_z==0:
-        count_maxima_2d(par_obj,time_pt,fileno)
-        return
-    predMtx = np.zeros((par_obj.height,par_obj.width,imfile.max_z+1))
-    for i in range(imfile.max_z+1):
-        predMtx[:,:,i]= par_obj.data_store['pred_arr'][fileno][time_pt][i]
-    radius = [par_obj.min_distance[0],par_obj.min_distance[1],par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration]
-    gau_stk = filters.gaussian_filter(predMtx,radius,mode='mirror')-filters.gaussian_filter(predMtx,[2*x if num>1 else x for num, x in enumerate(radius) ],mode='mirror')
-    y,x,z = np.gradient(gau_stk,1)
-    xy,xx,xz = np.gradient(x)
-    yy,yx,yz = np.gradient(y)
-    zy,zx,zz = np.gradient(z)
-    det3 = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
-    det2 = xx*yy-xy*yx
-    det1 = -1*xx
-
-    # if not already set, create. This is then used for the entire image and all subsequent training. A little hacky, but otherwise the normalisation screws everything up
-    if not par_obj.max_det:
-        par_obj.max_det=np.max(det3)
-        
-    detn = det3/par_obj.max_det
-    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
-    for i in range(imfile.max_z+1):
-        #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = detn[:,:,i]
-
-    pts = peak_local_max(detn, min_distance=radius,threshold_abs=par_obj.abs_thr)
- 
-    #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-    pts2keep = []
-    for pt2d in pts:
-        ptuple=tuple(pt2d)
-        #determinants of submatrices 
-        dp = det1[ptuple]
-        dp2 = det2[ptuple]
-        #dp3 = det3[ptuple]
-            #negative definite, therefore maximum (note signs in det calculation)
-        if dp>=0 and dp2>=0: # and dp3>=par_obj.abs_thr:
-            #print 'point retained', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
-            pts2keep.append([pt2d[0],pt2d[1],pt2d[2],1])
-    pts=pts2keep
-    par_obj.show_pts = 1
-
-    #Filter those which are not inside the region.
-    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() >0:
-        pts2keep = []
-        
-        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
-             for pt2d in pts:
-
-
-                if pt2d[2] == i:
-                    #Find the region of interest.
-                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
-                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
-                    #Reformat to make the path object.
-                    pot = []
-                    for b in range(0,ppt_x.__len__()):
-                        pot.append([ppt_x[b],ppt_y[b]])
-                    p = Path(pot)
-                    if p.contains_point([pt2d[1],pt2d[0]]) == True:
-                            pts2keep.append(pt2d)
-        pts = pts2keep
-        
-    par_obj.data_store['pts'][fileno][time_pt] = pts
-    
-def count_maxima_v2(par_obj,time_pt,fileno):
-    #count maxima won't work properly if have selected a random set of Z
-    #TODO check that mazi arr is cleared when forest trained
-    imfile=par_obj.filehandlers[fileno]
-    if par_obj.min_distance[2]==0 or par_obj.max_z==0:
-        count_maxima_2d(par_obj,time_pt,fileno)
-        return
-    predMtx = np.zeros((par_obj.height,par_obj.width,imfile.max_z+1))
-    for i in range(imfile.max_z+1):
-        predMtx[:,:,i]= par_obj.data_store['pred_arr'][fileno][time_pt][i]
-    radius = [par_obj.min_distance[0],par_obj.min_distance[1],par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration]
-    r2 = [par_obj.min_distance[0],par_obj.min_distance[1],par_obj.resize_factor*par_obj.min_distance[2]]
-    gau_stk = filters.gaussian_filter(predMtx,tuple(radius),mode='mirror')
-    xxi= np.zeros((par_obj.height,par_obj.width,imfile.max_z+1))
-    det= np.zeros((par_obj.height,par_obj.width,imfile.max_z+1))
-    for i in range(imfile.max_z+1):
-        y,x = np.gradient(gau_stk[:,:,i],1)
-        xy,xx = np.gradient(x)
-        xxi[:,:,i]=xx
-        yy,yx = np.gradient(y)
-        det[:,:,i] = xx*yy-xy*yx
-
-    # if not already set, create. This is then used for the entire image and all subsequent training. A little hacky, but otherwise the normalisation screws everything up
-    if not par_obj.max_det:
-        par_obj.max_det=np.max(det)
-        
-    detn = det/par_obj.max_det
-    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
-    for i in range(imfile.max_z+1):
-        #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = detn[:,:,i]
-
-    pts = peak_local_max(detn, min_distance=r2,threshold_abs=par_obj.abs_thr)
- 
-    #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-    pts2keep = []
-    for pt2d in pts:
-        
-        T=xxi[pt2d[0],pt2d[1],pt2d[2]]
-        #D=det[pt2d[0],pt2d[1],pt2d[2]]
-            
-        # Removes points that are positive definite and therefore minima
-        if T>0: # and D>0:
-            pass
-            #print 'point removed'
-        else:
-            pts2keep.append([pt2d[0],pt2d[1],pt2d[2],1])
-
     pts=pts2keep
     par_obj.show_pts = 1
 
@@ -1263,6 +1036,7 @@ def im_pred_inline_fn_new(par_obj, int_obj,zsliceList,tptList,imnoList,threaded=
 
 def return_imRGB_slice_new(par_obj,zslice,tpt,imno):
     '''Fetches slice zslice of timepoint tpt and puts in RGB format for display'''
+    clim=par_obj.clim
     imRGB = np.zeros((int(par_obj.height),int(par_obj.width),3),'float32')
     if par_obj.ch_display.__len__() > 1 or (par_obj.ch_display.__len__() == 1 and par_obj.numCH>1):
         #input_im = par_obj.tiffarray[tpt,zslice,::int(par_obj.resize_factor),::int(par_obj.resize_factor),:]
@@ -1270,14 +1044,17 @@ def return_imRGB_slice_new(par_obj,zslice,tpt,imno):
         if par_obj.numCH>3:
             for i,ch in enumerate(par_obj.ch_display):
                 if i==3: break
-                t0=time.time()
+
                 input_im = par_obj.filehandlers[imno].get_tiff_slice([tpt],[zslice],range(0,par_obj.ori_width,int(par_obj.resize_factor)),range(0,par_obj.ori_height,int(par_obj.resize_factor)),[ch])
-                imRGB[:,:,i] = input_im
+                imRGB[:,:,i] = (input_im.astype('float32')/par_obj.tiffarray_typemax)*clim[i][1]-clim[i][0]
         else:
             for i,ch in enumerate(par_obj.ch_display):
-                t0=time.time()
+
                 input_im = par_obj.filehandlers[imno].get_tiff_slice([tpt],[zslice],range(0,par_obj.ori_width,int(par_obj.resize_factor)),range(0,par_obj.ori_height,int(par_obj.resize_factor)),[ch])
-                imRGB[:,:,ch] = input_im
+                imRGB[:,:,ch] = (input_im.astype('float32')/par_obj.tiffarray_typemax)*clim[ch][1]-clim[ch][0]
+                
+    #imRGB/=par_obj.tiffarray_typemax
+    imRGB=np.clip(imRGB,0,1)
     return imRGB
 
 
@@ -1433,7 +1210,8 @@ def goto_img_fn_new(par_obj, int_obj):
     newImg=return_imRGB_slice_new(par_obj,zslice,tpt,imno)
     par_obj.save_im = newImg
     #deals with displaying different channels
-    newImg/=par_obj.tiffarray_typemax
+
+
     #newImg=channels_for_display2(par_obj, int_obj,newImg)
     
     if par_obj.overlay and zslice in par_obj.data_store['pred_arr'][imno][tpt]:
