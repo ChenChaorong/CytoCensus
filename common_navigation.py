@@ -162,6 +162,7 @@ def on_about(self):
     self.about_win.setLayout(layout)
     self.about_win.show()
     self.about_win.raise_()
+    
 class checkBoxCH(QtGui.QCheckBox):
     def __init__(self,par_obj,Win,ID,feature_select,text=None):
         QtGui.QCheckBox.__init__(self,text)
@@ -212,19 +213,22 @@ class contrast_controller(QtGui.QSlider):
         self.ID=ID
         self.Win=Win
         self.par_obj=par_obj
-        
-        self.setTickInterval(1)
-        self.setMaximum(10)
+        self.setTickPosition(1)
+        self.setTickInterval(5)
+        self.setMaximum(11)
         self.setMinimum(1)
         self.setOrientation(QtCore.Qt.Horizontal)
         if brightness==True:
             self.setToolTip('Adjust Brightness')
+            self.setMinimum(0)
+            self.setMaximum(10)
             self.setValue(5)
             self.setInvertedAppearance (True)
             self.valueChanged.connect(self.change_brightness)
         else:
             self.setToolTip('Adjust Contrast')
             self.valueChanged.connect(self.change_contrast)
+
         
     def change_contrast(self,value):
         value = float(value)
@@ -265,20 +269,3 @@ def create_channel_objects(self,par_obj,num,feature_select=False,parent=None):
             parent.append([cbx])
 
     return parent
-    
-
-    '''            brightness = QtGui.QSlider(self)
-            brightness.setTickInterval(1)
-            brightness.setMaximum(10)
-            brightness.setMinimum(-10)
-            brightness.valueChanged.connect(self.change_brightness)
-            brightness.setOrientation(QtCore.Qt.Horizontal)
-            self.toolbar.addWidget(brightness)
-            
-            contrast = QtGui.QSlider(self)
-            contrast.setTickInterval(1)
-            contrast.setMaximum(10)
-            contrast.setMinimum(1)
-            contrast.valueChanged.connect(self.change_contrast)
-            contrast.setOrientation(QtCore.Qt.Horizontal)
-            self.toolbar.addWidget(contrast)  '''

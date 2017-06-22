@@ -176,7 +176,7 @@ class File_handler(object):
             
             self.tiffarraymax = self.array.max()
             
-            if self.bitDepth in ['uint8','uint16','uint32']:
+            if self.bitDepth in ['uint8','uint16']:
                 self.tiffarray_typemax=np.iinfo(self.bitDepth).max
                 #12 bit depth
                 if self.bitDepth in ['uint16'] and self.tiffarraymax<4096:
