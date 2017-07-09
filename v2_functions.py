@@ -150,10 +150,10 @@ def peak_local_max(image, min_distance=10, threshold_abs=0, threshold_rel=0.1,
     if exclude_border:
         # zero out the image borders
         for i in range(image.ndim):
-            
+
             image = image.swapaxes(0, i)
             min_d = np.floor(min_distance[i])
-            
+
             image[:min_d] = 0
             image[-min_d:] = 0
             image = image.swapaxes(0, i)
@@ -175,7 +175,7 @@ def peak_local_max(image, min_distance=10, threshold_abs=0, threshold_rel=0.1,
         nd_indices = tuple(coordinates.T)
         out[nd_indices] = True
 
-       
+
         return out
         #return out
 """rankorder.py - convert an image of any type to an image of ints whose
@@ -191,7 +191,7 @@ Original author: Lee Kamentstky
 #import trackpy as tp
 
 def quick_bandpass(image, sigma_l, threshold=None):
-    
+
     #if threshold is None:
     #    if np.issubdtype(image.dtype, np.integer):
     #        threshold = 1
@@ -202,9 +202,10 @@ def quick_bandpass(image, sigma_l, threshold=None):
     #result -= boxcar
     output = filters.gaussian_laplace(image, sigma_l, mode='constant')
     return -output
-    
+
 def count_maxima_trackpy(par_obj, time_pt, fileno):
     #count maxima won't work properly if have selected a random set of Z
+    min_d = par_obj.min_distance
     imfile = par_obj.filehandlers[fileno]
     if par_obj.min_distance[2] == 0 or par_obj.max_z == 0:
         count_maxima_2d(par_obj, time_pt, fileno)
@@ -212,30 +213,29 @@ def count_maxima_trackpy(par_obj, time_pt, fileno):
     predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
     for i in range(imfile.max_z+1):
         predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
-        
-    radius = [(par_obj.min_distance[0]), (par_obj.min_distance[1]), 2*(par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration)]
 
-    min_radius = [par_obj.min_distance[0], par_obj.min_distance[1], par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration]
+    radius = [min_d[0], min_d[1], 2*(par_obj.resize_factor* min_d[2]/imfile.z_calibration)]
+
+    min_radius = [min_d[0], min_d[1], par_obj.resize_factor* min_d[2]/imfile.z_calibration]
     #gau_stk = filters.gaussian_filter(predMtx,radius,mode='mirror')
     #bp=tp.bandpass(predMtx,(rad_2),(radius))
     bp = quick_bandpass(predMtx, radius, threshold=None)
-    # if not already set, create. This is then used for the entire image and all subsequent training. 
+    #if not already set, create. This is then used for the entire image and all subsequent training.
     #A little hacky, but otherwise the normalisation screws everything up
     if not par_obj.max_det:
         par_obj.max_det = np.max(bp)
-        
+
     bp = bp/par_obj.max_det
     par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
     for i in range(imfile.max_z+1):
-        #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
         par_obj.data_store['maxi_arr'][fileno][time_pt][i] = bp[:, :, i]
 
     pts = peak_local_max(bp, min_distance=min_radius, threshold_abs=par_obj.abs_thr)
- 
+
     #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
     pts2keep = []
     for pt2d in pts:
-        #determinants of submatrices 
+        #determinants of submatrices
         pts2keep.append([pt2d[0], pt2d[1], pt2d[2], 1])
     pts = pts2keep
     par_obj.show_pts = 1
@@ -243,10 +243,10 @@ def count_maxima_trackpy(par_obj, time_pt, fileno):
     #Filter those which are not inside the region.
     if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
         pts2keep = []
-        
+
         for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
             for pt2d in pts:
-                
+
                 if pt2d[2] == i:
                     #Find the region of interest.
                     ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
@@ -256,15 +256,15 @@ def count_maxima_trackpy(par_obj, time_pt, fileno):
                     for b in range(0, ppt_x.__len__()):
                         pot.append([ppt_x[b], ppt_y[b]])
                     p = Path(pot)
-                    if p.contains_point([pt2d[1], pt2d[0]]) == True:
+                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
                         pts2keep.append(pt2d)
         pts = pts2keep
-        
+
     par_obj.data_store['pts'][fileno][time_pt] = pts
-    
-def detHess3d(predMtx, min_distance):
+
+def det_hess_3d(predMtx, min_distance):
     gau_stk = filters.gaussian_filter(predMtx, min_distance, mode='mirror')
-    
+
     y, x, z = np.gradient(gau_stk, 1)
     xy, xx, xz = np.gradient(x)
     yy, yx, yz = np.gradient(y)
@@ -272,9 +272,9 @@ def detHess3d(predMtx, min_distance):
     det3 = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
     det2 = xx*yy-xy*yx
     det1 = -1*xx
-    
+
     return det3, det2, det1
-    
+
 def count_maxima(par_obj, time_pt, fileno):
 
     #count maxima won't work properly if have selected a random set of Z
@@ -288,30 +288,30 @@ def count_maxima(par_obj, time_pt, fileno):
     predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
     for i in range(imfile.max_z+1):
         predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
-        
+
     radius = [par_obj.min_distance[0], par_obj.min_distance[1], par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration]
-    
-    [det3, det2, det1] = detHess3d(predMtx, radius)
+
+    [det3, det2, det1] = det_hess_3d(predMtx, radius)
 
 
-    # if not already set, create. This is then used for the entire image and all subsequent training. 
+    #if not already set, create. This is then used for the entire image and all subsequent training.
     #A little hacky, but otherwise the normalisation screws everything up
     if not par_obj.max_det:
         par_obj.max_det = np.max(det3)
     # normalise
     det3 = det3/par_obj.max_det
-    
+
     par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
     for i in range(imfile.max_z+1):
         par_obj.data_store['maxi_arr'][fileno][time_pt][i] = det3[:, :, i]
 
     pts = peak_local_max(det3, min_distance=radius, threshold_abs=par_obj.abs_thr)
- 
+
     #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
     pts2keep = []
     for pt2d in pts:
         ptuple = tuple(pt2d)
-        #determinants of submatrices 
+        #determinants of submatrices
         dp = det1[ptuple]
         dp2 = det2[ptuple]
         #dp3 = det3[ptuple]
@@ -325,10 +325,10 @@ def count_maxima(par_obj, time_pt, fileno):
     #Filter those which are not inside the region.
     if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
         pts2keep = []
-        
+
         for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
             for pt2d in pts:
-                
+
                 if pt2d[2] == i:
                     #Find the region of interest.
                     ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
@@ -341,19 +341,19 @@ def count_maxima(par_obj, time_pt, fileno):
                     if p.contains_point([pt2d[1], pt2d[0]]) is True:
                         pts2keep.append(pt2d)
         pts = pts2keep
-        
+
     par_obj.data_store['pts'][fileno][time_pt] = pts
 
-def detHess2d(predIm, min_distance):
+def det_hess_2d(predIm, min_distance):
     gau_Im = filters.gaussian_filter(predIm, (min_distance[0], min_distance[1]))
     y, x = np.gradient(gau_Im, 1)
     xy, xx = np.gradient(x)
     yy, yx = np.gradient(y)
-    
+
     det = xx*yy-xy*yx
-    
+
     return det, xx
-    
+
 def count_maxima_2d(par_obj, time_pt, fileno):
     #count maxima won't work properly if have selected a random set of Z
     imfile = par_obj.filehandlers[fileno]
@@ -362,15 +362,15 @@ def count_maxima_2d(par_obj, time_pt, fileno):
     xx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
     for i in range(imfile.max_z+1):
         predIm = par_obj.data_store['pred_arr'][fileno][time_pt][i]
-        [deti, xxi] = detHess2d(predIm, par_obj.min_distance)
+        [deti, xxi] = det_hess_2d(predIm, par_obj.min_distance)
         det[:, :, i] = deti
         xx[:, :, i] = xxi
-    
+
     # if not already set, create. This is then used for the entire image and all
     #subsequent training. A little hacky, but otherwise the normalisation screws everything up
     if not par_obj.max_det:
         par_obj.max_det = np.max(det)
-        
+
     detn = det/par_obj.max_det
     par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
     for i in range(imfile.max_z+1):
@@ -378,10 +378,10 @@ def count_maxima_2d(par_obj, time_pt, fileno):
         par_obj.data_store['maxi_arr'][fileno][time_pt][i] = detn[:, :, i]
 
     pts = peak_local_max(detn, min_distance=par_obj.min_distance, threshold_abs=par_obj.abs_thr)
-    
+
     pts2keep = []
     for pt2d in pts:
-        
+
         T = xxi[pt2d[0], pt2d[1], pt2d[2]]
         #D=det[pt2d[0],pt2d[1],pt2d[2]]
         # Removes points that are positive definite and therefore minima
@@ -397,7 +397,7 @@ def count_maxima_2d(par_obj, time_pt, fileno):
     #Filter those which are not inside the region.
     if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
         pts2keep = []
-        
+
         for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
             for pt2d in pts:
                 if pt2d[2] == i:
@@ -409,14 +409,14 @@ def count_maxima_2d(par_obj, time_pt, fileno):
                     for b in range(0, ppt_x.__len__()):
                         pot.append([ppt_x[b], ppt_y[b]])
                     p = Path(pot)
-                    if p.contains_point([pt2d[1], pt2d[0]]) == True:
+                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
                         pts2keep.append(pt2d)
 
         pts = pts2keep
 
-    
+
     par_obj.data_store['pts'][fileno][time_pt] = pts
-    
+
 def rank_order(image):
     """Return an image of the same shape where each pixel is the
     index of the pixel value in the ascending order of the unique
@@ -464,21 +464,21 @@ def rank_order(image):
     int_image = np.zeros_like(sort_order)
     int_image[sort_order] = sort_rank
     return (int_image.reshape(image.shape), original_values)
-    
+
 def _blob_overlap(blob1, blob2, min_distance):
     """Finds the overlapping area fraction between two blobs.
     Returns a float representing fraction of overlapped area.
     """
-    
+
     d1 = abs(blob1[0] - blob2[0]) > min_distance[0]
     d2 = abs(blob1[1] - blob2[1]) > min_distance[1]
     d3 = abs(blob1[2] - blob2[2]) > min_distance[2]
 
     if d1 is False or d2 is False or d3 is False:
         #overlap detected
-        
+
         return True
-    
+
     return False
 
 def _prune_blobs(blobs_array, min_distance):
@@ -504,7 +504,7 @@ def _prune_blobs(blobs_array, min_distance):
     # for most cases
     for blob1, blob2 in itt.combinations(blobs_array, 2):
 
-        if _blob_overlap(blob1, blob2, min_distance) == True:
+        if _blob_overlap(blob1, blob2, min_distance) is True:
             blob2[2] = -1
 
             #if blob1[2] > blob2[2]:
@@ -515,8 +515,8 @@ def _prune_blobs(blobs_array, min_distance):
     # return blobs_array[blobs_array[:, 2] > 0]
     return np.array([b for b in blobs_array if b[2] > 0])
 
-    
-    
+
+
 
 
 def save_roi_fn(par_obj):
@@ -536,19 +536,22 @@ def save_roi_fn(par_obj):
 
         #Finds the current frame and file.
         par_obj.rects = (par_obj.curr_z, int(s_ori_x), int(s_ori_y), int(abs(par_obj.rect_w)), \
-        int(abs(par_obj.rect_h)), par_obj.curr_t, par_obj.curr_file, par_obj.file_array[par_obj.curr_file])
+        int(abs(par_obj.rect_h)), par_obj.curr_t, \
+        par_obj.curr_file, par_obj.file_array[par_obj.curr_file])
         return True
-    
+
     return False
-    
+
 def stratified_sample(par_obj, binlength, samples_indices, imhist, samples_at_tiers, mImRegion, denseRegion):
-    indices = np.zeros(samples_indices[-1], 'uint32') #preallocate array rather than extend, size corrects for rounding errors
-    #Randomly sample from input ROI or im a certain number (par_obj.limit_size) patches. With replacement.
+    #preallocate array rather than extend, size corrects for rounding errors
+    indices = np.zeros(samples_indices[-1], 'uint32')
+    #Randomly sample from input ROI or im a certain number (par_obj.limit_size) patches.
+    #With replacement.
     for it in range(binlength):
         if samples_at_tiers[it] > 0:
             bin1 = imhist[1][it]
             bin2 = imhist[1][it+1]
-            
+
             stratified_indices = np.nonzero(((denseRegion >= bin1) & (denseRegion < bin2)).flat)
             if stratified_indices[0].__len__() != 0:
                 stratified_sampled_indices = np.random.choice(stratified_indices[0], size=samples_at_tiers[it], replace=True, p=None)
@@ -558,19 +561,20 @@ def stratified_sample(par_obj, binlength, samples_indices, imhist, samples_at_ti
     return indices
 
 def update_training_samples_fn_new_only(par_obj, int_obj, rects, arr='feat_arr'):
-    """Collects the pixels or patches which will be used for training and 
+    """Collects the pixels or patches which will be used for training and
     trains the forest."""
     #Makes sure everything is refreshed for the training, encase any regions
     #were changed. May have to be rethinked for speed later on.
     '''
     for b in range(0,par_obj.saved_ROI.__len__()):
         rects = par_obj.saved_ROI[b]
-        region_size += rects[4]*rects[3]       
+        region_size += rects[4]*rects[3]
     '''
     calc_ratio = par_obj.limit_ratio_size
-    #print 'calcratio',calc_ratio
+
     STRATIFY = False
-    dot_im = np.pad(np.ones((1, 1)), (int(par_obj.sigma_data)*6, int(par_obj.sigma_data)*4), mode='constant')
+    sigma = par_obj.sigma_data
+    dot_im = np.pad(np.ones((1, 1)), (int(sigma)*6, int(sigma)*4), mode='constant')
     dot_im = filters.gaussian_filter(dot_im, float(par_obj.sigma_data), mode='constant', cval=0)
     dot_im /= dot_im.max()
     binlength = 10
@@ -579,41 +583,39 @@ def update_training_samples_fn_new_only(par_obj, int_obj, rects, arr='feat_arr')
     samples_at_tiers = (imhist[0]/binlength*par_obj.limit_size).astype('int')
     #print samples_at_tiers
     samples_indices = [0]+(np.cumsum(samples_at_tiers)).tolist() #to allow preallocation of array
-    
-    
+
+
     #for b in range(0,par_obj.saved_ROI.__len__()):
         #TODO check this works for edge cases- with very sparse sampling, and with v small bin sizes
-        #Iterates through saved ROI.
-        #rects = par_obj.saved_ROI[b]
-    
+
     zslice = rects[0]
     tpt = rects[5]
     imno = rects[6]
     if par_obj.p_size == 1:
-        
+
         #if rects[5] == tpt and rects[0] == zslice and rects[6] == imno:
-            
+
         #Finds and extracts the features and output density for the specific regions.
-        mImRegion = par_obj.data_store[arr][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4], rects[1]+1:rects[1]+rects[3], :]
-        denseRegion = par_obj.data_store['dense_arr'][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4], rects[1]+1:rects[1]+rects[3]]
+        im_region = par_obj.data_store[arr][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4], rects[1]+1:rects[1]+rects[3], :]
+        p_region = par_obj.data_store['dense_arr'][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4], rects[1]+1:rects[1]+rects[3]]
         #Find the linear form of the selected feature representation
-        mimg_lin = np.reshape(mImRegion, (mImRegion.shape[0]*mImRegion.shape[1], mImRegion.shape[2]))
+        mimg_lin = np.reshape(im_region, (im_region.shape[0]*im_region.shape[1], im_region.shape[2]))
         #Find the linear form of the complementatory output region.
-        dense_lin = np.reshape(denseRegion, (denseRegion.shape[0]*denseRegion.shape[1]))
+        dense_lin = np.reshape(p_region, (p_region.shape[0]*p_region.shape[1]))
         #Sample the input pixels sparsely or densely.
         if par_obj.limit_sample is True:
-            
+
             if par_obj.limit_ratio is True:
-                
-                par_obj.limit_size = round(mImRegion.shape[0]*mImRegion.shape[1]/calc_ratio, 0)
+
+                par_obj.limit_size = round(im_region.shape[0]*im_region.shape[1]/calc_ratio, 0)
 
                 if STRATIFY is True:
-                    indices = stratified_sample(par_obj, binlength, samples_indices, imhist, samples_at_tiers, mImRegion, denseRegion)
+                    indices = stratified_sample(par_obj, binlength, samples_indices, imhist, samples_at_tiers, im_region, p_region)
                 else:
-                    indices = np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
+                    indices = np.random.choice(int(im_region.shape[0]*im_region.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
             else:
                 #this works because the first n indices refer to the full first two dimensions, and np indexing takes slices
-                indices = np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
+                indices = np.random.choice(int(im_region.shape[0]*im_region.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
             #Add to feature vector and output vector.
             par_obj.f_matrix.extend(mimg_lin[indices])
             par_obj.o_patches.extend(dense_lin[indices])
@@ -623,14 +625,14 @@ def update_training_samples_fn_new_only(par_obj, int_obj, rects, arr='feat_arr')
             #And the the output matrix, output patches
             par_obj.o_patches.extend(dense_lin)
 def update_training_samples_fn_auto(par_obj, int_obj, rects):
-    """Collects the pixels or patches which will be used for training and 
+    """Collects the pixels or patches which will be used for training and
     trains the forest."""
     #Makes sure everything is refreshed for the training, encase any regions
     #were changed. May have to be rethinked for speed later on.
     '''
     for b in range(0,par_obj.saved_ROI.__len__()):
         rects = par_obj.saved_ROI[b]
-        region_size += rects[4]*rects[3]       
+        region_size += rects[4]*rects[3]
     '''
     calc_ratio = par_obj.limit_ratio_size
     #print 'calcratio',calc_ratio
@@ -641,17 +643,17 @@ def update_training_samples_fn_auto(par_obj, int_obj, rects):
     binlength = 10
     imhist = np.histogram(dot_im, bins=binlength, range=(0, 1), density=True)
     # adjust top bin to make sure we include everthing if we have overlapping gaussians-try to avoid though-if very common will distort bins
-    imhist[1][binlength] = 5 
+    imhist[1][binlength] = 5
     samples_at_tiers = (imhist[0]/binlength*par_obj.limit_size).astype('int')
     #print samples_at_tiers
     samples_indices = [0]+(np.cumsum(samples_at_tiers)).tolist() #to allow preallocation of array
-    
-    
+
+
     #for b in range(0,par_obj.saved_ROI.__len__()):
         #TODO check this works for edge cases- with very sparse sampling, and with v small bin sizes
         #Iterates through saved ROI.
         #rects = par_obj.saved_ROI[b]
-    
+
     zslice = rects[0]
     tpt = rects[5]
     imno = rects[6]
@@ -668,7 +670,7 @@ def update_training_samples_fn_auto(par_obj, int_obj, rects):
         if par_obj.limit_sample is True:
             if par_obj.limit_ratio is True:
                 par_obj.limit_size = round(mImRegion.shape[0]*mImRegion.shape[1]/calc_ratio, 0)
-                
+
                 if STRATIFY is True:
                     indices = stratified_sample(par_obj, binlength, samples_indices, imhist, samples_at_tiers, mImRegion, denseRegion)
                 else:
@@ -684,18 +686,18 @@ def update_training_samples_fn_auto(par_obj, int_obj, rects):
             par_obj.f_matrix.extend(mimg_lin)
             #And the the output matrix, output patches
             par_obj.o_patches.extend(dense_lin)
-                
+
 def train_forest(par_obj, int_obj, model_num):
-    
+
     if par_obj.max_features > par_obj.num_of_feat[model_num]:
         par_obj.max_features = par_obj.num_of_feat[model_num]
-        
-    #assigns model type        
+
+    #assigns model type
     par_obj.RF[model_num] = lf.RF(par_obj, 'ETR')
-    
+
     #Fits the data.
     X = np.array(par_obj.f_matrix)
-    Y = np.array(par_obj.o_patches)        
+    Y = np.array(par_obj.o_patches)
     par_obj.RF[model_num].fit(X, Y)
     """
     importances = par_obj.RF[model_num].method.feature_importances_
@@ -703,12 +705,12 @@ def train_forest(par_obj, int_obj, model_num):
     print("Feature ranking:")
     for f in range(len(importances)):
         print("%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]]))
-        
+
     t4 = time.time()
-    print 'actual training',t4-t3 
+    print 'actual training',t4-t3
     """
     par_obj.o_patches = []
-    par_obj.f_matrix = []    
+    par_obj.f_matrix = []
 
 def refresh_all_density(par_obj):
     number_of_saved_roi = range(0, len(par_obj.saved_ROI))
@@ -717,23 +719,23 @@ def refresh_all_density(par_obj):
         zslice = int(par_obj.saved_ROI[it][0])
         fileno = int(par_obj.saved_ROI[it][6])
         update_com_fn(par_obj, tpt, zslice, fileno)
-        
+
 def update_com_fn(par_obj, tpt, zslice, fileno):
-    
+
     #Construct empty array for current image.
     dots_im = np.zeros((par_obj.height, par_obj.width))
     #In array of all saved dots.
     for i in range(0, par_obj.saved_dots.__len__()):
         #Any ROI in the present image.
         #print 'iiiii',win.saved_dots.__len__()
-        
+
         if(par_obj.saved_ROI[i][0] == zslice and par_obj.saved_ROI[i][5] == tpt and par_obj.saved_ROI[i][6] == fileno):
             #Save the corresponding dots.
             dots = par_obj.saved_dots[i]
             #Scan through the dots
             for b in range(0, dots.__len__()):
-               
-                #save the column and row 
+
+                #save the column and row
                 c_dot = dots[b][2]
                 r_dot = dots[b][1]
                 #Set it to register as dot.
@@ -741,23 +743,17 @@ def update_com_fn(par_obj, tpt, zslice, fileno):
     #Convolve the dots to represent density estimation.
     #print 'Using template matching to generate C-O-M representation'
     dense_im = np.zeros(dots_im.shape).astype(np.float64)
-    
+
     size_of_kernel = np.ceil(par_obj.sigma_data * 6) #At least the 3-sigma rule.
     if size_of_kernel % 2 == 0:
         size_of_kernel = int(size_of_kernel + 1)
-    
+
     patch = np.zeros((size_of_kernel, size_of_kernel))
     m_p = int((size_of_kernel-1)/2)
     patch[m_p, m_p] = 1
-    
+
     kernel = filters.gaussian_filter(patch.astype(np.float32), float(par_obj.sigma_data), order=0, output=None, mode='reflect', cval=0.0)
-   
-    #kernel = distance_transform_edt(patch==0).astype(np.float32)
-    #kernel=kernel/np.max(kernel)    
-    #kernel=(kernel>0.5).astype('float32')
-    #kernel=-kernel+np.max(kernel)
-    #kernel=kernel/np.max(kernel)
-    #kernel=np.log(kernel*1000+1)
+
     #Replace member of dense_array with new image.
     r_arr, c_arr = np.where(dots_im > 0)
     for r, c in zip(r_arr, c_arr):
@@ -765,28 +761,28 @@ def update_com_fn(par_obj, tpt, zslice, fileno):
         p2 = patch.shape[0]
         p3 = 0
         p4 = patch.shape[1]
-        
+
         r1 = int(r-m_p)
         r2 = int(r+m_p+1)
         c1 = int(c-m_p)
         c2 = int(c+m_p+1)
-        
+
         if r1 < 0:
             p1 = abs(r1-0)
             r1 = 0
         if r2 > dots_im.shape[0]:
             p2 = (patch.shape[0]-1)- (abs(r2-dots_im.shape[0]))+1
-            r2 = dots_im.shape[0]       
+            r2 = dots_im.shape[0]
         if c1 < 0:
             p3 = abs(c1-0)
             c1 = 0
         if c2 > dots_im.shape[1]:
             p4 = (patch.shape[1]-1)- (abs(c2-dots_im.shape[1]))+1
             c2 = dots_im.shape[1]
-        
-        
-        
-        dense_im[r1:r2, c1:c2] =  np.max([kernel[p1:p2, p3:p4], dense_im[r1:r2, c1:c2]], 0)
+
+
+
+        dense_im[r1:r2, c1:c2] = np.max([kernel[p1:p2, p3:p4], dense_im[r1:r2, c1:c2]], 0)
 
     '''NORMALISE GAUSSIANS. THIS MAKES IT USELESS FOR DOING 2D DENSITY ESTIMATION,
  but super useful if you want a probability output between 0 and 1 at the end of the day
@@ -796,42 +792,8 @@ for thresholding and the like'''
 
     par_obj.data_store['dense_arr'][fileno][tpt][zslice] = dense_im
 
-"""
-def update_density_fn_new(par_obj,tpt,zslice,imno):
-    #Construct empty array for current image.
-    dots_im = np.zeros((par_obj.height,par_obj.width))
-    #In array of all saved dots.
-    if par_obj.saved_dots.__len__()>0:
-        for i in range(0,par_obj.saved_dots.__len__()):
-            #Any ROI in the present image.
-            #print 'iiiii',win.saved_dots.__len__()
-            if(par_obj.saved_ROI[i][0] == zslice and par_obj.saved_ROI[i][5] == tpt and par_obj.saved_ROI[i][6] == imno):
-                #Save the corresponding dots.
-                dots = par_obj.saved_dots[i]
-                #Scan through the dots
-                for b in range(0,dots.__len__()):
-                   
-                    #save the column and row 
-                    c_dot = dots[b][2]
-                    r_dot = dots[b][1]
-                    #Set it to register as dot.
-                    dots_im[c_dot, r_dot] = 1 #change from 255
-        #Convolve the dots to represent density estimation.
-        #dense_im = filters.gaussian_laplace(dots_im.astype(np.float32),float(par_obj.sigma_data), output=None, mode='reflect', cval=0.0)
-        dense_im = filters.gaussian_filter(dots_im.astype(np.float32),float(par_obj.sigma_data), order=0, output=None, mode='reflect', cval=0.0)
-        '''NORMALISE GAUSSIANS. THIS MAKES IT USELESS FOR DOING 2D DENSITY ESTIMATION,
- but super useful if you want a probability output between 0 and 1 at the end of the day
-for thresholding and the like'''
-        if not par_obj.gaussian_im_max:
-            dot_im=filters.gaussian_filter(np.ones((1,1)),float(par_obj.sigma_data),mode='constant',cval=0)
-            par_obj.gaussian_im_max=dot_im[0,0]
-
-        dense_im=dense_im/par_obj.gaussian_im_max*10000
-        par_obj.data_store['dense_arr'][imno][tpt][zslice] = dense_im
-"""
 def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threaded=False):
     """Accesses TIFF file slice (from open tiffarray. Calculates features to slices specified"""
-    print 'version1'    
     # consider cropping
     if par_obj.to_crop is False:
         par_obj.crop_x1 = 0
@@ -840,104 +802,17 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
         par_obj.crop_y2 = par_obj.height
     par_obj.height = par_obj.crop_y2-par_obj.crop_y1
     par_obj.width = par_obj.crop_x2-par_obj.crop_x1
+
     if par_obj.FORCE_nothreading is not False:
         threaded = par_obj.FORCE_nothreading
-    if threaded == 'Z':
-        imRGBlist = []
-        for tpt in tptList:
-            for imno in imnoList:
-                for zslice in zsliceList:
-                    if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
-                        #imRGB=return_rgb_slice(par_obj,zslice,tpt,imno)
-                        width = range(0, par_obj.ori_width, int(par_obj.resize_factor))
-                        height = range(0, par_obj.ori_height, int(par_obj.resize_factor))
-                        imRGB = par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice], width, height, par_obj.ch_active)
 
-                        #imRGBlist.append(imRGB)
-                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarray_typemax)    
-                #initiate pool and start caclulating features
-                int_obj.report_progress('Calculating Features for File:'+str(imno+1)+ ' Timepoint: '+str(tpt+1) +' All  Z')
-                featlist = []
-                tee1 = time.time()
-                pool = ThreadPool(8) 
-                featlist = pool.map(functools.partial(lf.feature_create_threadable, par_obj), imRGBlist)
-                pool.close() 
-                pool.join() 
-                tee2 = time.time()
-                #feat =feature_create(par_obj,imRGB,imStr,i)
-                
-                lcount = -1
+    if threaded is False:
 
-                for zslice in zsliceList:
-                    if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
-                        lcount = lcount+1
-                        if zslice == zsliceList[0]:
-                            feat = np.concatenate((featlist[lcount], featlist[lcount], featlist[lcount], featlist[lcount+1], featlist[lcount+2]), axis=2)
-                        elif zslice == zsliceList[-1]:
-                            feat = np.concatenate((featlist[lcount-2], featlist[lcount-1], featlist[lcount], featlist[lcount], featlist[lcount]), axis=2)
-                        elif zslice == zsliceList[1]:
-                            feat = np.concatenate((featlist[lcount], featlist[lcount-1], featlist[lcount], featlist[lcount+1], featlist[lcount+2]), axis=2)
-                        elif zslice == zsliceList[-2]:
-                            feat = np.concatenate((featlist[lcount-2], featlist[lcount-1], featlist[lcount], featlist[lcount+1], featlist[lcount+1]), axis=2)
-
-                        else:
-                            feat = np.concatenate((featlist[lcount-2], featlist[lcount-1], featlist[lcount], featlist[lcount+1], featlist[lcount+2]), axis=2)
-    
-                        par_obj.num_of_feat[0] = feat.shape[2]
-    
-                        par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat  
-        imRGBlist = []
-        for tpt in tptList:
-            for imno in imnoList:
-                for zslice in zsliceList:
-                    if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
-                        #imRGB=return_rgb_slice(par_obj,zslice,tpt,imno)
-                        width = range(0, par_obj.ori_width, int(par_obj.resize_factor))
-                        height = range(0, par_obj.ori_height, int(par_obj.resize_factor))
-                        imRGB = par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice], width, height, par_obj.ch_active)
-
-                        #imRGBlist.append(imRGB)
-                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarray_typemax)    
-                #initiate pool and start caclulating features
-                int_obj.report_progress('Calculating Features for File:'+str(imno+1)+ ' Timepoint: '+str(tpt+1) +' All  Z')
-                featlist = []
-                tee1 = time.time()
-                pool = ThreadPool(8) 
-                featlist = pool.map(functools.partial(lf.feature_create_threadable, par_obj), imRGBlist)
-                pool.close() 
-                pool.join() 
-                tee2 = time.time()
-                #feat =feature_create(par_obj,imRGB,imStr,i)
-                
-                lcount = -1
-
-                for zslice in zsliceList:
-                    if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
-                        lcount = lcount+1
-                        if zslice == zsliceList[0]:
-                            feat = np.concatenate((featlist[lcount], featlist[lcount], featlist[lcount], featlist[lcount+1], featlist[lcount+2]), axis=2)
-                        elif zslice == zsliceList[-1]:
-                            feat = np.concatenate((featlist[lcount-2], featlist[lcount-1], featlist[lcount], featlist[lcount], featlist[lcount]), axis=2)
-                        elif zslice == zsliceList[1]:
-                            feat = np.concatenate((featlist[lcount], featlist[lcount-1], featlist[lcount], featlist[lcount+1], featlist[lcount+2]), axis=2)
-                        elif zslice == zsliceList[-2]:
-                            feat = np.concatenate((featlist[lcount-2], featlist[lcount-1], featlist[lcount], featlist[lcount+1], featlist[lcount+1]), axis=2)
-
-                        else:
-                            feat = np.concatenate((featlist[lcount-2], featlist[lcount-1], featlist[lcount], featlist[lcount+1], featlist[lcount+2]), axis=2)
-                        int_obj.report_progress('Calculating Features for File:'+str(imno+1)+ ' Timepoint: '+str(tpt+1) +' Z: '+str(zslice+1))
-                        par_obj.num_of_feat[0] = feat.shape[2]
-    
-                        par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat  
-
-    elif threaded is False:
-        
-        
         for imno in imnoList:
             for tpt in tptList:
                 for zslice in zsliceList:
                     #checks if features already in array
-                    
+
                     if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
                         #imRGB=return_rgb_slice(par_obj,zslice,tpt,imno)
                         #imRGB/=par_obj.tiffarraymax
@@ -949,12 +824,12 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
                         imRGB = imRGB.astype('float32')/ par_obj.tiffarray_typemax
                         #If you want to ignore previous features which have been saved.
                         int_obj.report_progress('Calculating Features for File:'+str(imno+1)+ ' Timepoint: '+str(tpt+1) +' Z: '+str(zslice+1))
-                        
+
                         feat = lf.feature_create_threadable(par_obj, imRGB)
-                        
+
                         par_obj.num_of_feat[0] = feat.shape[2]
                         par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat
-                        
+
     elif threaded == 'auto':
         #threaded version
         imRGBlist = []
@@ -962,15 +837,15 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
             for imno in imnoList:
                 featlist = []
                 tee1 = time.time()
-                pool = ThreadPool(8) 
+                pool = ThreadPool(8)
                 featlist = pool.map(functools.partial(lf.feature_create_threadable_auto, par_obj, imno, tpt), zsliceList)
-                pool.close() 
-                pool.join() 
+                pool.close()
+                pool.join()
                 tee2 = time.time()
                 #feat =feature_create(par_obj,imRGB,imStr,i)
                 print tee2-tee1
                 lcount = -1
-    
+
                 for zslice in zsliceList:
                     lcount = lcount+1
                     feat = featlist[lcount]
@@ -987,33 +862,33 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
             for imno in imnoList:
                 for zslice in zsliceList:
                     if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
-                        
+
                         width = range(0, par_obj.ori_width, int(par_obj.resize_factor))
                         height = range(0, par_obj.ori_height, int(par_obj.resize_factor))
                         imRGB = par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice], width, height, par_obj.ch_active)
-                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarray_typemax)    
+                        imRGBlist.append(imRGB.astype('float32')/ par_obj.tiffarray_typemax)
                 #initiate pool and start caclulating features
                 int_obj.report_progress('Calculating Features for File:'+str(imno+1)+ ' Timepoint: '+str(tpt+1) +' Z: '+'ALL')
                 featlist = []
                 tee1 = time.time()
-                pool = ThreadPool(8) 
+                pool = ThreadPool(8)
                 featlist = pool.map(functools.partial(lf.feature_create_threadable, par_obj), imRGBlist)
-                pool.close() 
-                pool.join() 
+                pool.close()
+                pool.join()
                 tee2 = time.time()
                 #feat =feature_create(par_obj,imRGB,imStr,i)
                 print tee2-tee1
                 lcount = -1
-    
+
                 for zslice in zsliceList:
                     if zslice not in par_obj.data_store['feat_arr'][imno][tpt]:
                         lcount = lcount+1
                         feat = featlist[lcount]
                         int_obj.report_progress('Calculating Features for File:'+str(imno+1)+ ' Timepoint: '+str(tpt+1) +' Z: '+str(zslice+1))
-    
+
                         par_obj.num_of_feat[0] = feat.shape[2]
-    
-                        par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat  
+
+                        par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat
         int_obj.report_progress('Features calculated')
     return
 
@@ -1021,24 +896,25 @@ def return_rgb_slice(par_obj, zslice, tpt, imno):
     """Fetches slice zslice of timepoint tpt and puts in RGB format for display"""
     width = range(0, par_obj.ori_width, int(par_obj.resize_factor))
     height = range(0, par_obj.ori_height, int(par_obj.resize_factor))
-    
+    imfile = par_obj.filehandlers[imno]
     clim = par_obj.clim
     imRGB = np.zeros((int(par_obj.height), int(par_obj.width), 3), 'float32')
-    if par_obj.ch_display.__len__() > 1 or (par_obj.ch_display.__len__() == 1 and par_obj.numCH > 1):
-        
-        if par_obj.numCH>3:
-            for i, ch in enumerate(par_obj.ch_display):
-                if i==3: break #can only display 3 channels
 
-                input_im = par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice], width, height, [ch])
+    if len(par_obj.ch_display) > 1 or (len(par_obj.ch_display) == 1 and par_obj.numCH > 1):
+
+        if par_obj.numCH > 3:
+            for i, ch in enumerate(par_obj.ch_display):
+                if i == 3: break #can only display 3 channels
+
+                input_im = imfile.get_tiff_slice([tpt], [zslice], width, height, [ch])
                 imRGB[:, :, i] = (input_im.astype('float32')/par_obj.filehandlers[imno].tiffarraymax)*clim[i][1]-clim[i][0]
         else:
             for i, ch in enumerate(par_obj.ch_display):
 
-                input_im = par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice], width, height, [ch])
+                input_im = imfile.get_tiff_slice([tpt], [zslice], width, height, [ch])
                 imRGB[:, :, ch] = (input_im.astype('float32')/par_obj.filehandlers[imno].tiffarraymax)*clim[ch][1]-clim[ch][0]
-                
-    imRGB=np.clip(imRGB, 0, 1)
+
+    imRGB = np.clip(imRGB, 0, 1)
     return imRGB
 
 
@@ -1052,12 +928,12 @@ def evaluate_forest_new(par_obj, int_obj, withGT, model_num, zsliceList, tptList
             for zslice in zsliceList:
                 '''
                 if(par_obj.p_size >1):
-                    
+
                     mimg_lin,dense_linPatch, pos = extractPatch(par_obj.p_size, par_obj.feat_arr[zslice], None, 'dense')
                     tree_pred = par_obj.RF[model_num].predict(mimg_lin)
-                    
+
                     linPred = v2.regenerateImg(par_obj.p_size, tree_pred, pos)
-                        
+
                 else:
                 '''
                 mimg_lin = np.reshape(par_obj.data_store[arr][imno][tpt][zslice], (par_obj.height * par_obj.width, par_obj.data_store[arr][imno][tpt][zslice].shape[2]))
@@ -1065,23 +941,21 @@ def evaluate_forest_new(par_obj, int_obj, withGT, model_num, zsliceList, tptList
                 linPred = par_obj.RF[model_num].predict(mimg_lin)
                 #linPred=linPred[:,1]-linPred[:,0]
                 t1 = time.time()
-                    
-    
-    
+
                 par_obj.data_store['pred_arr'][imno][tpt][zslice] = linPred.reshape(par_obj.height, par_obj.width)
-    
+
                 maxPred = np.max(linPred)
                 minPred = np.min(linPred)
                 par_obj.maxPred = max([par_obj.maxPred, maxPred])
                 par_obj.minPred = min([par_obj.minPred, minPred])
                 sum_pred = np.sum(linPred/255)
                 par_obj.data_store['sum_pred'][imno][tpt][zslice] = sum_pred
-                
+
                 print 'prediction time taken', t1 - t2
                 print 'Predicted i:', par_obj.data_store['sum_pred'][imno][tpt][zslice]
                 int_obj.report_progress('Making Prediction for File: '+str(imno+1)+' T: '+str(tpt+1)+' Z: ' +str(zslice+1))
-                        
-    
+
+
                 if withGT == True:
                     try:
                         #If it has already been opened.
@@ -1100,12 +974,12 @@ def evaluate_forest_auto(par_obj, int_obj, withGT, model_num, zsliceList, tptLis
             for zslice in zsliceList:
                 '''
                 if(par_obj.p_size >1):
-                    
+
                     mimg_lin,dense_linPatch, pos = extractPatch(par_obj.p_size, par_obj.feat_arr[zslice], None, 'dense')
                     tree_pred = par_obj.RF[model_num].predict(mimg_lin)
-                    
+
                     linPred = v2.regenerateImg(par_obj.p_size, tree_pred, pos)
-                        
+
                 else:
                 '''
                 mimg_lin = np.reshape(par_obj.data_store['double_feat_arr'][imno][tpt][zslice], (par_obj.height * par_obj.width, par_obj.data_store['double_feat_arr'][imno][tpt][zslice].shape[2]))
@@ -1114,35 +988,26 @@ def evaluate_forest_auto(par_obj, int_obj, withGT, model_num, zsliceList, tptLis
 
 
                 t1 = time.time()
-                    
-    
-    
+
+
+
                 par_obj.data_store['pred_arr'][imno][tpt][zslice] = linPred.reshape(par_obj.height, par_obj.width)
-    
+
                 maxPred = np.max(linPred)
                 minPred = np.min(linPred)
                 par_obj.maxPred = max([par_obj.maxPred, maxPred])
                 par_obj.minPred = min([par_obj.minPred, minPred])
                 sum_pred = np.sum(linPred/255)
                 par_obj.data_store['sum_pred'][imno][tpt][zslice] = sum_pred
-                
+
                 print 'prediction time taken', t1 - t2
                 print 'Predicted i:', par_obj.data_store['sum_pred'][imno][tpt][zslice]
-                int_obj.report_progress('Making Prediction for Image: '+str(imno+1)+' Frame: ' +str(zslice+1)+' Timepoint: '+str(tpt+1))
-                        
-    
-                if withGT is True:
-                    try:
-                        #If it has already been opened.
-                        a = par_obj.data_store['gt_sum'][imno][tpt][zslice]
-                    except:
-                        #Else find the file.
-                        gt_im = pylab.imread(par_obj.data_store['gt_array'][imno][tpt][zslice])[:, :, 0]
-                        par_obj.data_store['gt_sum'][imno][tpt][zslice] = np.sum(gt_im)
+                int_obj.report_progress('Making Prediction for Image: '\
+                +str(imno+1)+' Frame: ' +str(zslice+1)+' Timepoint: '+str(tpt+1))
 
 def goto_img_fn_new(par_obj, int_obj):
-    """Loads up requested image and displays"""
-    tpt = par_obj.curr_t    
+    """Loads up current image and displays it"""
+    tpt = par_obj.curr_t
     zslice = par_obj.curr_z
     imno = par_obj.curr_file
     t0 = time.time()
@@ -1153,96 +1018,85 @@ def goto_img_fn_new(par_obj, int_obj):
     if par_obj.overlay and zslice in par_obj.data_store['pred_arr'][imno][tpt]:
         newImg[:, :, 2] = (par_obj.data_store['pred_arr'][imno][tpt][zslice])/par_obj.maxPred
 
-    for i in range(0, int_obj.plt1.lines.__len__()):
-        int_obj.plt1.lines.pop(0)
-
+    #sets image for display
     int_obj.plt1.images[0].set_data(newImg)
-    #int_obj.plt1.set_ylim([0,newImg.shape[0]])
-    #int_obj.plt1.set_xlim([newImg.shape[1],0])
-    #int_obj.plt1.axis("off")
-    #int_obj.plt1.set_xticklabels([])
-    #int_obj.plt1.set_yticklabels([])
-    
+
+    #remove rois
+    int_obj.plt1.lines = []
+
+    #update image text
     int_obj.image_num_txt.setText('Current File is : ' + str(par_obj.curr_file+1)\
     +'/'+str(par_obj.max_file)+', Current Time: '+str(par_obj.curr_t+1)+'/'+str(par_obj.max_t+1)\
     +', Current Z: '+str(par_obj.curr_z+1)+'/'+str(par_obj.max_z+1))
     # filename: ' +str(evalLoadImWin.file_array[im_num]))
 
-    """Deals with displaying Kernel/Prediction/Counts""" 
-#    int_obj.image_num_txt.setText('The Current Image is No. ' + str(zslice+1)+' and the time point is: '+str(tpt+1))
-    im2draw = None
-    
+    """Deals with displaying Kernel/Prediction/Counts"""
+    #im2draw = None
+
     if par_obj.show_pts == 0:
         if zslice in par_obj.data_store['dense_arr'][imno][tpt]:
+
             im2draw = par_obj.data_store['dense_arr'][imno][tpt][zslice]
-            int_obj.plt2.images[0].set_data(im2draw)
             int_obj.plt2.images[0].autoscale()
-            int_obj.canvas2.draw()
             int_obj.plt2_is_clear = False
+            int_obj.plt2.images[0].set_data(im2draw)
+            int_obj.canvas2.draw()
+
         elif int_obj.plt2_is_clear is not True:
-            
-            #elif np.sum(int_obj.plt2.images[0].get_array()) != 0: #don't update if just zeros 
+
             int_obj.plt2_is_clear = True
             im2draw = np.zeros((par_obj.height, par_obj.width))
             int_obj.plt2.images[0].set_data(im2draw)
             int_obj.canvas2.draw()
-            print 'test2'
+
+        else: # don't update
+            pass
 
     elif par_obj.show_pts == 1:
         if zslice in par_obj.data_store['pred_arr'][imno][tpt]:
             im2draw = par_obj.data_store['pred_arr'][imno][tpt][zslice].astype(np.float32)
         else:
             im2draw = np.zeros((par_obj.height, par_obj.width))
-        int_obj.plt2.images[0].set_data(im2draw)
+
         int_obj.plt2.images[0].set_clim(None, par_obj.maxPred)
+        int_obj.plt2.images[0].set_data(im2draw)
         int_obj.canvas2.draw()
-        
+
     elif par_obj.show_pts == 2:
-        #show det(hessian) array, and (I assume) the green circles?
+        #show det(hessian) array, and the green circles?
         pt_x = []
         pt_y = []
         pts = par_obj.data_store['pts'][imno][tpt]
-        
-        ind = np.where(np.array(range(par_obj.max_z+1)) == zslice)#[0][0]
-        #print 'ind',ind
+
+        ind = np.where(np.array(range(par_obj.filehandlers[imno].max_z+1)) == zslice)
+
         for pt2d in pts:
             #if pt2d[3] == 0:
             #    break
-                
+
             if pt2d[2] == ind:
                 pt_x.append(pt2d[1])
                 pt_y.append(pt2d[0])
-        #int_obj.plt2.clear()
-        int_obj.plt2.lines = []
 
+        int_obj.plt2.lines = []
         int_obj.plt2.axes.plot(pt_x, pt_y, 'wo')
         int_obj.plt2.autoscale_view(tight=True)
-        
         int_obj.plt1.axes.plot(pt_x, pt_y, 'wo')
         int_obj.plt1.autoscale_view(tight=True)
-        
-        string_2_show = 'The Predicted Count: ' + str(pts.__len__())
+
         if zslice in par_obj.data_store['maxi_arr'][imno][tpt]:
             im2draw = par_obj.data_store['maxi_arr'][imno][tpt][zslice].astype(np.float32)
-            int_obj.plt2.images[0].set_data(im2draw)
             int_obj.plt2.images[0].set_clim(0, 1)
+            int_obj.plt2.images[0].set_data(im2draw)
             int_obj.canvas2.draw()
 
+    #set data and draw canvas
 
 
-    #int_obj.plt2.set_ylim([0,newImg.shape[0]])
-    #int_obj.plt2.set_xlim([newImg.shape[1],0])
     int_obj.draw_saved_dots_and_roi()
     int_obj.cursor.draw_ROI()
-    
-    #ax=int_obj.plt2.axes.images[0]
-    #int_obj.plt2.axes.draw_artist(ax)
-    print time.time() -t0
-    
-    #pdb.set_trace()
-    #int_obj.canvas1.draw()
-    #int_obj.canvas2.draw()
 
+    print time.time() -t0
 
 def load_and_initiate_plots(par_obj, int_obj):
     """prepare plots and data for display"""
@@ -1259,16 +1113,17 @@ def load_and_initiate_plots(par_obj, int_obj):
     #modest_image.imshow(int_obj.plt2.axes,newImg,interpolation='none')
     int_obj.plt2.axis("off")
     int_obj.plt2.autoscale()
-    
+
     int_obj.cursor.draw_ROI()
-    int_obj.image_num_txt.setText('Current File is : ' + str(par_obj.curr_file+1)+'/'+str(par_obj.max_file+1)+' ,Current Time: '+str(par_obj.curr_t+1)+'/'+str(par_obj.max_t+1)+' ,Current Z: '+str(par_obj.curr_z+1)+'/'+str(par_obj.max_z+1)) # filename: ' +str(evalLoadImWin.file_array[im_num]))
-    
+    int_obj.image_num_txt.setText('Current File is : ' + str(par_obj.curr_file+1)+'/'+str(par_obj.max_file+1)+' ,Current Time: '+str(par_obj.curr_t+1)+'/'+str(par_obj.max_t+1)+' ,Current Z: '+str(par_obj.curr_z+1)+'/'+str(par_obj.max_z+1))
+    # filename: ' +str(evalLoadImWin.file_array[im_num]))
+
     goto_img_fn_new(par_obj, int_obj)
 
 def eval_pred_show_fn(par_obj, int_obj, zslice, tpt):
     """Shows Prediction Image when forest is loaded"""
     if par_obj.eval_load_im_win_eval == True:
-        
+
         int_obj.image_num_txt.setText('The Current Image is No. ' + str(zslice+1)+' and the time point is: '+str(tpt+1))
 
         #if int_obj.count_maxima_plot_on.isChecked() == True:
@@ -1290,13 +1145,13 @@ def eval_pred_show_fn(par_obj, int_obj, zslice, tpt):
                     im2draw = par_obj.data_store['pred_arr'][imno][tpt][zslice].astype(np.float32)
             int_obj.plt2.imshow(im2draw, vmax=par_obj.maxPred)
         if par_obj.show_pts == 2:
-            
+
             pt_x = []
             pt_y = []
             pts = par_obj.data_store['pts'][imno][tpt]
-            
+
             ind = np.where(np.array(par_obj.frames_2_load[0]) == zslice)[0][0]
-            
+
         for pt2d in pts:
             if pt2d[3] == 0:
                 break
@@ -1323,15 +1178,15 @@ def eval_pred_show_fn(par_obj, int_obj, zslice, tpt):
 
 
 def import_data_fn(par_obj, file_array, file_array_offset=0):
-    """Function which loads in list of Tiff stacks and checks for consistency"""        
+    """Function which loads in list of Tiff stacks and checks for consistency"""
     #careful with use of non-zero offset. Intended primarily for use in validation
 
     par_obj.max_file = file_array.__len__()
-        
+
     par_obj.filehandlers = [None]*(par_obj.max_file+file_array_offset)
-    
+
     for imno, imfile in enumerate(file_array):
-            
+
         par_obj.filehandlers[imno] = File_handler(str(imfile))
         #currently doesn't check if multiple filetypes, on the basis only loads tiffs
         #check number of channels is consistent
@@ -1350,7 +1205,7 @@ def import_data_fn(par_obj, file_array, file_array_offset=0):
         else:
             status_text = 'Different image size in the selected images'
             raise Exception(status_text)# if this isn't true then something is wrong
-            
+
         if imno == 0:
             par_obj.ori_width = par_obj.filehandlers[imno].width
         elif par_obj.ori_width == par_obj.filehandlers[imno].width:
@@ -1362,59 +1217,47 @@ def import_data_fn(par_obj, file_array, file_array_offset=0):
         if imno == 0:
             par_obj.bitDepth = par_obj.filehandlers[imno].bitDepth
             par_obj.tiffarray_typemax = par_obj.filehandlers[imno].tiffarray_typemax
-                                              
+
         elif par_obj.bitDepth == par_obj.filehandlers[imno].bitDepth:
             pass
         else:
             status_text = 'Different image bit depth in the selected images'
             raise Exception(status_text)# if this isn't true then something is wrong
-            
+
     #set max z and t for current time
     par_obj.max_z = par_obj.filehandlers[par_obj.curr_file].max_z
     par_obj.max_t = par_obj.filehandlers[par_obj.curr_file].max_t
+
     #Prepare RGB example image
-    x = range(0, par_obj.ori_width, par_obj.resize_factor)
-    y = range(0, par_obj.ori_height, par_obj.resize_factor)
-    imRGB = par_obj.filehandlers[0].get_tiff_slice([0], [0], x, y, range(par_obj.numCH))
-    
-    #If images have colour channels
-    if imRGB.shape.__len__() > 2:
-    #If images have more than three channels. 
-        if imRGB.shape[2] > 2:
-            #three channels.
-            par_obj.ex_img = imRGB
-        elif imRGB.shape[2] == 2:
-            #2 channels.
-            par_obj.ex_img = np.zeros((par_obj.ori_height, par_obj.ori_width, 3))
-            par_obj.ex_img[:, :, 0:2] = imRGB
-        else:
-            #If the size of the third dimenion is just 1, this is invalid for imshow so remove it
-            par_obj.ex_img = np.squeeze(imRGB)
-    elif imRGB.shape.__len__() == 2:
-        par_obj.ex_img = imRGB.astype('float32')
+    par_obj.height = par_obj.ori_height/par_obj.resize_factor
+    par_obj.width = par_obj.ori_width/par_obj.resize_factor
+    par_obj.ch_display = range(0, min(par_obj.numCH, 3))
+    par_obj.ex_img = return_rgb_slice(par_obj, 0, 0, 0)
 
     statusText = str(file_array.__len__())+' Files Loaded.'
     return True, statusText
 
 def save_output_prediction_fn(par_obj, int_obj):
-    #funky ordering TZCYX
+    """Saves prediction to tiff file using tiffiles imsave"""
     for fileno, imfile in enumerate(par_obj.filehandlers):
+        #funky ordering TZCYX
         image = np.zeros([imfile.max_t+1, imfile.max_z+1, 1, par_obj.height, par_obj.width], 'float32')
         for tpt in range(imfile.max_t+1):
             for zslice in range(imfile.max_z+1):
                 image[tpt, zslice, 0, :, :] = par_obj.data_store['pred_arr'][fileno][tpt][zslice].astype(np.float32)
         imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
-         
+
         print 'Prediction written to disk'
         int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
-def save_output_hess_fn(par_obj, int_obj):
-    #funky ordering TZCYX
 
+def save_output_hess_fn(par_obj, int_obj):
+    """Saves hessian map to tiff file using tiffiles imsave"""
     for fileno, imfile in enumerate(par_obj.filehandlers):
+        #funky ordering TZCYX
         image = np.zeros([imfile.max_t+1, imfile.max_z+1, 1, par_obj.height, par_obj.width], 'float32')
         for tpt in range(imfile.max_t+1):
             for zslice in range(imfile.max_z+1):
-                image[tpt, zslice, 0, :, :] = par_obj.data_store['maxi_arr'][fileno][tpt][zslice].astype(np.float32)
+                image[tpt, zslice, 0, :, :] = par_obj.data_store['maxi_arr'][fileno][tpt][zslice].astype('float32')
         print 'Prediction written to disk'
         imsave(par_obj.csvPath+par_obj.file_name[fileno]+'_'+par_obj.modelName+'_Hess.tif', image, imagej=True)
         int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
@@ -1424,8 +1267,8 @@ def save_output_mask_fn(par_obj,int_obj):
     for fileno,imfile in enumerate(par_obj.filehandlers):
         image = np.zeros([imfile.max_t+1,imfile.max_z+1,1,par_obj.height,par_obj.width], 'bool')
         for tpt in range(imfile.max_t+1):
-            
-            for i in range(0,par_obj.data_store['pts'][fileno][tpt].__len__()):                
+
+            for i in range(0,par_obj.data_store['pts'][fileno][tpt].__len__()):
                 [x,y,z,W]=par_obj.data_store['pts'][fileno][tpt][i]
                 if W:
                     image[tpt,z,0,x,y]=255
@@ -1448,7 +1291,7 @@ def save_output_ROI(par_obj, int_obj):
         filename = imfile.base_name
         with open(par_obj.csvPath+filename+'_outputROI.pickle', 'wb') as afile:
             pickle.dump([par_obj.data_store['roi_stkint_x'][fileno], par_obj.data_store['roi_stkint_y'][fileno]], afile)
-        
+
     with open(par_obj.csvPath+par_obj.modelName+'_outputROI.csv', 'wb') as csvfile:
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Z: ')]+[str('Regions(x): ')]+[str('Regions(y): ')])
@@ -1461,20 +1304,20 @@ def save_output_ROI(par_obj, int_obj):
                 for i in ppt_x.keys():
                     spamwriter.writerow([str(filename)]+[tpt+1]+[i]+[ppt_x[i]]+[ppt_y[i]])
     int_obj.report_progress('Data exported to '+ par_obj.csvPath)
-        
+
 def save_output_data_fn(par_obj, int_obj):
     local_time = time.asctime(time.localtime(time.time()))
-    
+
     with open(par_obj.csvPath+'_'+par_obj.modelName+'outputData.csv', 'a') as csvfile:
         spamwriter = csv.writer(csvfile, dialect='excel')
         spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('Predicted count: ')])
 
         for fileno in range(par_obj.max_file):
-                
+
             for tpt in par_obj.tpt_list:
                 filename = str(par_obj.file_array[fileno])
                 spamwriter.writerow([local_time]+[str(filename)]+[tpt+1]+[par_obj.data_store['pts'][fileno][tpt].__len__()])
-                
+
 
     for fileno in range(par_obj.max_file):
         with open(par_obj.csvPath+par_obj.filehandlers[fileno].name+'_'+par_obj.modelName+'_outputPoints.csv', 'a') as csvfile:
@@ -1486,13 +1329,15 @@ def save_output_data_fn(par_obj, int_obj):
                 for i in range(0, par_obj.data_store['pts'][fileno][tpt].__len__()):
                     spamwriter.writerow([local_time]+[str(filename)]+[tpt+1]+[pts[i][0]]+[pts[i][1]]+[pts[i][2]])
     int_obj.report_progress('Data exported to '+ par_obj.csvPath)
-    
+
 def save_user_ROI(par_obj, int_obj):
     #funky ordering TZCYX
     for fileno, imfile in enumerate(par_obj.filehandlers):
         filename = imfile.base_name
         with open(par_obj.csvPath+filename+'_outputROI.pickle', 'wb') as afile:
-            pickle.dump([par_obj.data_store['roi_stkint_x'][fileno], par_obj.data_store['roi_stkint_y'][fileno], par_obj.data_store['roi_stk_x'][fileno], par_obj.data_store['roi_stk_y'][fileno]], afile, par_obj.resize_factor)
+            data = [par_obj.data_store['roi_stkint_x'][fileno], par_obj.data_store['roi_stkint_y'][fileno],\
+                    par_obj.data_store['roi_stk_x'][fileno], par_obj.data_store['roi_stk_y'][fileno]]
+            pickle.dump(data, afile, par_obj.resize_factor)
 
     with open(par_obj.csvPath+par_obj.modelName+'_outputROI.csv', 'wb') as csvfile:
         spamwriter = csv.writer(csvfile)
@@ -1506,7 +1351,7 @@ def save_user_ROI(par_obj, int_obj):
                 for i in ppt_x.keys():
                     spamwriter.writerow([str(filename)]+[tpt+1]+[i]+[ppt_x[i]]+[ppt_y[i]])
     int_obj.report_progress('Data exported to '+ par_obj.csvPath)
-    
+
 def save_ROI_area(par_obj, int_obj):
 
     with open(par_obj.csvPath+par_obj.modelName+'_outputROI_area.csv', 'wb') as csvfile:
@@ -1521,75 +1366,66 @@ def save_ROI_area(par_obj, int_obj):
                 for i in ppt_x.keys():
                     area += ROI_area(par_obj, fileno, tpt, i)
                 spamwriter.writerow([str(filename)]+[tpt+1]+[area])
-                
+
     int_obj.report_progress('Data exported to '+ par_obj.csvPath)
+
 def PolyArea(x, y):
     return 0.5*np.abs(np.dot(x, np.roll(y, 1))-np.dot(y, np.roll(x, 1)))
+
 def ROI_area(par_obj, fileno, tpt, zslice):
+    'Calculates area of interpolated ROI'
     ppt_x = par_obj.data_store['roi_stkint_x'][fileno][tpt][zslice]
     ppt_y = par_obj.data_store['roi_stkint_y'][fileno][tpt][zslice]
-    
+    imfile = par_obj.filehandlers[fileno]
     counter = 0
-    #for i in range(0,ppt_x.__len__()):
-        #pot.append([ppt_x[i],ppt_y[i]])
-    counter += par_obj.filehandlers[fileno].z_calibration * PolyArea(np.array(ppt_x), np.array(ppt_y))
-    #p = Path(pot)
-    #counter=0
-    #for y in range(0,par_obj.height):
-    #    for x in range(0,par_obj.width):
-    #        if p.contains_point([x,y]) == True:
-    #            counter+=1
+
+    counter += imfile.z_calibration * PolyArea(np.array(ppt_x), np.array(ppt_y))
+
     return counter
-        
+
 def load_user_ROI(par_obj, int_obj):
     #funky ordering TZCYX
     #fileName = QtGui.QFileDialog.getOpenFileName(None, "Load ROIs", filter="QuantiFly ROI files (*.outputROI)")
     #filename, file_ext = os.path.splitext(os.path.basename(fileName[0:-18]))
-    
+
     for fileno, imfile in enumerate(par_obj.filehandlers):
         name = imfile.full_name +'_outputROI.pickle'
         if os.path.isfile(name):
-            
-            with open(name, 'rb') as afile:                
+
+            with open(name, 'rb') as afile:
                 rois = pickle.load(afile)
                 par_obj.data_store['roi_stkint_x'][fileno] = rois[0]
-                resizef = 1           
-                
-                roi_f = par_obj.data_store['roi_stkint_x'][fileno]                
+                resizef = 1
+
+                roi_f = par_obj.data_store['roi_stkint_x'][fileno]
                 for t in roi_f:
                     for z in roi_f[t]:
                         roi_f[t][z] = [x*resizef for x in roi_f[t][z]]
-                        
+
                 par_obj.data_store['roi_stkint_y'][fileno] = rois[1]
-                roi_f = par_obj.data_store['roi_stkint_y'][fileno]                
+                roi_f = par_obj.data_store['roi_stkint_y'][fileno]
                 for t in roi_f:
                     for z in roi_f[t]:
                         roi_f[t][z] = [x*resizef for x in roi_f[t][z]]
 
 
-                        
+
                 if len(rois) > 2:
                     par_obj.data_store['roi_stk_x'][fileno] = rois[2]
-                    roi_f = par_obj.data_store['roi_stk_x'][fileno]                
+                    roi_f = par_obj.data_store['roi_stk_x'][fileno]
                     for t in roi_f:
                         for z in roi_f[t]:
-                            roi_f[t][z] = [x*resizef for x in roi_f[t][z]]                    
+                            roi_f[t][z] = [x*resizef for x in roi_f[t][z]]
                     par_obj.data_store['roi_stk_y'][fileno] = rois[3]
-                    roi_f = par_obj.data_store['roi_stk_y'][fileno]                
+                    roi_f = par_obj.data_store['roi_stk_y'][fileno]
                     for t in roi_f:
                         for z in roi_f[t]:
-                            roi_f[t][z] = [x*resizef for x in roi_f[t][z]]                    
-      
-    int_obj.report_progress('ROIs imported')
-    
+                            roi_f[t][z] = [x*resizef for x in roi_f[t][z]]
 
-def reset_parameters(par_obj):
-    par_obj.frames_2_load = {}
-    par_obj.left_2_calc = []
-    par_obj.saved_ROI = []
-    par_obj.saved_dots = []
-def processImgs(self, par_obj):
-    """Loads images and calculates the features."""
+    int_obj.report_progress('ROIs imported')
+
+def setup_parameters(self, par_obj):
+    """Loads parameters and initiates data structure"""
     #Resets everything should this be another patch of images loaded.
 
     par_obj.height = par_obj.ori_height/par_obj.resize_factor
@@ -1600,6 +1436,8 @@ def processImgs(self, par_obj):
     par_obj.curr_file = 0
 
     par_obj.initiate_data_store()
-    
 
-
+    par_obj.frames_2_load = {}
+    par_obj.left_2_calc = []
+    par_obj.saved_ROI = []
+    par_obj.saved_dots = []
