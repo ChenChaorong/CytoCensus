@@ -12,51 +12,54 @@ from gnu import return_license
 import numpy as np
 
 def navigation_setup(self,par_obj):
-    
+
     #Sets up the button which changes to the prev image
-    self.prev_im_btn = QtGui.QPushButton('Z (<)')
+    self.prev_im_btn = QtGui.QPushButton('Z ('+unichr(8595)+')')
     self.prev_im_btn.setEnabled(True)
-    
+
     #Sets up the button which changes to the next Image.
-    self.next_im_btn = QtGui.QPushButton('Z (>)')
+    self.next_im_btn = QtGui.QPushButton('Z ('+unichr(8593)+')')
     self.next_im_btn.setEnabled(True)
-    
+
     #Sets up the button which changes to the prev image
-    self.first_im_btn = QtGui.QPushButton('Z (<<)')
+    self.first_im_btn = QtGui.QPushButton('Z (bottom)')
     self.first_im_btn.setEnabled(True)
-    
+
     #Sets up the button which changes to the next Image.
-    self.last_im_btn = QtGui.QPushButton('Z (>>)')
+    self.last_im_btn = QtGui.QPushButton('Z (top)')
     self.last_im_btn.setEnabled(True)
-    
+
      #Sets up the button which changes to the prev image
-    self.prev_time_btn = QtGui.QPushButton('Time (<)')
+    self.prev_time_btn = QtGui.QPushButton('Time ('+unichr(8592)+')')
     self.prev_time_btn.setEnabled(True)
-    
+
     #Sets up the button which changes to the next Image.
-    self.next_time_btn = QtGui.QPushButton('Time (>)')
+    self.next_time_btn = QtGui.QPushButton('Time ('+unichr(8594)+')')
     self.next_time_btn.setEnabled(True)
-    
+
     #Sets up the button which changes to the next File.
     self.prev_file_btn = QtGui.QPushButton('File (<)')
     self.prev_file_btn.setEnabled(True)
-    
+
     #Sets up the button which changes to the next File.
     self.next_file_btn = QtGui.QPushButton('File (>)')
     self.next_file_btn.setEnabled(True)
-    
+
     self.output_count_txt = QtGui.QLabel()
-    
+
     self.panel_buttons = QtGui.QHBoxLayout()
     self.panel_buttons.addWidget(self.prev_im_btn)
     self.panel_buttons.addWidget(self.next_im_btn)
+    self.panel_buttons.addSpacing(5)
     self.panel_buttons.addWidget(self.first_im_btn)
     self.panel_buttons.addWidget(self.last_im_btn)
+    self.panel_buttons.addSpacing(5)
     self.panel_buttons.addWidget(self.prev_time_btn)
     self.panel_buttons.addWidget(self.next_time_btn)
+    self.panel_buttons.addSpacing(5)
     self.panel_buttons.addWidget(self.prev_file_btn)
     self.panel_buttons.addWidget(self.next_file_btn)
-
+    self.panel_buttons.addStretch()
     self.prev_im_btn.clicked.connect(lambda: self.Btn_fns.prev_im(par_obj))
     self.next_im_btn.clicked.connect(lambda: self.Btn_fns.next_im(par_obj))
     self.first_im_btn.clicked.connect(lambda: self.Btn_fns.first_im(par_obj))
