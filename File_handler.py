@@ -50,24 +50,24 @@ class File_handler(object):
     def __init__(self,file_path):
         #store high level file data and metadata
         self.full_name=file_path
-        
+
         self.base_name=os.path.basename(file_path)
         self.path=os.path.dirname(file_path)
-        
+
         self.ext = self.base_name.split(".")[-1]
         self.name = self.base_name.split(".")[0]
-        
+
         self.array = [] #memmap object l
-        self.z_calibration = 1 
+        self.z_calibration = 1
         self.order={} #ordering of tiff objects
         #default file extents
 
         self.max_t = 0
         self.max_z = 0
         self.numCH = 0
-        
+
         self.import_file()
-        
+
     def get_tiff_slice(self,tpt=[0],zslice=[0],x=[0],y=[0],c=[0]):
         #deal with different TXYZC orderings. Always return TZYXC
         #handles lists and ints nicely
@@ -92,21 +92,21 @@ class File_handler(object):
             if b=='X':
                 alist.append(x)
                 blist.append(n)
-    
+
         for n,b in enumerate(self.order):
             if b=='C' or b=='S':
                 alist.append(c)
                 blist.append(n)
-        
+
         tiff2=self.array.transpose(blist)
-        
+
         if self.order.__len__()==5:
             #tiff=np.squeeze(tiff2[alist[0],:,:,:,:][:,alist[1],:,:,:][:,:,alist[2],:,:][:,:,:,alist[3],:][:,:,:,:,alist[4]])
             tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1],alist[2],alist[3],alist[4])])
         elif self.order.__len__()==4:
             #tiff=np.squeeze(tiff2[alist[0],:,:,:][:,alist[1],:,:][:,:,alist[2],:][:,:,:,alist[3]])
             tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1],alist[2],alist[3])])
-    
+
         elif self.order.__len__()==3:
             #tiff=np.squeeze(tiff2[alist[0],:,:][:,alist[1],:][:,:,alist[2]])
             tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1],alist[2])])
@@ -114,11 +114,11 @@ class File_handler(object):
             #tiff=np.squeeze(tiff2[alist[0],:][:,alist[1]])
             tiff=np.squeeze(tiff2[np.ix_(alist[0],alist[1])])
         return tiff
-    
+
     def close(self):
         self.array =[]
         self.Tiff.close()
-        
+
     def import_file(self):
 
         #loads in Tiff image data for subsequent use
@@ -132,28 +132,28 @@ class File_handler(object):
         else:
             statusText = 'Status: Image format not-recognised. Please choose either png or TIFF files.'
             return False, statusText
-        
+
     def import_tiff(self):
             self.Tiff = TiffFile(self.full_name)
 
             meta = self.Tiff.series[0]
-            
+
             try: #if an imagej file, we know where, and can extract the x,y,z
             #if 1==1:
                 x = self.Tiff.pages[0].tags.x_resolution.value
                 y = self.Tiff.pages[0].tags.y_resolution.value
                 if x!=y: raise Exception('x resolution different to y resolution')# if this isn't true then something is wrong
                 x_res=float(x[1])/float(x[0])
-                
+
                 z=self.Tiff.pages[0].imagej_tags['spacing']
-                
+
                 self.z_calibration = z/x_res
-                
+
                 print('z_scale_factor', self.z_calibration)
             except:
                 #might need to modify this to work with OME-TIFFs
                 print 'tiff resolution not recognised'
-            
+
             self.order = meta.axes
             for n,b in enumerate(self.order):
                     if b == 'T':
@@ -171,11 +171,11 @@ class File_handler(object):
                         self.numCH = meta.shape[n]
 
             self.bitDepth = meta.dtype
-            
+
             self.array=self.Tiff.asarray(memmap=True)
-            
+
             self.tiffarraymax = self.array.max()
-            
+
             if self.bitDepth in ['uint8','uint16']:
                 self.tiffarray_typemax=np.iinfo(self.bitDepth).max
                 #12 bit depth
@@ -184,4 +184,4 @@ class File_handler(object):
             else:
                 self.tiffarray_typemax=np.finfo(self.bitDepth).max
 
-            
+
