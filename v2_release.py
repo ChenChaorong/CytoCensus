@@ -1,3 +1,4 @@
+# coding=UTF-8
 #Main script for running QuantiFly training.
 import time
 import numpy as np
@@ -17,7 +18,7 @@ from matplotlib.figure import Figure
 import v2_functions as v2
 #import numdifftools as ndt
 from common_navigation import navigation_setup,create_channel_objects,btn_fn, on_about
-from parameter_object import parameterClass
+from parameter_object import ParameterClass
 from user_ROI import ROI
 
 #import pdb
@@ -81,7 +82,7 @@ class fileDialog(QtGui.QMainWindow):
 
 
     def showDialog(self):
-        
+
         self.parent.selIntButton.setEnabled(False)
         par_obj.file_array =[]
         path =None
@@ -97,6 +98,8 @@ class fileDialog(QtGui.QMainWindow):
         self.parent.image_status_text.showMessage(updateText)
         if success == True:
             self.parent.updateAfterImport()
+            self.parent.resize_factor_text.hide()
+            self.parent.resize_factor_input.hide()
 
 
 class Load_win_fn(QtGui.QWidget):
@@ -111,7 +114,7 @@ class Load_win_fn(QtGui.QWidget):
         load_im_lo.addStretch()
         self.ex = fileDialog(self)
         self.loadImages_button.clicked.connect(self.ex.showDialog)
-        
+
         #about button
         about=QtGui.QPushButton('About',self)
         load_im_lo.addWidget(about)
@@ -119,47 +122,44 @@ class Load_win_fn(QtGui.QWidget):
         #SigmaData input field.
 
         resize_lo = QtGui.QHBoxLayout()
-        sigma_lo = QtGui.QHBoxLayout()
+
         sampling_lo= QtGui.QHBoxLayout()
         max_features_lo= QtGui.QHBoxLayout()
 
 
-        self.samplingText = QtGui.QLabel('Sampling:')
-        self.samplingText.resize(40,20)
+        self.samplingText = QtGui.QLabel('Sampling :')
+        self.samplingText.setToolTip('5 is a good default, try setting this lower for rare and small objects')
+        self.samplingText.resize(40, 20)
         self.samplingText.hide()
         self.sampling_input = QtGui.QLineEdit(str(par_obj.limit_ratio_size))
-        self.sampling_input.resize(10,10)
+        self.sampling_input.setToolTip('5 is a good default, try setting this lower for rare and small objects')
+        self.sampling_input.resize(10, 10)
         self.sampling_input.textChanged[str].connect(self.sampling_change)
         self.sampling_input.hide()
         sampling_lo.addWidget(self.samplingText)
         sampling_lo.addWidget(self.sampling_input)
-        self.featuresText = QtGui.QLabel('Max size Random Feature subset')
-        self.featuresText.resize(40,20)
-        self.featuresText.hide()
-        self.features_input = QtGui.QLineEdit(str(par_obj.max_features))
-        self.features_input.resize(10,10)
-        self.features_input.textChanged[str].connect(self.features_change)
-        self.features_input.hide()
-        max_features_lo.addWidget(self.featuresText)
-        max_features_lo.addWidget(self.features_input)
+        sampling_lo.addStretch()
+        #self.featuresText = QtGui.QLabel('Max size Random Feature subset')
+        #self.featuresText.resize(40, 20)
+        #self.featuresText.hide()
+        #self.features_input = QtGui.QLineEdit(str(par_obj.max_features))
+        #self.features_input.resize(10,10)
+        #self.features_input.textChanged[str].connect(self.features_change)
+        #self.features_input.hide()
+        #max_features_lo.addWidget(self.featuresText)
+        #max_features_lo.addWidget(self.features_input)
 
-        self.feature_scaleText = QtGui.QLabel('Input sigma for features:')
-        self.feature_scaleText.resize(40,20)
-        self.feature_scaleText.hide()
-        self.feature_scale_input = QtGui.QLineEdit(str(par_obj.feature_scale))
-        self.feature_scale_input.resize(10,10)
-        self.feature_scale_input.textChanged[str].connect(self.feature_scale_change)
-        self.feature_scale_input.hide()
-        sigma_lo.addWidget(self.feature_scaleText)
-        sigma_lo.addWidget(self.feature_scale_input)
 
         self.resize_factor_text = QtGui.QLabel('Resize Factor:')
-        self.resize_factor_text.resize(40,20)
+        self.resize_factor_text.resize(40, 20)
+        self.resize_factor_text.setToolTip('Subsample image for speed of calculation')
         self.resize_factor_input = QtGui.QLineEdit(str(par_obj.resize_factor))
-        self.resize_factor_input.resize(10,10)
+        self.resize_factor_input.setToolTip('Subsample image for speed of calculation')
+        self.resize_factor_input.resize(10, 10)
         self.resize_factor_input.textChanged[str].connect(self.resize_factor_change)
         resize_lo.addWidget(self.resize_factor_text)
         resize_lo.addWidget(self.resize_factor_input)
+        resize_lo.addStretch()
 
 
 
@@ -207,7 +207,7 @@ class Load_win_fn(QtGui.QWidget):
 
         #Image frames dialog.
         Text_FrmOpt1_panel = QtGui.QHBoxLayout()
-        self.Text_FrmOpt1 = QtGui.QLabel('Please choose the z-slices you wish to use for training. Use either \',\' to separate individual frames or a \'-\' to indicate a range:')
+        self.Text_FrmOpt1 = QtGui.QLabel('Please choose the z-slices you wish to use for training. Use \'-\' to indicate a range:')
         self.Text_FrmOpt1.hide()
         Im_Range_lo.addLayout(Text_FrmOpt1_panel)
 
@@ -242,22 +242,43 @@ class Load_win_fn(QtGui.QWidget):
         self.Text_Radio.hide()
         self.radio_group=QtGui.QButtonGroup(self) # Number
         self.r0 = QtGui.QRadioButton("Basic",self)
-        self.r1 = QtGui.QRadioButton("Fine",self)
-        self.r2 = QtGui.QRadioButton("Fine3",self)
-        self.r0.setChecked(True)
+        self.r0.setToolTip('13 features/channel (Set Feature size) - Fast, less accurate')
+        self.r1 = QtGui.QRadioButton("Detailed",self)
+        self.r1.setToolTip('21 features/channel (Set Feature size) - Slower, more accurate')
+        self.r2 = QtGui.QRadioButton("Pyramid (Default)",self)
+        self.r2.setToolTip('26 features/channel, calculated more efficiently. No need to set feature size')
+        self.r3 = QtGui.QRadioButton("Histogram equalised",self)
+        self.r3.setToolTip('Pyramid features but equalised. Try if your imaging conditions vary a lot - Slowest')
+        self.r2.setChecked(True)
         self.radio_group.addButton(self.r0)
         self.radio_group.addButton(self.r1)
         self.radio_group.addButton(self.r2)
+        self.radio_group.addButton(self.r3)
         self.r0.hide()
         self.r1.hide()
         self.r2.hide()
+        self.r3.hide()
         Radio_Layout=QtGui.QVBoxLayout()
         Radio_Layout.addWidget(self.Text_Radio)
         Radio_Layout.addWidget(self.r0)
         Radio_Layout.addWidget(self.r1)
         Radio_Layout.addWidget(self.r2)
+        Radio_Layout.addWidget(self.r3)
         Radio_Layout.addStretch()
-
+        
+        #Feature sigma, if basic or detailed features chosen 
+        sigma_lo = QtGui.QHBoxLayout()
+        self.feature_scaleText = QtGui.QLabel('Feature size (sigma):')
+        self.feature_scaleText.resize(40, 20)
+        self.feature_scaleText.hide()
+        self.feature_scale_input = QtGui.QLineEdit(str(par_obj.feature_scale))
+        self.feature_scale_input.resize(10, 10)
+        self.feature_scale_input.textChanged[str].connect(self.feature_scale_change)
+        self.feature_scale_input.hide()
+        sigma_lo.addWidget(self.feature_scaleText)
+        sigma_lo.addWidget(self.feature_scale_input)
+        sigma_lo.addStretch()
+        
         #Load images button
         Confirm_im_lo= QtGui.QHBoxLayout()
         self.confirmImages_btn = QtGui.QPushButton("Confirm Images")
@@ -284,13 +305,13 @@ class Load_win_fn(QtGui.QWidget):
         self.setLayout(vbox)
         vbox.addLayout(load_im_lo)
         vbox.addLayout(resize_lo)
-        vbox.addLayout(sigma_lo)
         vbox.addLayout(sampling_lo)
         vbox.addLayout(max_features_lo)
         vbox.addLayout(Channel_Select_lo)
         vbox.addLayout(canvas_lo)
         vbox.addLayout(Im_Range_lo)
         vbox.addLayout(Radio_Layout)
+        vbox.addLayout(sigma_lo)
         vbox.addStretch()
         vbox.addLayout(Confirm_im_lo)
         vbox.addWidget(self.image_status_text)
@@ -344,7 +365,6 @@ class Load_win_fn(QtGui.QWidget):
         self.canvas1.show()
         self.canvas1.draw()
 
-
         par_obj.ch_active =[];
         if par_obj.numCH> 0:
             self.Text_CHopt.show()
@@ -356,13 +376,17 @@ class Load_win_fn(QtGui.QWidget):
         #self.CH_cbx1.stateChange()
         self.feature_scale_input.show()
         self.feature_scaleText.show()
-        self.sampling_input.show()
-        self.samplingText.show()
-        self.features_input.show()
-        self.featuresText.show()
+        #self.features_input.show()
+        #self.featuresText.show()
         self.r0.show()
         self.r1.show()
         self.r2.show()
+        self.r3.show()
+        self.sampling_input.show()
+        self.samplingText.show()
+
+
+
         self.Text_Radio.show()
     def hyphen_range(self,s):
         """ yield each integer from a complex range string like "1-9,12, 15-20,23"
@@ -398,13 +422,13 @@ class Load_win_fn(QtGui.QWidget):
                 par_obj.tpt_list=range(par_obj.max_t)
         else:
             par_obj.tpt_list = [0]
-            
+
         if par_obj.max_z> 0:
             fmStr = self.linEdit_Frm.text()
             if fmStr != '': #catch empty limit
                 par_obj.user_max_z = max(self.hyphen_range(fmStr))
                 par_obj.user_min_z = min(self.hyphen_range(fmStr))
-            else: 
+            else:
                 par_obj.user_max_z = []
                 par_obj.user_min_z = 0
         else:
@@ -414,21 +438,23 @@ class Load_win_fn(QtGui.QWidget):
 
         self.image_status_text.showMessage('Status: Images loaded. Click \'Goto Training\'')
         self.selIntButton.setEnabled(True)
-        v2.processImgs(self,par_obj)
+        v2.setup_parameters(self,par_obj)
+        
         if self.r0.isChecked():
             par_obj.feature_type = 'basic'
         if self.r1.isChecked():
             par_obj.feature_type = 'fine'
-
         if self.r2.isChecked():
-            par_obj.feature_type = 'fine3'
+            par_obj.feature_type = 'pyramid'
+        if self.r3.isChecked():
+            par_obj.feature_type = 'histeq'
         print par_obj.feature_type
 
     def report_progress(self,message):
         self.image_status_text.showMessage('Status: '+message)
         app.processEvents()
-                
-        
+
+
 class Win_fn(QtGui.QWidget):
     """Class which houses main training functionality"""
     def __init__(self,par_obj):
@@ -447,7 +473,7 @@ class Win_fn(QtGui.QWidget):
         self.toolbar = NavigationToolbar(self.canvas1,self)
         self.toolbar.actionTriggered.connect(self.on_resize)
         self.toolbar.actionTriggered.connect(self.on_resize)
-        
+
         self.plt1.imshow(im_RGB)
 
         #Removes the tick labels
@@ -501,43 +527,51 @@ class Win_fn(QtGui.QWidget):
         self.count_txt = QtGui.QLabel()
 
         #Sets up the button which saves the ROI.
-        self.save_ROI_btn = QtGui.QPushButton('Save ROI')
+        self.save_ROI_btn = QtGui.QPushButton('1. Save ROI')
+
+        self.save_ROI_btn.setToolTip('Right-click and drag to make ROI. Then Save ROI (Space)')
         self.save_ROI_btn.setEnabled(True)
 
         #Sets up the button which saves the ROI.
-        self.save_dots_btn = QtGui.QPushButton('Save Dots')
+        self.save_dots_btn = QtGui.QPushButton('2. Save Dots')
+        self.save_dots_btn.setToolTip('Click within ROI to add annotations. Then Save Dots')
         self.save_dots_btn.setEnabled(False)
 
         #Button for training model
-        self.train_model_btn = QtGui.QPushButton('Train Model')
+        self.train_model_btn = QtGui.QPushButton('3. Train Model')
+        self.train_model_btn.setToolTip('When annotations are added, train the model')
         self.train_model_btn.setEnabled(False)
 
         #Selects and reactivates an existing ROI.
         self.sel_ROI_btn = QtGui.QPushButton('Select ROI')
+        self.sel_ROI_btn.setToolTip('Click on ROI to select- Select ROI highlighted in yellow')
         self.sel_ROI_btn.setEnabled(True)
         self.select_ROI= False
 
         #Allows deletion of dots.
         self.remove_dots_btn = QtGui.QPushButton('Remove Dots')
+        self.remove_dots_btn.setToolTip('Select ROI, then click Remove dots, and choose dots to remove')
         self.remove_dots_btn.setEnabled(False)
         self.remove_dots = False
 
         #Load in ROI file.
         self.load_gt_btn = QtGui.QPushButton('Import ROI/Dots')
+        self.load_gt_btn.setToolTip('Load previously saved annotation file')
         self.load_gt_btn.setEnabled(True)
         self.load_gt = False
 
         #Save in ROI file.
-        self.save_gt_btn = QtGui.QPushButton('Output ROI/Dots')
+        self.save_gt_btn = QtGui.QPushButton('Export ROI/Dots')
+        self.save_gt_btn.setToolTip('Save ROIs and dots to annotation file (.quantiROI)')
         self.save_gt_btn.setEnabled(True)
         self.save_gt = False
-        
+
         #common navigation elements
-        self.Btn_fns = btn_fn(self)     
+        self.Btn_fns = btn_fn(self)
         navigation_setup(self,par_obj)
 
         #Populates the grid with the different widgets.
-        self.top_left_grid.addLayout(self.panel_buttons, 0, 0,1,4)
+        self.top_left_grid.addLayout(self.panel_buttons, 0, 0,1,3)
 
         self.top_left_grid.addWidget(self.image_num_txt, 2, 0, 2, 3)
         self.top_left_grid.addWidget(self.save_ROI_btn, 4, 0)
@@ -550,7 +584,8 @@ class Win_fn(QtGui.QWidget):
 
         #SigmaData input Label.
         self.sigma_data_text = QtGui.QLabel(self)
-        self.sigma_data_text.setText('Input Sigma for Kernel Size:')
+        self.sigma_data_text.setText('Object size (pixels):')
+        self.sigma_data_text.setToolTip('Set this smaller than the object size. Map on right hand side should show similar size objects to those in your image')
         self.top_right_grid.addWidget(self.sigma_data_text, 0, 0)
 
         #SigmaData input field.
@@ -581,6 +616,7 @@ class Win_fn(QtGui.QWidget):
 
         #Saves the model
         self.save_model_btn = QtGui.QPushButton('Save Training Model')
+        self.save_model_btn.setToolTip('When happy with your training, save the model for batch processing')
         self.save_model_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.save_model_btn, 1, 0)
 
@@ -605,15 +641,18 @@ class Win_fn(QtGui.QWidget):
         self.top_right_grid.addWidget(self.kernel_show_btn, 2, 2)
 
         self.evaluate_btn = QtGui.QPushButton('Evaluate Forest')
+        self.evaluate_btn.setToolTip('Evaluate the model on another timepoint')
         self.evaluate_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.evaluate_btn, 3, 0)
 
-        self.count_maxima_btn = QtGui.QPushButton('Count Maxima')
+        self.count_maxima_btn = QtGui.QPushButton('Find object centres')
+        self.count_maxima_btn.setToolTip('Use the probability map to estimate cell centres')
         self.count_maxima_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.count_maxima_btn, 4, 0)
 
         #Button for overlay
         self.overlay_prediction_btn = QtGui.QPushButton('Overlay Prediction')
+        self.overlay_prediction_btn.setToolTip('Switch between displaying Prediction, Training, and Cell centres')
         self.overlay_prediction_btn.setEnabled(True)
         self.top_right_grid.addWidget(self.overlay_prediction_btn, 0,2)
 
@@ -656,8 +695,6 @@ class Win_fn(QtGui.QWidget):
 
         self.top_right_grid.addLayout(self.min_distance_panel,4,1,1,2)
         #self.top_right_grid.addWidget(self.count_maxima_plot_on,4,2)
-
-
 
         self.top_right_grid.setRowStretch(4,2)
 
@@ -715,9 +752,9 @@ class Win_fn(QtGui.QWidget):
         par_obj.subdivide_ROI = []
         self.m_Cursor = self.makeCursor()
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
-        
 
-        
+
+
     def evaluate_forest_fn(self):
         #Don't want to train for all the images so we select them.
         v2.im_pred_inline_fn_new(par_obj, self,range(par_obj.max_z+1),[par_obj.curr_t],[par_obj.curr_file],threaded=True)
@@ -727,22 +764,22 @@ class Win_fn(QtGui.QWidget):
         self.kernel_btn_fn()
         print 'evaluating'
         self.image_status_text.showMessage('Evaluation complete')
-        
+
     def save_gt_v2(self):
-        
+
         model_name = self.save_model_name_txt.text()
-        
+
         #funky ordering TZCYX
         for fileno,imfile in enumerate(par_obj.filehandlers):
-            
+
             rects=[par_obj.saved_ROI[x] for x,y in enumerate(par_obj.saved_ROI) if y[6]==fileno]
             dots=[par_obj.saved_dots[x] for x,y in enumerate(par_obj.saved_ROI) if y[6]==fileno]
-    
+
             file_to_save = {'dots':dots,'rect':rects}
-        
+
             fileName = imfile.path+'/'+imfile.name+'_'+model_name+'.quantiROI'
             pickle.dump( file_to_save, open( fileName, "wb" ) )
-                        
+
     def save_gt_fn(self):
         file_to_save = {'dots':par_obj.saved_dots,'rect':par_obj.saved_ROI}
         fileName = QtGui.QFileDialog.getSaveFileName(self, "Save dots and regions", "~/Documents", ".quantiROI");
@@ -750,7 +787,7 @@ class Win_fn(QtGui.QWidget):
         if fileName[-10:]=='.quantiROI':
             fileName=fileName[0:-10]
         pickle.dump( file_to_save, open( fileName+".quantiROI", "wb" ) )
-        
+
     def load_gt_fn(self):
         print 'load the gt'
         fileName = QtGui.QFileDialog.getOpenFileName(self, "Load dots and regions", "~/Documents", "QuantiFly ROI files (*.quantiROI) ;;MTrackJ Data Format (*.mdf)")
@@ -832,7 +869,7 @@ class Win_fn(QtGui.QWidget):
     def report_progress(self,message):
         self.image_status_text.showMessage('Status: '+message)
         app.processEvents()
-        
+
     def keyPressEvent(self, ev):
         """When the . and , keys are pressed"""
         if ev.key() == QtCore.Qt.Key_Period:
@@ -853,7 +890,7 @@ class Win_fn(QtGui.QWidget):
             self.Btn_fns.next_im(par_obj)
         if event.delta() < 0:
             self.Btn_fns.prev_im(par_obj)
-            
+
     def loadTrainFn(self):
         #Win_fn()
         channel_wid = QtGui.QWidget()
@@ -861,7 +898,7 @@ class Win_fn(QtGui.QWidget):
         channel_wid.setLayout(channel_lay)
 
         win.top_left_grid.addWidget(channel_wid,1,0,1,3)
-        
+
         ChannelGroup=create_channel_objects(self,par_obj,par_obj.numCH)
         for chbx,contrast,brightness in ChannelGroup:
             channel_lay.addWidget(chbx)
@@ -902,7 +939,7 @@ class Win_fn(QtGui.QWidget):
         """When the image is clicked"""
         if event.button == 1: #left
             if(par_obj.draw_ROI == True):
-                
+
                 par_obj.mouse_down = True
                 self.save_roi_fn()
             else:
@@ -913,7 +950,7 @@ class Win_fn(QtGui.QWidget):
             par_obj.mouse_down = True
 
             if(par_obj.draw_ROI == True):
-    
+
                 self.x1 = event.xdata
                 self.y1 = event.ydata
                 par_obj.ori_x = event.xdata
@@ -982,7 +1019,7 @@ class Win_fn(QtGui.QWidget):
                 par_obj.rect_h = par_obj.ori_y_2 - par_obj.ori_y
             t1 = time.time()
             print t1-t2
-            
+
         #If we are in the dot drawing phase
         elif(par_obj.draw_dots == True and event.button == 1):
             x = int(np.round(event.xdata,0))
@@ -1348,7 +1385,7 @@ class Win_fn(QtGui.QWidget):
     def feat_scale_change_btn_fn(self):
         self.feat_scale_change_btn.setEnabled(False)
         print('Training Features')
-        v2.processImgs()
+        v2.setup_parameters()
         v2.refresh_all_density()
         self.feat_scale_change_btn.setEnabled(True)
         self.image_status_text.showMessage('Model Trained. Continue adding samples, or click \'Save Training Model\'. ')
@@ -1425,15 +1462,17 @@ class Win_fn(QtGui.QWidget):
                 save_im[:,:,0] = par_obj.save_im[:, :,0]
                 save_im[:,:,1] = par_obj.save_im[:, :,0]
                 save_im[:,:,2] = par_obj.save_im[:, :,0]
-                
+
         par_obj.file_ext=''        #added for backwards compatibility when saving
 
-        save_file ={"name":par_obj.modelName,'description':par_obj.modelDescription,"c":par_obj.c,"M":par_obj.M,\
-        "sigma_data":par_obj.sigma_data, "model":par_obj.RF, "date":local_time, "feature_type":par_obj.feature_type, \
-        "feature_scale":par_obj.feature_scale, "ch_active":par_obj.ch_active, "limit_ratio_size":par_obj.limit_ratio_size, \
-        "max_depth":par_obj.max_depth, "min_samples":par_obj.min_samples_split, "min_samples_leaf":par_obj.min_samples_leaf,\
-        "max_features":par_obj.max_features, "num_of_tree":par_obj.num_of_tree, "file_ext":par_obj.file_ext, "imFile":save_im,\
-        "resize_factor":par_obj.resize_factor, "min_distance":par_obj.min_distance, "abs_thr":par_obj.abs_thr,"rel_thr":par_obj.rel_thr,"max_det": par_obj.max_det};
+
+        save_file ={"name":par_obj.modelName,'description':par_obj.modelDescription,"c":par_obj.c,"M":par_obj.M,
+        "sigma_data":par_obj.sigma_data, "model":par_obj.RF, "date":local_time, "feature_type":par_obj.feature_type, 
+        "feature_scale":par_obj.feature_scale, "ch_active":par_obj.ch_active, "limit_ratio_size":par_obj.limit_ratio_size, 
+        "max_depth":par_obj.max_depth, "min_samples":par_obj.min_samples_split, "min_samples_leaf":par_obj.min_samples_leaf,
+        "max_features":par_obj.max_features, "num_of_tree":par_obj.num_of_tree, "file_ext":par_obj.file_ext, "imFile":save_im,
+        "resize_factor":par_obj.resize_factor, "min_distance":par_obj.min_distance, "abs_thr":par_obj.abs_thr,
+        "rel_thr":par_obj.rel_thr,"max_det": par_obj.max_det};
 
         pickle.dump(save_file, open(filename, "wb"))
         self.save_model_btn.setEnabled(False)
@@ -1461,7 +1500,7 @@ if __name__ == '__main__':
     #Creates tab widget.
     win_tab = QtGui.QTabWidget()
     #Creates win, an instance of QWidget
-    par_obj  = parameterClass()
+    par_obj  = ParameterClass()
     win = Win_fn(par_obj)
     loadWin= Load_win_fn(par_obj,win)
 
