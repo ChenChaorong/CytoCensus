@@ -913,7 +913,16 @@ def return_rgb_slice(par_obj, zslice, tpt, imno):
 
                 input_im = imfile.get_tiff_slice([tpt], [zslice], width, height, [ch])
                 imRGB[:, :, ch] = (input_im.astype('float32')/par_obj.filehandlers[imno].tiffarraymax)*clim[ch][1]-clim[ch][0]
-
+    
+    elif par_obj.numCH == 1 and len(par_obj.ch_display) == 1:
+        input_im = imfile.get_tiff_slice([tpt], [zslice], width, height)
+        
+        im = ((input_im.astype('float32')/par_obj.filehandlers[imno].tiffarraymax)*clim[0][1]-clim[0][0])
+        imRGB[:, :, 0] = im
+        imRGB[:, :, 1] = im
+        imRGB[:, :, 2] = im
+        
+        
     imRGB = np.clip(imRGB, 0, 1)
     return imRGB
 
@@ -1191,8 +1200,9 @@ def import_data_fn(par_obj, file_array, file_array_offset=0):
         #currently doesn't check if multiple filetypes, on the basis only loads tiffs
         #check number of channels is consistent
         if imno == 0:
-            par_obj.numCH = par_obj.filehandlers[imno].numCH
-        elif par_obj.numCH == par_obj.filehandlers[imno].numCH:
+            par_obj.numCH = max(par_obj.filehandlers[imno].numCH,1)
+                
+        elif par_obj.numCH == max(par_obj.filehandlers[imno].numCH,1):
             pass
         else:
             status_text = 'Different number of image channels in the selected images'
