@@ -382,7 +382,7 @@ def count_maxima_2d(par_obj, time_pt, fileno):
     pts2keep = []
     for pt2d in pts:
 
-        T = xxi[pt2d[0], pt2d[1], pt2d[2]]
+        T = xx[pt2d[0], pt2d[1], pt2d[2]]
         #D=det[pt2d[0],pt2d[1],pt2d[2]]
         # Removes points that are positive definite and therefore minima
         if T > 0: # and D>0:
