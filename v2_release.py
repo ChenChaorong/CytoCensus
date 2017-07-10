@@ -359,7 +359,12 @@ class Load_win_fn(QtGui.QWidget):
         self.confirmImages_btn.setEnabled(True)
 
         self.plt1.cla()
-        self.plt1.imshow(par_obj.ex_img/par_obj.ex_img.max())
+        
+        if par_obj.ex_img.max() <> 0:
+            self.plt1.imshow(par_obj.ex_img/par_obj.ex_img.max())
+        else:
+            self.plt1.imshow(par_obj.ex_img)
+            
         self.plt1.set_xticklabels([])
         self.plt1.set_yticklabels([])
         self.canvas1.show()
