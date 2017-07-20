@@ -806,7 +806,7 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
     if par_obj.FORCE_nothreading is not False:
         threaded = par_obj.FORCE_nothreading
 
-    if threaded is False:
+    if threaded == 0:
 
         for imno in imnoList:
             for tpt in tptList:
@@ -1271,30 +1271,22 @@ def save_output_hess_fn(par_obj, int_obj):
         print 'Prediction written to disk'
         imsave(par_obj.csvPath+par_obj.file_name[fileno]+'_'+par_obj.modelName+'_Hess.tif', image, imagej=True)
         int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
-"""
+
 def save_output_mask_fn(par_obj,int_obj):
     #funky ordering TZCYX
     for fileno,imfile in enumerate(par_obj.filehandlers):
-        image = np.zeros([imfile.max_t+1,imfile.max_z+1,1,par_obj.height,par_obj.width], 'bool')
+        filename = imfile.full_name
+        image = np.zeros([imfile.max_t+1,imfile.max_z+1,1,par_obj.height,par_obj.width], 'uint8')
         for tpt in range(imfile.max_t+1):
 
             for i in range(0,par_obj.data_store['pts'][fileno][tpt].__len__()):
                 [x,y,z,W]=par_obj.data_store['pts'][fileno][tpt][i]
                 if W:
                     image[tpt,z,0,x,y]=255
-        dist=list(par_obj.min_distance)
-        selem=ball(np.round(dist[0],0)).astype('bool')
-        if dist[2] is not 0:
-            drange=range(selem.shape[0]/2,selem.shape[0],np.round(dist[0]/dist[2],0).astype('uint8'))
-            lrange=range(0,selem.shape[0]/2,np.round(dist[0]/dist[2],0).astype('uint8'))
-            selem2=selem[np.newaxis,lrange+drange,np.newaxis,:,:]
-        else:
-            selem=disk(np.round(dist[0])).astype('bool')
-            selem2=selem[np.newaxis,np.newaxis,np.newaxis,:,:]
-        image=scipy.ndimage.binary_dilation(image,selem2).astype('uint8')
-        imsave(par_obj.csvPath+par_obj.file_name[fileno]+'_'+par_obj.modelName+'_Hess.tif',image, imagej=True)
+
+        imsave(filename+'_'+par_obj.modelName+'_Hess.tif',image, imagej=True)
         int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
-"""
+
 def save_output_ROI(par_obj, int_obj):
     #funky ordering TZCYX
     for fileno, imfile in enumerate(par_obj.filehandlers):
