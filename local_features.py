@@ -71,7 +71,7 @@ def feature_create_threadable(par_obj, imRGB):
     feat = np.zeros(((int(par_obj.crop_y2) - int(par_obj.crop_y1)), (int(par_obj.crop_x2) -
     int(par_obj.crop_x1)), feat_length * (par_obj.ch_active.__len__())))
 
-    if par_obj.numCH == 0:
+    if par_obj.numCH == 1:
         imG = imRGB[:, :].astype(np.float32)
 
         feat = feat_func(imG, par_obj.feature_scale)
