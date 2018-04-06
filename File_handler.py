@@ -180,7 +180,7 @@ class File_handler(object):
                 self.tiffarray_typemax=np.iinfo(self.bitDepth).max
                 #12 bit depth
                 if self.bitDepth in ['uint16'] and self.tiffarraymax<4096:
-                    self.tiffarray_typemax=4095
+                    self.tiffarray_typemax=4095          
             else:
                 self.tiffarray_typemax=np.finfo(self.bitDepth).max
 
