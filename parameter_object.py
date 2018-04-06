@@ -49,7 +49,7 @@ class ParameterClass(object):
         self.c = 0
         self.M = 1
 
-
+        self.z_project = False
         #store high level file data and metadata
         self.file_name = {}
         self.file_array = []
@@ -76,7 +76,7 @@ class ParameterClass(object):
         #hessian defaults
         self.min_distance = [2, 2, 2]
         self.min_distance_old = []
-        self.abs_thr = 0.05
+        self.abs_thr = 1
         self.rel_thr = 0
         self.z_cal = 1
         self.max_det = []
@@ -105,7 +105,7 @@ class ParameterClass(object):
         self.limit_size = 3000 #patches per image or ROI. # overridden by limit ratio
         self.roi_tolerance = 10
         self.double_train = False
-        self.count_maxima_small = False
+        self.count_maxima_laplace = False
         #Random Forest parameters
         self.RF = {} #possibility to apply multiple models efficiently. Not implemented
         self.max_depth = 10
