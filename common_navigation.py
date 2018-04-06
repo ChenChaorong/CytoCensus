@@ -236,19 +236,14 @@ class contrast_controller(QtGui.QSlider):
 
     def change_contrast(self,value):
         value = float(value)
-        for idx,ch in enumerate(self.par_obj.ch_display):
-            if self.ID==ch:
-
-                self.par_obj.clim[ch][1]=value
-
+        self.par_obj.clim[self.ID][1]=value
         self.Win.goto_img_fn()
 
     def change_brightness(self,value):
 
         value = float(value)/10-0.5
-        for idx,ch in enumerate(self.par_obj.ch_display):
-            if self.ID==ch:
-                self.par_obj.clim[ch][0]=value
+        print self.ID
+        self.par_obj.clim[self.ID][0]=value
 
         self.Win.goto_img_fn()
 
