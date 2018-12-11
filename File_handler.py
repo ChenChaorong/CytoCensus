@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 import numpy as np
-from tifffile import TiffFile, imsave #Install with pip install tifffile.
+from tifffile import TiffFile, imsave, TiffWriter#Install with pip install tifffile.
 import os
 """
 Created on Fri Feb 17 19:48:58 2017
@@ -184,4 +184,66 @@ class File_handler(object):
             else:
                 self.tiffarray_typemax=np.finfo(self.bitDepth).max
 
+class Intermediate_handler():
+    """ Wrapper for saving intermediate results to file and keeping track of them """
+    def  __init__(self,filename):
+        try:
+            os.remove(filename)
+        except:
+            pass
+        self.plane = 0
+        self.tif = None
+        self.filename = filename
+        self.refs = []
+        self.array = None
+    def reader(self):
+        self.read = True
+        self.write = False
+        return self
+        
+    def writer(self):
+        self.write = True
+        self.read = False
+        return self
+        
+    def __enter__(self):
+        if self.write:
+            self.tif = TiffWriter(self.filename, bigtiff=True,append=True)
+        if self.read:
+            self.tif = TiffFile(self.filename)
+            self.array = self.tif.asarray(memmap=True)
 
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+            self.array = None
+            self.tif.close()
+                
+
+    def close(self):
+            self.array = None
+            
+            if self.tif is not None:
+                self.tif.close()
+
+    def write_plane(self, data,t,z,f):
+        #works plane by plane
+        #print 'writing plane' + str((t,z,f))
+        #print data.shape
+            
+        self.tif.save(data, compress = 0, contiguous = True)
+        
+        if len(data.shape)>2:
+            for i in range (data.shape[0]):
+                self.plane += 1
+                self.refs = self.refs + [(t,z+i)]
+        else:
+            self.plane += 1
+            self.refs = self.refs + [(t,z)]
+    
+    def read_plane(self,t,z,f):
+        #works plane by plane
+        planeno = self.refs.index((t,z))
+        return np.squeeze(self.tif.asarray(planeno))
+        
+        
