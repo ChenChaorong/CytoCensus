@@ -2,7 +2,8 @@
 #Main script for running QuantiFly training.
 import time
 import numpy as np
-from PyQt4 import QtGui, QtCore,QtWebKit
+from PyQt5 import QtGui, QtCore#,QtWebKit
+from PyQt5 import QtWidgets
 import errno
 import os
 import os.path
@@ -17,9 +18,13 @@ from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as Navigatio
 from matplotlib.figure import Figure
 import v2_functions as v2
 #import numdifftools as ndt
-from common_navigation import navigation_setup,create_channel_objects,btn_fn, on_about
+from common_navigation import navigation_setup,create_channel_objects,btn_fn, on_about, Worker
 from parameter_object import ParameterClass
 from user_ROI import ROI
+
+import signal
+
+signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 #import pdb
 """QBrain Software v0.1
@@ -42,7 +47,7 @@ from user_ROI import ROI
 """
 
 
-class fileDialog(QtGui.QMainWindow):
+class fileDialog(QtWidgets.QMainWindow):
     """The dialog for loading images"""
     def __init__(self,parent):
         super(fileDialog, self).__init__()
@@ -63,11 +68,11 @@ class fileDialog(QtGui.QMainWindow):
 
     def initUI(self):
 
-        self.textEdit = QtGui.QTextEdit()
+        self.textEdit = QtWidgets.QTextEdit()
         self.setCentralWidget(self.textEdit)
         self.statusBar()
 
-        openFile = QtGui.QAction(QtGui.QIcon('open.png'), 'Open', self)
+        openFile = QtWidgets.QAction(QtGui.QIcon('open.png'), 'Open', self)
 
         openFile.setShortcut('Ctrl+O')
         openFile.setStatusTip('Open new File')
@@ -84,54 +89,62 @@ class fileDialog(QtGui.QMainWindow):
     def showDialog(self):
 
         self.parent.selIntButton.setEnabled(False)
+
         par_obj.file_array =[]
-        path =None
-        for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file',self.parent.filepath,'Images(*.tif *.tiff);;'):
-            par_obj.file_array.append(path)
+        path = None
+        for path in QtWidgets.QFileDialog.getOpenFileNames(self, 'Open file',self.parent.filepath,'Images(*.tif *.tiff);;'):
+            if path <> '':
+                par_obj.file_array.append(path[0])
         if path==None:return
+        
         self.parent.config['filepath'] = str(QtCore.QFileInfo(path).absolutePath())+'/'
         pickle.dump(self.parent.config, open(str(os.path.expanduser('~')+'/.densitycount/config.p'), "w" ))
 
         self.parent.image_status_text.showMessage('Status: Loading Images. ')
-        success, updateText = v2.import_data_fn(par_obj, par_obj.file_array)
 
+        success, updateText = v2.import_data_fn(par_obj, par_obj.file_array)
+        
+        
         self.parent.image_status_text.showMessage(updateText)
         if success == True:
             self.parent.updateAfterImport()
             self.parent.resize_factor_text.hide()
             self.parent.resize_factor_input.hide()
+        else :
+            self.parent.image_status_text.showMessage('Image import unsuccesful. Use TIF files')
+        return
 
 
-class Load_win_fn(QtGui.QWidget):
+class Load_win_fn(QtWidgets.QWidget):
     """The class for loading and processing images"""
     def __init__(self,par_obj,win):
         super(Load_win_fn, self).__init__()
 
         #Load images button
-        load_im_lo = QtGui.QHBoxLayout()
-        self.loadImages_button = QtGui.QPushButton("Load Images", self)
+        load_im_lo = QtWidgets.QHBoxLayout()
+        self.loadImages_button = QtWidgets.QPushButton("Load Images", self)
         load_im_lo.addWidget(self.loadImages_button)
         load_im_lo.addStretch()
         self.ex = fileDialog(self)
         self.loadImages_button.clicked.connect(self.ex.showDialog)
 
         #about button
-        about=QtGui.QPushButton('About',self)
+        about=QtWidgets.QPushButton('About',self)
         load_im_lo.addWidget(about)
         about.clicked.connect(lambda: on_about(self))
         #SigmaData input field.
 
-        resize_lo = QtGui.QHBoxLayout()
+        resize_lo = QtWidgets.QHBoxLayout()
 
-        sampling_lo= QtGui.QHBoxLayout()
-        max_features_lo= QtGui.QHBoxLayout()
+        sampling_lo= QtWidgets.QHBoxLayout()
+        max_features_lo= QtWidgets.QHBoxLayout()
 
 
-        self.samplingText = QtGui.QLabel('Sampling :')
+        self.samplingText = QtWidgets.QLabel('Sampling :')
         self.samplingText.setToolTip('5 is a good default, try setting this lower for rare and small objects')
         self.samplingText.resize(40, 20)
         self.samplingText.hide()
-        self.sampling_input = QtGui.QLineEdit(str(par_obj.limit_ratio_size))
+        self.sampling_input = QtWidgets.QLineEdit(str(par_obj.limit_ratio_size))
         self.sampling_input.setToolTip('5 is a good default, try setting this lower for rare and small objects')
         self.sampling_input.resize(10, 10)
         self.sampling_input.textChanged[str].connect(self.sampling_change)
@@ -139,10 +152,10 @@ class Load_win_fn(QtGui.QWidget):
         sampling_lo.addWidget(self.samplingText)
         sampling_lo.addWidget(self.sampling_input)
         sampling_lo.addStretch()
-        #self.featuresText = QtGui.QLabel('Max size Random Feature subset')
+        #self.featuresText = QtWidgets.QLabel('Max size Random Feature subset')
         #self.featuresText.resize(40, 20)
         #self.featuresText.hide()
-        #self.features_input = QtGui.QLineEdit(str(par_obj.max_features))
+        #self.features_input = QtWidgets.QLineEdit(str(par_obj.max_features))
         #self.features_input.resize(10,10)
         #self.features_input.textChanged[str].connect(self.features_change)
         #self.features_input.hide()
@@ -150,10 +163,10 @@ class Load_win_fn(QtGui.QWidget):
         #max_features_lo.addWidget(self.features_input)
 
 
-        self.resize_factor_text = QtGui.QLabel('Resize Factor:')
+        self.resize_factor_text = QtWidgets.QLabel('Resize Factor:')
         self.resize_factor_text.resize(40, 20)
         self.resize_factor_text.setToolTip('Subsample image for speed of calculation')
-        self.resize_factor_input = QtGui.QLineEdit(str(par_obj.resize_factor))
+        self.resize_factor_input = QtWidgets.QLineEdit(str(par_obj.resize_factor))
         self.resize_factor_input.setToolTip('Subsample image for speed of calculation')
         self.resize_factor_input.resize(10, 10)
         self.resize_factor_input.textChanged[str].connect(self.resize_factor_change)
@@ -164,13 +177,14 @@ class Load_win_fn(QtGui.QWidget):
 
 
         #Channel dialog generation.
-        Channel_Select_lo = QtGui.QVBoxLayout()
-        Channel_button_lo = QtGui.QHBoxLayout()
-        self.Text_CHopt = QtGui.QLabel('Please select which channels you want to include in the feature calculation')
+        Channel_Select_lo = QtWidgets.QVBoxLayout()
+        Channel_button_lo = QtWidgets.QHBoxLayout()
+        self.Text_CHopt = QtWidgets.QLabel('Please select which channels you want to include in the feature calculation')
         Channel_Select_lo.addWidget(self.Text_CHopt)
         self.Text_CHopt.resize(500,40)
         self.Text_CHopt.hide()
         #Object factory for channel selection.
+
         ButtonGroup=create_channel_objects(self,par_obj,10,True)
         for cbx in ButtonGroup:
             cbx[0].hide()
@@ -190,37 +204,37 @@ class Load_win_fn(QtGui.QWidget):
         self.canvas1.hide()
         par_obj.rect_h=0
         par_obj.rect_w=0
-        canvas_lo =QtGui.QHBoxLayout()
+        canvas_lo =QtWidgets.QHBoxLayout()
         canvas_lo.addWidget(self.canvas1)
         canvas_lo.addStretch()
 
 
         #Image range selection
-        Im_Range_lo=QtGui.QVBoxLayout()
+        Im_Range_lo=QtWidgets.QVBoxLayout()
         #Image Details
-        self.Text_FrmOpt2 = QtGui.QLabel()
+        self.Text_FrmOpt2 = QtWidgets.QLabel()
         Im_Range_lo.addWidget(self.Text_FrmOpt2)
         self.Text_FrmOpt2.hide()
-        self.Text_FrmOpt4 = QtGui.QLabel()
+        self.Text_FrmOpt4 = QtWidgets.QLabel()
         Im_Range_lo.addWidget(self.Text_FrmOpt4)
         self.Text_FrmOpt4.hide()
 
         #Image frames dialog.
-        Text_FrmOpt1_panel = QtGui.QHBoxLayout()
-        self.Text_FrmOpt1 = QtGui.QLabel('Please choose the z-slices you wish to use for training. Use \'-\' to indicate a range:')
+        Text_FrmOpt1_panel = QtWidgets.QHBoxLayout()
+        self.Text_FrmOpt1 = QtWidgets.QLabel('Please choose the z-slices you wish to use for training. Use \'-\' to indicate a range:')
         self.Text_FrmOpt1.hide()
         Im_Range_lo.addLayout(Text_FrmOpt1_panel)
 
         #Image frames input.
-        linEdit_Frm_panel = QtGui.QHBoxLayout()
-        self.linEdit_Frm = QtGui.QLineEdit()
+        linEdit_Frm_panel = QtWidgets.QHBoxLayout()
+        self.linEdit_Frm = QtWidgets.QLineEdit()
         self.linEdit_Frm.hide()
         linEdit_Frm_panel.addWidget(self.linEdit_Frm)
         linEdit_Frm_panel.addStretch()
         Im_Range_lo.addLayout(linEdit_Frm_panel)
 
-        Text_FrmOpt3_panel = QtGui.QHBoxLayout()
-        self.Text_FrmOpt3 = QtGui.QLabel()
+        Text_FrmOpt3_panel = QtWidgets.QHBoxLayout()
+        self.Text_FrmOpt3 = QtWidgets.QLabel()
         self.Text_FrmOpt3.setText('Please choose the time-points you wish to use for training. Use either \',\' to separate individual frames or a \'-\' to indicate a range:')
         self.Text_FrmOpt3.hide()
         Text_FrmOpt1_panel.addWidget(self.Text_FrmOpt1)
@@ -228,8 +242,8 @@ class Load_win_fn(QtGui.QWidget):
         Im_Range_lo.addLayout(Text_FrmOpt3_panel)
 
 
-        linEdit_Frm_panel2 = QtGui.QHBoxLayout()
-        self.linEdit_Frm2 = QtGui.QLineEdit()
+        linEdit_Frm_panel2 = QtWidgets.QHBoxLayout()
+        self.linEdit_Frm2 = QtWidgets.QLineEdit()
         self.linEdit_Frm2.hide()
         linEdit_Frm_panel2.addWidget(self.linEdit_Frm2)
         linEdit_Frm_panel2.addStretch()
@@ -237,17 +251,17 @@ class Load_win_fn(QtGui.QWidget):
 
 
         #Feature calculation type to perform:
-        self.Text_Radio = QtGui.QLabel('Feature select which kind of feature detection you would like to use:')
+        self.Text_Radio = QtWidgets.QLabel('Feature select which kind of feature detection you would like to use:')
         self.Text_Radio.resize(500,40)
         self.Text_Radio.hide()
-        self.radio_group=QtGui.QButtonGroup(self) # Number
-        self.r0 = QtGui.QRadioButton("Basic",self)
+        self.radio_group=QtWidgets.QButtonGroup(self) # Number
+        self.r0 = QtWidgets.QRadioButton("Basic",self)
         self.r0.setToolTip('13 features/channel (Set Feature size) - Fast, less accurate')
-        self.r1 = QtGui.QRadioButton("Detailed",self)
+        self.r1 = QtWidgets.QRadioButton("Detailed",self)
         self.r1.setToolTip('21 features/channel (Set Feature size) - Slower, more accurate')
-        self.r2 = QtGui.QRadioButton("Pyramid (Default)",self)
+        self.r2 = QtWidgets.QRadioButton("Pyramid (Default)",self)
         self.r2.setToolTip('26 features/channel, calculated more efficiently. No need to set feature size')
-        self.r3 = QtGui.QRadioButton("Histogram equalised",self)
+        self.r3 = QtWidgets.QRadioButton("Histogram equalised",self)
         self.r3.setToolTip('Pyramid features but equalised. Try if your imaging conditions vary a lot - Slowest')
         self.r2.setChecked(True)
         self.radio_group.addButton(self.r0)
@@ -258,7 +272,7 @@ class Load_win_fn(QtGui.QWidget):
         self.r1.hide()
         self.r2.hide()
         self.r3.hide()
-        Radio_Layout=QtGui.QVBoxLayout()
+        Radio_Layout=QtWidgets.QVBoxLayout()
         Radio_Layout.addWidget(self.Text_Radio)
         Radio_Layout.addWidget(self.r0)
         Radio_Layout.addWidget(self.r1)
@@ -267,11 +281,11 @@ class Load_win_fn(QtGui.QWidget):
         Radio_Layout.addStretch()
         
         #Feature sigma, if basic or detailed features chosen 
-        sigma_lo = QtGui.QHBoxLayout()
-        self.feature_scaleText = QtGui.QLabel('Feature size (sigma):')
+        sigma_lo = QtWidgets.QHBoxLayout()
+        self.feature_scaleText = QtWidgets.QLabel('Feature size (sigma):')
         self.feature_scaleText.resize(40, 20)
         self.feature_scaleText.hide()
-        self.feature_scale_input = QtGui.QLineEdit(str(par_obj.feature_scale))
+        self.feature_scale_input = QtWidgets.QLineEdit(str(par_obj.feature_scale))
         self.feature_scale_input.resize(10, 10)
         self.feature_scale_input.textChanged[str].connect(self.feature_scale_change)
         self.feature_scale_input.hide()
@@ -280,20 +294,20 @@ class Load_win_fn(QtGui.QWidget):
         sigma_lo.addStretch()
         
         #Load images button
-        Confirm_im_lo= QtGui.QHBoxLayout()
-        self.confirmImages_btn = QtGui.QPushButton("Confirm Images")
+        Confirm_im_lo= QtWidgets.QHBoxLayout()
+        self.confirmImages_btn = QtWidgets.QPushButton("Confirm Images")
         self.confirmImages_btn.clicked.connect(self.confirmImages_btn_fn)
         self.confirmImages_btn.setEnabled(False)
 
         #Move to training button.
-        self.selIntButton = QtGui.QPushButton("Goto Training")
+        self.selIntButton = QtWidgets.QPushButton("Goto Training")
         self.selIntButton.clicked.connect(win.loadTrainFn)
         self.selIntButton.setEnabled(False)
 
         Confirm_im_lo.addWidget(self.confirmImages_btn)
         Confirm_im_lo.addWidget(self.selIntButton)
         Confirm_im_lo.addStretch()
-        self.image_status_text = QtGui.QStatusBar()
+        self.image_status_text = QtWidgets.QStatusBar()
         self.image_status_text.setStyleSheet("QLabel {  color : green }")
         self.image_status_text.showMessage('Status: Highlight training images in folder. ')
 
@@ -301,7 +315,7 @@ class Load_win_fn(QtGui.QWidget):
 
 
         #Set up Vertical layout
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
         self.setLayout(vbox)
         vbox.addLayout(load_im_lo)
         vbox.addLayout(resize_lo)
@@ -317,7 +331,7 @@ class Load_win_fn(QtGui.QWidget):
         vbox.addWidget(self.image_status_text)
 
         #File browsing functions
-        #layout = QtGui.QVBoxLayout()
+        #layout = QtWidgets.QVBoxLayout()
 
 
     def resize_factor_change(self,text):
@@ -460,10 +474,12 @@ class Load_win_fn(QtGui.QWidget):
         app.processEvents()
 
 
-class Win_fn(QtGui.QWidget):
+class Win_fn(QtWidgets.QWidget):
     """Class which houses main training functionality"""
     def __init__(self,par_obj):
         super(Win_fn, self).__init__()
+        self.threadpool = QtCore.QThreadPool()
+        self.threadpool.setMaxThreadCount=1
         #Sets up the figures for displaying images.
         self.figure1 = Figure(figsize=(8, 8), dpi=100)
         self.canvas1 = FigureCanvas(self.figure1)
@@ -499,21 +515,21 @@ class Win_fn(QtGui.QWidget):
         self.plt2.set_yticklabels([])
 
         #The ui for training
-        self.count_txt = QtGui.QLabel()
-        self.image_num_txt = QtGui.QLabel()
-        box = QtGui.QVBoxLayout()
+        self.count_txt = QtWidgets.QLabel()
+        self.image_num_txt = QtWidgets.QLabel()
+        box = QtWidgets.QVBoxLayout()
         self.setLayout(box)
 
         #Widget containing the top panel.
-        top_panel = QtGui.QHBoxLayout()
+        top_panel = QtWidgets.QHBoxLayout()
 
         #Top left and right widget panels
-        top_left_panel = QtGui.QGroupBox('Basic Controls')
-        top_right_panel = QtGui.QGroupBox('Advanced Controls')
+        top_left_panel = QtWidgets.QGroupBox('Basic Controls')
+        top_right_panel = QtWidgets.QGroupBox('Advanced Controls')
 
         #Grid layouts for the top and left panels.
-        self.top_left_grid = QtGui.QGridLayout()
-        self.top_right_grid = QtGui.QGridLayout()
+        self.top_left_grid = QtWidgets.QGridLayout()
+        self.top_right_grid = QtWidgets.QGridLayout()
         self.top_left_grid.setSpacing(2)
         self.top_right_grid.setSpacing(2)
 
@@ -529,44 +545,44 @@ class Win_fn(QtGui.QWidget):
 
         #Sets the current text.
         self.image_num_txt.setText(' Image is: ' + str(par_obj.curr_z +1))
-        self.count_txt = QtGui.QLabel()
+        self.count_txt = QtWidgets.QLabel()
 
         #Sets up the button which saves the ROI.
-        self.save_ROI_btn = QtGui.QPushButton('1. Save ROI')
+        self.save_ROI_btn = QtWidgets.QPushButton('1. Save ROI')
 
         self.save_ROI_btn.setToolTip('Right-click and drag to make ROI. Then Save ROI (Space)')
         self.save_ROI_btn.setEnabled(True)
 
         #Sets up the button which saves the ROI.
-        self.save_dots_btn = QtGui.QPushButton('2. Save Dots')
+        self.save_dots_btn = QtWidgets.QPushButton('2. Save Dots')
         self.save_dots_btn.setToolTip('Click within ROI to add annotations. Then Save Dots')
         self.save_dots_btn.setEnabled(False)
 
         #Button for training model
-        self.train_model_btn = QtGui.QPushButton('3. Train Model')
+        self.train_model_btn = QtWidgets.QPushButton('3. Train Model')
         self.train_model_btn.setToolTip('When annotations are added, train the model')
         self.train_model_btn.setEnabled(False)
 
         #Selects and reactivates an existing ROI.
-        self.sel_ROI_btn = QtGui.QPushButton('Select ROI')
+        self.sel_ROI_btn = QtWidgets.QPushButton('Select ROI')
         self.sel_ROI_btn.setToolTip('Click on ROI to select- Select ROI highlighted in yellow')
         self.sel_ROI_btn.setEnabled(True)
         self.select_ROI= False
 
         #Allows deletion of dots.
-        self.remove_dots_btn = QtGui.QPushButton('Remove Dots')
+        self.remove_dots_btn = QtWidgets.QPushButton('Remove Dots')
         self.remove_dots_btn.setToolTip('Select ROI, then click Remove dots, and choose dots to remove')
         self.remove_dots_btn.setEnabled(False)
         self.remove_dots = False
 
         #Load in ROI file.
-        self.load_gt_btn = QtGui.QPushButton('Import ROI/Dots')
+        self.load_gt_btn = QtWidgets.QPushButton('Import ROI/Dots')
         self.load_gt_btn.setToolTip('Load previously saved annotation file')
         self.load_gt_btn.setEnabled(True)
         self.load_gt = False
 
         #Save in ROI file.
-        self.save_gt_btn = QtGui.QPushButton('Export ROI/Dots')
+        self.save_gt_btn = QtWidgets.QPushButton('Export ROI/Dots')
         self.save_gt_btn.setToolTip('Save ROIs and dots to annotation file (.quantiROI)')
         self.save_gt_btn.setEnabled(True)
         self.save_gt = False
@@ -588,13 +604,13 @@ class Win_fn(QtGui.QWidget):
         self.top_left_grid.addWidget(self.save_gt_btn, 6,1,1,1)
 
         #SigmaData input Label.
-        self.sigma_data_text = QtGui.QLabel(self)
+        self.sigma_data_text = QtWidgets.QLabel(self)
         self.sigma_data_text.setText('Object size (pixels):')
         self.sigma_data_text.setToolTip('Set this smaller than the object size. Map on right hand side should show similar size objects to those in your image')
         self.top_right_grid.addWidget(self.sigma_data_text, 0, 0)
 
         #SigmaData input field.
-        self.sigma_data_input = QtGui.QLineEdit(str(par_obj.sigma_data))
+        self.sigma_data_input = QtWidgets.QLineEdit(str(par_obj.sigma_data))
         self.sigma_data_input.onChanged = self.sigmaOnChange
         self.sigma_data_input.setFixedWidth(40)
         self.sigma_data_input.textChanged[str].connect(self.sigmaOnChange)
@@ -602,12 +618,12 @@ class Win_fn(QtGui.QWidget):
 
 
         #Feature scale input Label.
-        #self.sigma_data_text = QtGui.QLabel()
+        #self.sigma_data_text = QtWidgets.QLabel()
         #self.sigma_data_text.setText('Scale of Feature Descriptor:')
         #self.top_right_grid.addWidget(self.sigma_data_text, 1, 0)
 
         #Feature scale input field
-        #self.feature_scale_input = QtGui.QLineEdit(str(par_obj.feature_scale))
+        #self.feature_scale_input = QtWidgets.QLineEdit(str(par_obj.feature_scale))
         #self.feature_scale_input.onChanged = self.feature_scale_change
         #self.feature_scale_input.resize(40, 20)
         #self.feature_scale_input.textChanged[str].connect(self.feature_scale_change)
@@ -615,48 +631,48 @@ class Win_fn(QtGui.QWidget):
         #self.top_right_grid.addWidget(self.feature_scale_input, 1, 1)
 
         #Feature scale input btn.
-        #self.feat_scale_change_btn = QtGui.QPushButton('Recalculate Features')
+        #self.feat_scale_change_btn = QtWidgets.QPushButton('Recalculate Features')
         #self.feat_scale_change_btn.setEnabled(True)
         #self.top_right_grid.addWidget(self.feat_scale_change_btn, 1, 2)
 
         #Saves the model
-        self.save_model_btn = QtGui.QPushButton('Save Training Model')
+        self.save_model_btn = QtWidgets.QPushButton('Save Training Model')
         self.save_model_btn.setToolTip('When happy with your training, save the model for batch processing')
         self.save_model_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.save_model_btn, 1, 0)
 
         #Saves the extremel random decision tree model
-        self.save_model_name_txt = QtGui.QLineEdit('Insert Model Name')
+        self.save_model_name_txt = QtWidgets.QLineEdit('Insert Model Name')
         self.top_right_grid.addWidget(self.save_model_name_txt, 1, 1)
 
-        self.output_count_txt = QtGui.QLabel()
+        self.output_count_txt = QtWidgets.QLabel()
         self.top_right_grid.addWidget(self.output_count_txt, 3,1,1,4)
 
         #Saves the extremely random decision tree model.
-        self.save_model_desc_txt = QtGui.QLineEdit('Insert Model Description')
+        self.save_model_desc_txt = QtWidgets.QLineEdit('Insert Model Description')
         self.save_model_desc_txt.setFixedWidth(200)
         self.top_right_grid.addWidget(self.save_model_desc_txt, 2, 0, 1, 4)
-        self.clear_dots_btn = QtGui.QPushButton('Clear All ROI')
+        self.clear_dots_btn = QtWidgets.QPushButton('Clear All ROI')
         self.top_right_grid.addWidget(self.clear_dots_btn, 1, 2)
 
         #Shows the kernel label distributions
-        self.kernel_show_btn = QtGui.QPushButton('Showing Kernel')
+        self.kernel_show_btn = QtWidgets.QPushButton('Showing Kernel')
         self.kernel_show_btn.setMinimumWidth(170)
         self.clear_dots_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.kernel_show_btn, 2, 2)
 
-        self.evaluate_btn = QtGui.QPushButton('Evaluate Forest')
+        self.evaluate_btn = QtWidgets.QPushButton('Evaluate Forest')
         self.evaluate_btn.setToolTip('Evaluate the model on another timepoint')
         self.evaluate_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.evaluate_btn, 3, 0)
 
-        self.count_maxima_btn = QtGui.QPushButton('Find object centres')
+        self.count_maxima_btn = QtWidgets.QPushButton('Find object centres')
         self.count_maxima_btn.setToolTip('Use the probability map to estimate cell centres')
         self.count_maxima_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.count_maxima_btn, 4, 0)
 
         #Button for overlay
-        self.overlay_prediction_btn = QtGui.QPushButton('Overlay Prediction')
+        self.overlay_prediction_btn = QtWidgets.QPushButton('Overlay Prediction')
         self.overlay_prediction_btn.setToolTip('Switch between displaying Prediction, Training, and Cell centres')
         self.overlay_prediction_btn.setEnabled(True)
         self.top_right_grid.addWidget(self.overlay_prediction_btn, 0,2)
@@ -664,34 +680,34 @@ class Win_fn(QtGui.QWidget):
         #common navigation buttons
 
 
-        self.count_replot_btn = QtGui.QPushButton('Replot')
+        self.count_replot_btn = QtWidgets.QPushButton('Replot')
 
-        self.count_maxima_plot_on = QtGui.QCheckBox()
+        self.count_maxima_plot_on = QtWidgets.QCheckBox()
         self.count_maxima_plot_on.setChecked = False
 
 
-        self.count_txt_1 = QtGui.QLineEdit(str(par_obj.min_distance[0]))
+        self.count_txt_1 = QtWidgets.QLineEdit(str(par_obj.min_distance[0]))
         self.count_txt_1.setFixedWidth(20)
-        self.count_txt_2 = QtGui.QLineEdit(str(par_obj.min_distance[1]))
+        self.count_txt_2 = QtWidgets.QLineEdit(str(par_obj.min_distance[1]))
         self.count_txt_2.setFixedWidth(20)
-        self.count_txt_3 = QtGui.QLineEdit(str(par_obj.min_distance[2]))
+        self.count_txt_3 = QtWidgets.QLineEdit(str(par_obj.min_distance[2]))
         self.count_txt_3.setFixedWidth(20)
 
-        abs_thr_lbl = QtGui.QLabel('Abs Thr:')
-        self.abs_thr_txt = QtGui.QLineEdit(str(par_obj.abs_thr))
+        abs_thr_lbl = QtWidgets.QLabel('Abs Thr:')
+        self.abs_thr_txt = QtWidgets.QLineEdit(str(par_obj.abs_thr))
         self.abs_thr_txt.setFixedWidth(35)
-        z_cal_lbl = QtGui.QLabel('Z Cal.:')
-        self.z_cal_txt = QtGui.QLineEdit(str(par_obj.z_cal))
+        z_cal_lbl = QtWidgets.QLabel('Z Cal.:')
+        self.z_cal_txt = QtWidgets.QLineEdit(str(par_obj.z_cal))
         self.z_cal_txt.setFixedWidth(50)
 
 
-        self.min_distance_panel = QtGui.QHBoxLayout()
+        self.min_distance_panel = QtWidgets.QHBoxLayout()
         self.min_distance_panel.addStretch()
-        self.min_distance_panel.addWidget(QtGui.QLabel("x:"))
+        self.min_distance_panel.addWidget(QtWidgets.QLabel("x:"))
         self.min_distance_panel.addWidget(self.count_txt_1)
-        self.min_distance_panel.addWidget(QtGui.QLabel("y:"))
+        self.min_distance_panel.addWidget(QtWidgets.QLabel("y:"))
         self.min_distance_panel.addWidget(self.count_txt_2 )
-        self.min_distance_panel.addWidget(QtGui.QLabel("z:"))
+        self.min_distance_panel.addWidget(QtWidgets.QLabel("z:"))
         self.min_distance_panel.addWidget(self.count_txt_3 )
         self.min_distance_panel.addWidget(abs_thr_lbl)
         self.min_distance_panel.addWidget(self.abs_thr_txt)
@@ -704,7 +720,7 @@ class Win_fn(QtGui.QWidget):
         self.top_right_grid.setRowStretch(4,2)
 
         #Sets up the image panel splitter.
-        image_panel = QtGui.QSplitter(QtCore.Qt.Horizontal)
+        image_panel = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         image_panel.addWidget(self.canvas1)
         image_panel.addWidget(self.canvas2)
 
@@ -716,15 +732,15 @@ class Win_fn(QtGui.QWidget):
         self.ome =self.canvas1.mpl_connect('motion_notify_event', self.on_motion)
         self.okp =self.canvas1.mpl_connect('key_press_event', self.on_key)
         #Splitter which separates the controls at the top and the images below.
-        splitter = QtGui.QSplitter(QtCore.Qt.Vertical)
-        hbox1 = QtGui.QWidget()
+        splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        hbox1 = QtWidgets.QWidget()
         hbox1.setLayout(top_panel)
         splitter.addWidget(hbox1)
         splitter.addWidget(image_panel)
         box.addWidget(splitter)
 
         #Status bar which is located beneath images.
-        self.image_status_text = QtGui.QStatusBar()
+        self.image_status_text = QtWidgets.QStatusBar()
         box.addWidget(self.toolbar)
         box.addWidget(self.image_status_text)
         self.image_status_text.showMessage('Status: Please Select a Region and Click \'Save ROI\'. ')
@@ -775,7 +791,7 @@ class Win_fn(QtGui.QWidget):
         model_name = self.save_model_name_txt.text()
 
         #funky ordering TZCYX
-        for fileno,imfile in enumerate(par_obj.filehandlers):
+        for fileno,imfile in par_obj.filehandlers.iteritems():
 
             rects=[par_obj.saved_ROI[x] for x,y in enumerate(par_obj.saved_ROI) if y[6]==fileno]
             dots=[par_obj.saved_dots[x] for x,y in enumerate(par_obj.saved_ROI) if y[6]==fileno]
@@ -787,7 +803,7 @@ class Win_fn(QtGui.QWidget):
 
     def save_gt_fn(self):
         file_to_save = {'dots':par_obj.saved_dots,'rect':par_obj.saved_ROI}
-        fileName = QtGui.QFileDialog.getSaveFileName(self, "Save dots and regions", "~/Documents", ".quantiROI");
+        fileName = QtWidgets.QFileDialog.getSaveFileName(self, "Save dots and regions", "~/Documents", ".quantiROI");
         print 'the filename address',fileName
         if fileName[-10:]=='.quantiROI':
             fileName=fileName[0:-10]
@@ -795,7 +811,7 @@ class Win_fn(QtGui.QWidget):
 
     def load_gt_fn(self):
         print 'load the gt'
-        fileName = QtGui.QFileDialog.getOpenFileName(self, "Load dots and regions", "~/Documents", "QuantiFly ROI files (*.quantiROI) ;;MTrackJ Data Format (*.mdf)")
+        fileName = QtWidgets.QFileDialog.getOpenFileName(self, "Load dots and regions", "~/Documents", "QuantiFly ROI files (*.quantiROI) ;;MTrackJ Data Format (*.mdf)")
         filename, file_ext = os.path.splitext(fileName)
         print 'load the file', fileName
         if file_ext=='.quantiROI':
@@ -833,7 +849,7 @@ class Win_fn(QtGui.QWidget):
         self.goto_img_fn(par_obj.curr_z,par_obj.curr_t)
 
     def load_gt_mdf(self):
-        fileName = QtGui.QFileDialog.getOpenFileName(self, "Load dots", "~/Documents", "MTrackJ Data Format (*.mdf)");
+        fileName = QtWidgets.QFileDialog.getOpenFileName(self, "Load dots", "~/Documents", "MTrackJ Data Format (*.mdf)");
         filename, file_extension = os.path.splitext(fileName)
         print 'load the file', fileName
         lines_list = list(open(fileName, 'rb').read().split('\n'))
@@ -865,9 +881,9 @@ class Win_fn(QtGui.QWidget):
         t0=time.time()
         par_obj.max_det=[]
         par_obj.min_distance = [float(self.count_txt_1.text()),float(self.count_txt_2.text()),float(self.count_txt_3.text())]
-        par_obj.abs_thr =float(self.abs_thr_txt.text())
+        par_obj.abs_thr =float(self.abs_thr_txt.text())/100
         #par_obj.z_cal =float(self.z_cal_txt.text())
-        v2.count_maxima(par_obj,par_obj.curr_t,par_obj.curr_file)
+        v2.count_maxima(par_obj,par_obj.curr_t,par_obj.curr_file,reset_max=True)
         par_obj.show_pts = 1
         self.kernel_btn_fn()
 
@@ -875,6 +891,42 @@ class Win_fn(QtGui.QWidget):
         self.image_status_text.showMessage('Status: '+message)
         app.processEvents()
 
+
+
+    def loadTrainFn(self):
+        #Win_fn()
+        channel_wid = QtWidgets.QWidget()
+        channel_lay = QtWidgets.QHBoxLayout()
+        channel_wid.setLayout(channel_lay)
+
+        win.top_left_grid.addWidget(channel_wid,1,0,1,3)
+        
+        #cleanup if reloading image
+        if hasattr(self,'ChannelGroup'):
+            for chbx,contrast,brightness in self.ChannelGroup:
+                chbx.hide()
+                contrast.hide()
+                brightness.hide()
+                chbx.deleteLater()
+                contrast.deleteLater()                
+                brightness.deleteLater()
+                
+            
+        ChannelGroup=create_channel_objects(self,par_obj,par_obj.numCH)
+        for chbx,contrast,brightness in ChannelGroup:
+            channel_lay.addWidget(chbx)
+            channel_lay.addWidget(contrast)
+            channel_lay.addWidget(brightness)
+            contrast.show()
+            chbx.show()
+            chbx.setChecked(True)
+        self.ChannelGroup = ChannelGroup
+        channel_lay.addStretch()
+
+        win_tab.setCurrentWidget(win)
+        app.processEvents()
+        self.checkChange()
+        
     def keyPressEvent(self, ev):
         """When the . and , keys are pressed"""
         if ev.key() == QtCore.Qt.Key_Period:
@@ -891,34 +943,15 @@ class Win_fn(QtGui.QWidget):
             self.Btn_fns.next_time(par_obj)
     def wheelEvent(self, event):
         """When the mousewheel is rotated"""
-        if event.delta() > 0:
+        if event.angleDelta().y() > 3:
             self.Btn_fns.next_im(par_obj)
-        if event.delta() < 0:
+        if event.angleDelta().y() < -3:
             self.Btn_fns.prev_im(par_obj)
-
-    def loadTrainFn(self):
-        #Win_fn()
-        channel_wid = QtGui.QWidget()
-        channel_lay = QtGui.QHBoxLayout()
-        channel_wid.setLayout(channel_lay)
-
-        win.top_left_grid.addWidget(channel_wid,1,0,1,3)
-
-        ChannelGroup=create_channel_objects(self,par_obj,par_obj.numCH)
-        for chbx,contrast,brightness in ChannelGroup:
-            channel_lay.addWidget(chbx)
-            channel_lay.addWidget(contrast)
-            channel_lay.addWidget(brightness)
-            contrast.show()
-            chbx.show()
-            chbx.setChecked(True)
-
-        channel_lay.addStretch()
-
-        win_tab.setCurrentWidget(win)
-        app.processEvents()
-        self.checkChange()
-
+        if event.angleDelta().x() > 10:
+            self.Btn_fns.next_time(par_obj)
+        if event.angleDelta().x() < -10:
+            self.Btn_fns.prev_time(par_obj)
+            
     def on_key(self,event):
         if event.key==' ':
             if par_obj.draw_dots==True:
@@ -1047,7 +1080,7 @@ class Win_fn(QtGui.QWidget):
                     self.plt1.plot([i[1],i[1]],[i[2]-5,i[2]+5],'-',color='r')
                     self.canvas1.draw()
         elif(par_obj.remove_dots == True and event.button == 1):
-            #par_obj.pixMap = QtGui.QPixmap(q2r.rgb2qimage(par_obj.imgs[par_obj.curr_z]))
+            #par_obj.pixMap = QtWidgets.QPixmap(q2r.rgb2qimage(par_obj.imgs[par_obj.curr_z]))
             x = event.xdata
             y = event.ydata
             self.draw_saved_dots_and_roi()
@@ -1122,10 +1155,8 @@ class Win_fn(QtGui.QWidget):
             self.plt1.plot([i[1]-5,i[1]+5],[i[2],i[2]],'-',color=colour)
             self.plt1.plot([i[1],i[1]],[i[2]-5,i[2]+5],'-',color=colour)
 
-
-
-
         return
+    
     def makeCursor(self):
         m_LPixmap = QtGui.QPixmap(28, 28)
         bck = QtGui.QColor(168, 34, 3)
@@ -1142,10 +1173,10 @@ class Win_fn(QtGui.QWidget):
         return m_Cursor
     def on_enter(self,ev):
         #Changes cursor to the special crosshair on entering image pane.
-        QtGui.QApplication.setOverrideCursor(self.m_Cursor)
+        QtWidgets.QApplication.setOverrideCursor(self.m_Cursor)
         self.canvas1.setFocus()
     def on_leave(self,ev):
-        QtGui.QApplication.restoreOverrideCursor()
+        QtWidgets.QApplication.restoreOverrideCursor()
     def save_roi_fn(self):
         #If there is no width or height either no roi is selected or it is too thin.
         success = v2.save_roi_fn(par_obj)
@@ -1477,7 +1508,7 @@ class Win_fn(QtGui.QWidget):
         "max_depth":par_obj.max_depth, "min_samples":par_obj.min_samples_split, "min_samples_leaf":par_obj.min_samples_leaf,
         "max_features":par_obj.max_features, "num_of_tree":par_obj.num_of_tree, "file_ext":par_obj.file_ext, "imFile":save_im,
         "resize_factor":par_obj.resize_factor, "min_distance":par_obj.min_distance, "abs_thr":par_obj.abs_thr,
-        "rel_thr":par_obj.rel_thr,"max_det": par_obj.max_det};
+        "rel_thr":par_obj.rel_thr,"max_det": par_obj.max_det, "count_maxima_laplace":par_obj.count_maxima_laplace};
 
         pickle.dump(save_file, open(filename, "wb"))
         self.save_model_btn.setEnabled(False)
@@ -1494,20 +1525,22 @@ class Win_fn(QtGui.QWidget):
 # Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
     #generate layout
-    app = QtGui.QApplication([])
-    QtGui.QApplication.setQuitOnLastWindowClosed(True)
+    app = QtWidgets.QApplication([])
+    QtWidgets.QApplication.setQuitOnLastWindowClosed(True)
     # Create and display the splash screen
     splash_pix = QtGui.QPixmap('splash_loading.png')
-    splash = QtGui.QSplashScreen(splash_pix, QtCore.Qt.WindowStaysOnTopHint)
+    splash = QtWidgets.QSplashScreen(splash_pix, QtCore.Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
     splash.show()
     app.processEvents()
     #Creates tab widget.
-    win_tab = QtGui.QTabWidget()
+    win_tab = QtWidgets.QTabWidget()
     #Creates win, an instance of QWidget
     par_obj  = ParameterClass()
     win = Win_fn(par_obj)
+    win.processEvents=app.processEvents
     loadWin= Load_win_fn(par_obj,win)
+    
 
     #Adds win tab and places button in par_obj.
     win_tab.addTab(loadWin, "Load Images")
@@ -1523,4 +1556,4 @@ if __name__ == '__main__':
     win_tab.activateWindow()
     #Automates the loading for testing.
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
-        QtGui.QApplication.instance().exec_()
+        QtWidgets.QApplication.instance().exec_()
