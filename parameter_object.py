@@ -12,6 +12,11 @@ import os
 import errno
 #import shelve
 #import UserDict
+class Data(object):
+    def __init__(self):
+        self.predictions = []
+        self.hessians = [] 
+
 class ParameterClass(object):
     def __init__(self):
         #debugging
@@ -79,12 +84,13 @@ class ParameterClass(object):
         self.abs_thr = 1
         self.rel_thr = 0
         self.z_cal = 1
-        self.max_det = []
+        self.max_det = 0
         #ROI point
         self.npts = 100
 
         #store for processed data
         self.data_store = {}
+        self.data = Data()
 
         #save path #TODO check different operating systems
         self.forPath = os.path.expanduser('~')+'/.densitycount/models/'
