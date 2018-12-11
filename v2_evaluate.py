@@ -1,33 +1,31 @@
 #Script for running evaluation mode
 #import pylab
-from PyQt4 import QtGui, QtCore, Qt, QtWebKit
-try:
-    from PyQt4.QtCore import QString as QString
-except:
-    QString=str
+from PyQt5 import QtGui, QtCore#, Qt, QtWebKit
+from PyQt5 import QtWidgets
+import os.path
 import time
 #import vigra
 #import scipy
 #from scipy.ndimage import filters
-from scipy.sparse.csgraph import _validation
+#from scipy.sparse.csgraph import _validation
 #from sklearn.ensemble import ExtraTreesRegressor
 #import thread
 #import random
-import csv
+#import csv
 import cPickle as pickle
 import datetime
 #import errno
 import os
 import numpy as np
 import copy
-import datetime
+#import datetime
 #import functools
 #from scipy.special import _ufuncs_cxx
 #import sklearn.utils.lgamma
 #from gnu import return_license
 #from matplotlib.path import Path
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
-import pdb
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+#import pdb
 from common_navigation import navigation_setup,create_channel_objects,btn_fn
 from parameter_object import ParameterClass
 from user_ROI import ROI
@@ -47,7 +45,7 @@ try:
 except:
     pass
 
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import v2_functions as v2
 """QBrain Software v0.1
@@ -70,38 +68,38 @@ import v2_functions as v2
 """
 
 
-class Eval_load_im_win(QtGui.QWidget):
+class Eval_load_im_win(QtWidgets.QWidget):
     def __init__(self,par_obj):
         super(Eval_load_im_win, self).__init__()
         """Setups the load image interface"""
 
         #Stops reinitalise of text which can produce buggy text.
         #if par_obj.evalLoadImWin_loaded !=True:
-        vbox0 = QtGui.QVBoxLayout()
+        vbox0 = QtWidgets.QVBoxLayout()
         self.setLayout(vbox0)
 
         #Load images button
-        self.loadImages_button_panel = QtGui.QHBoxLayout()
-        self.loadImages_button = QtGui.QPushButton("Add Images")
+        self.loadImages_button_panel = QtWidgets.QHBoxLayout()
+        self.loadImages_button = QtWidgets.QPushButton("Add Images")
         self.loadImages_button.move(20, 20)
         self.loadImages_button_panel.addWidget(self.loadImages_button)
         self.loadImages_button_panel.addStretch()
 
-        about_btn = QtGui.QPushButton('About')
+        about_btn = QtWidgets.QPushButton('About')
         about_btn.clicked.connect(lambda: on_about(self))
         self.loadImages_button_panel.addWidget(about_btn)
 
 
         #Table widget which displays
-        self.modelTabIm_panel = QtGui.QHBoxLayout()
-        self.modelTabIm = QtGui.QTableWidget()
+        self.modelTabIm_panel = QtWidgets.QHBoxLayout()
+        self.modelTabIm = QtWidgets.QTableWidget()
         self.modelTabIm.setRowCount(1)
         self.modelTabIm.setColumnCount(4)
         self.modelTabIm.setColumnWidth(0,125)
         self.modelTabIm.resize(550,200)
-        self.modelTabIm.setHorizontalHeaderLabels(QString(",Image name, Range, Path").split(","))
+        self.modelTabIm.setHorizontalHeaderLabels(str(",Image name, Range, Path").split(","))
         self.modelTabIm.hide()
-        self.modelTabIm.setEditTriggers( QtGui.QTableWidget.NoEditTriggers )
+        self.modelTabIm.setEditTriggers( QtWidgets.QTableWidget.NoEditTriggers )
         self.modelTabIm_panel.addWidget(self.modelTabIm)
         self.modelTabIm_panel.addStretch()
 
@@ -115,8 +113,8 @@ class Eval_load_im_win(QtGui.QWidget):
         vbox0.addStretch()
 
         #Move to training button.
-        self.selIntButton_panel = QtGui.QHBoxLayout()
-        self.selIntButton = QtGui.QPushButton("Goto Model Import")
+        self.selIntButton_panel = QtWidgets.QHBoxLayout()
+        self.selIntButton = QtWidgets.QPushButton("Goto Model Import")
         self.selIntButton.clicked.connect(self.goto_model_import)
         self.selIntButton.move(20, 520)
         self.selIntButton.setEnabled(False)
@@ -127,7 +125,7 @@ class Eval_load_im_win(QtGui.QWidget):
 
         #Status bar to report whats going on.
 
-        self.image_status_text = QtGui.QStatusBar()
+        self.image_status_text = QtWidgets.QStatusBar()
         self.image_status_text.showMessage('Status: Highlight training images in folder. ')
         vbox0.addWidget(self.image_status_text)
 
@@ -140,21 +138,21 @@ class Eval_load_im_win(QtGui.QWidget):
             evalImWin.eval_im_btn.setEnabled(False)
             par_obj.eval_load_im_win_eval = False
 
-class Eval_load_model_win(QtGui.QWidget):
+class Eval_load_model_win(QtWidgets.QWidget):
     """Interface which allows selection of model."""
     def __init__(self,par_obj):
 
         super(Eval_load_model_win,self).__init__()
 
         #The main layout
-        box = QtGui.QVBoxLayout()
+        box = QtWidgets.QVBoxLayout()
         self.setLayout(box)
 
-        hbox0 = QtGui.QHBoxLayout()
+        hbox0 = QtWidgets.QHBoxLayout()
         box.addLayout(hbox0)
         #The two principle columns
-        vbox0 = QtGui.QVBoxLayout()
-        vbox1 = QtGui.QVBoxLayout()
+        vbox0 = QtWidgets.QVBoxLayout()
+        vbox1 = QtWidgets.QVBoxLayout()
         hbox0.addLayout(vbox0)
         hbox0.addLayout(vbox1)
 
@@ -162,6 +160,9 @@ class Eval_load_model_win(QtGui.QWidget):
         #Find all files in folder with serielize prefix.
 
         files = os.listdir(par_obj.forPath)
+        
+        files = sorted(files, key=lambda p: os.path.getmtime(par_obj.forPath+p))
+
         filesRF =[]
         for b in range(0,files.__len__()):
 
@@ -174,33 +175,33 @@ class Eval_load_model_win(QtGui.QWidget):
         filesLen =filesRF.__len__()
 
 
-        self.modelTabFor = QtGui.QTableWidget()
+        self.modelTabFor = QtWidgets.QTableWidget()
         self.modelTabFor.setRowCount(1)
         self.modelTabFor.setColumnCount(3)
         self.modelTabFor.setColumnWidth(2,200)
         self.modelTabFor.resize(600,500)
-        self.modelTabFor.setHorizontalHeaderLabels(QString(",model name, date and time saved").split(","))
-        self.modelTabFor.setEditTriggers( QtGui.QTableWidget.NoEditTriggers )
+        self.modelTabFor.setHorizontalHeaderLabels(str(",model name, date and time saved").split(","))
+        self.modelTabFor.setEditTriggers( QtWidgets.QTableWidget.NoEditTriggers )
 
         vbox0.addWidget(self.modelTabFor)
 
         #Button for going to model evaluation.
-        self.gotoEvalButton = QtGui.QPushButton("Goto Image Evaluation")
+        self.gotoEvalButton = QtWidgets.QPushButton("Goto Image Evaluation")
         self.gotoEvalButton.setEnabled(False)
         self.gotoEvalButton.clicked.connect(self.gotoEvalButton_fn)
 
         vbox0.addWidget(self.gotoEvalButton)
 
         #Status text.
-        self.image_status_text = QtGui.QStatusBar()
+        self.image_status_text = QtWidgets.QStatusBar()
         self.image_status_text.resize(300,20)
         self.image_status_text.setStyleSheet("QLabel {  color : green }")
         self.image_status_text.showMessage('Status: Please click a model from above and then click \'Load Model\'. ')
 
         #The second column.
-        self.modelIm_panel = QtGui.QHBoxLayout()
+        self.modelIm_panel = QtWidgets.QHBoxLayout()
 
-        self.figure1 = Figure(figsize=(3, 3), dpi=100)
+        self.figure1 = Figure()
         self.canvas1 = FigureCanvas(self.figure1)
         self.figure1.patch.set_facecolor('grey')
 
@@ -221,19 +222,19 @@ class Eval_load_model_win(QtGui.QWidget):
 
 
 
-        self.modelImTxt1_panel = QtGui.QHBoxLayout()
-        self.modelImTxt2_panel = QtGui.QHBoxLayout()
-        self.modelImTxt3_panel = QtGui.QHBoxLayout()
-        self.modelImTxt4_panel = QtGui.QHBoxLayout()
-        self.modelImTxt5_panel = QtGui.QHBoxLayout()
-        self.modelImTxt6_panel = QtGui.QHBoxLayout()
+        self.modelImTxt1_panel = QtWidgets.QHBoxLayout()
+        self.modelImTxt2_panel = QtWidgets.QHBoxLayout()
+        self.modelImTxt3_panel = QtWidgets.QHBoxLayout()
+        self.modelImTxt4_panel = QtWidgets.QHBoxLayout()
+        self.modelImTxt5_panel = QtWidgets.QHBoxLayout()
+        self.modelImTxt6_panel = QtWidgets.QHBoxLayout()
 
-        self.modelImTxt1 = QtGui.QLabel()
-        self.modelImTxt2 = QtGui.QLabel()
-        self.modelImTxt3 = QtGui.QLabel()
-        self.modelImTxt4 = QtGui.QLabel()
-        self.modelImTxt5 = QtGui.QLabel()
-        self.modelImTxt6 = QtGui.QLabel()
+        self.modelImTxt1 = QtWidgets.QLabel()
+        self.modelImTxt2 = QtWidgets.QLabel()
+        self.modelImTxt3 = QtWidgets.QLabel()
+        self.modelImTxt4 = QtWidgets.QLabel()
+        self.modelImTxt5 = QtWidgets.QLabel()
+        self.modelImTxt6 = QtWidgets.QLabel()
 
         self.modelImTxt1.setText('Name: ')
         self.modelImTxt1.resize(400,25)
@@ -293,11 +294,11 @@ class Eval_load_model_win(QtGui.QWidget):
                     btn.setText('Click to View')
                     self.modelTabFor.setCellWidget(c, 0, btn)
 
-                    text1 = QtGui.QLabel(self.modelTabFor)
+                    text1 = QtWidgets.QLabel(self.modelTabFor)
                     text1.setText(str(' '+strFn[1]))
                     self.modelTabFor.setCellWidget(c,1,text1)
 
-                    text2 = QtGui.QLabel(self.modelTabFor)
+                    text2 = QtWidgets.QLabel(self.modelTabFor)
                     text2.setText(str(' '+strFn[2]))
                     self.modelTabFor.setCellWidget(c,2,text2)
                     c= c+1
@@ -310,11 +311,11 @@ class Eval_load_model_win(QtGui.QWidget):
                     btn.setText('Click to View')
                     self.modelTabFor.setCellWidget(c, 0, btn)
 
-                    text1 = QtGui.QLabel(self.modelTabFor)
+                    text1 = QtWidgets.QLabel(self.modelTabFor)
                     text1.setText(str(' '+strFn[2]))
                     self.modelTabFor.setCellWidget(c,1,text1)
 
-                    text2 = QtGui.QLabel(self.modelTabFor)
+                    text2 = QtWidgets.QLabel(self.modelTabFor)
                     text2.setText(str(' '+datetime.datetime.fromtimestamp(float(strFn[1])).strftime('%Y-%m-%d %H:%M:%S')))
                     self.modelTabFor.setCellWidget(c,2,text2)
                     c= c+1
@@ -410,7 +411,7 @@ class Eval_load_model_win(QtGui.QWidget):
         evalImWin.loadTrainFn()
         v2.load_and_initiate_plots(par_obj, evalImWin)
 
-class Eval_disp_im_win(QtGui.QWidget):
+class Eval_disp_im_win(QtWidgets.QWidget):
     """ Arranges widget to visualise the input images and ouput prediction. """
     def __init__(self,par_obj):
         super(Eval_disp_im_win, self).__init__()
@@ -445,23 +446,23 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.plt2.set_yticklabels([])
 
         #The ui for training
-        self.count_txt = QtGui.QLabel()
-        self.image_num_txt = QtGui.QLabel()
-        box = QtGui.QVBoxLayout()
+        self.count_txt = QtWidgets.QLabel()
+        self.image_num_txt = QtWidgets.QLabel()
+        box = QtWidgets.QVBoxLayout()
         self.setLayout(box)
 
         #Widget containing the top panel.
-        top_panel = QtGui.QHBoxLayout()
+        top_panel = QtWidgets.QHBoxLayout()
 
         #Top left and right widget panels
-        top_left_panel = QtGui.QGroupBox('Basic Controls')
-        top_middle_panel = QtGui.QGroupBox('ROI Controls')
-        top_right_panel = QtGui.QGroupBox('Advanced Controls')
+        top_left_panel = QtWidgets.QGroupBox('Basic Controls')
+        top_middle_panel = QtWidgets.QGroupBox('ROI Controls')
+        top_right_panel = QtWidgets.QGroupBox('Advanced Controls')
 
 
         #Grid layouts for the top and left panels.
-        self.top_left_grid = QtGui.QGridLayout()
-        self.top_right_grid = QtGui.QGridLayout()
+        self.top_left_grid = QtWidgets.QGridLayout()
+        self.top_right_grid = QtWidgets.QGridLayout()
 
         self.top_left_grid.setSpacing(2)
         self.top_right_grid.setSpacing(1)
@@ -483,7 +484,7 @@ class Eval_disp_im_win(QtGui.QWidget):
 
         #Sets the current text.
         self.image_num_txt.setText('The Current Image is: ' + str(par_obj.curr_z +1)+' and the time point is: '+str(par_obj.curr_t +1))
-        self.count_txt = QtGui.QLabel()
+        self.count_txt = QtWidgets.QLabel()
 
         #Populates the grid with the different widgets.
         self.top_left_grid.addLayout(self.panel_buttons, 0, 0,1,3)
@@ -492,26 +493,29 @@ class Eval_disp_im_win(QtGui.QWidget):
 
         top_right_panel.setLayout(self.top_right_grid)
 
-        self.eval_im_btn = QtGui.QPushButton('Evaluate Images')
+        self.eval_im_btn = QtWidgets.QPushButton('Evaluate Images')
         self.eval_im_btn.clicked.connect(self.evaluate_images)
 
-        self.count_all_btn = QtGui.QPushButton('Count Maxima at all time')
+        self.count_all_btn = QtWidgets.QPushButton('Re-Count Maxima')
         self.count_all_btn.clicked.connect(self.count_all_fn)
 
-        self.save_output_data_btn = QtGui.QPushButton('Save Output Data')
+        self.toggle_display_btn = QtWidgets.QPushButton('Show Probability/Maxima')
+        self.toggle_display_btn.clicked.connect(self.kernel_btn_fn)
+
+        self.save_output_data_btn = QtWidgets.QPushButton('Save Output Data')
         self.save_output_data_btn.clicked.connect(self.save_output_data)
 
-        self.save_output_prediction_btn = QtGui.QPushButton('Save Prediction')
+        self.save_output_prediction_btn = QtWidgets.QPushButton('Save Prediction')
         self.save_output_prediction_btn.clicked.connect(self.save_output_prediction)
 
-        self.save_output_mask_btn = QtGui.QPushButton('Save Point Mask')
+        self.save_output_mask_btn = QtWidgets.QPushButton('Save Point Mask')
         self.save_output_mask_btn.clicked.connect(self.save_output_mask)
 
-        self.save_output_link = QtGui.QLabel()
+        self.save_output_link = QtWidgets.QLabel()
         self.save_output_link.setText('''<p><a href="'''+str(par_obj.csvPath)+'''">Goto output folder</a></p>
         <p><span style="font-size: 17px;"><br /></span></p>''')
 
-        self.kernel_show_btn = QtGui.QPushButton('Showing Prediction')
+        self.kernel_show_btn = QtWidgets.QPushButton('Showing Prediction')
         #self.kernel_show_btn.setMinimumWidth(170)
 
 
@@ -522,11 +526,12 @@ class Eval_disp_im_win(QtGui.QWidget):
         self.top_right_grid.addWidget(self.save_output_data_btn, 1, 0)
         self.top_right_grid.addWidget(self.save_output_prediction_btn,1,1)
         self.top_right_grid.addWidget(self.save_output_mask_btn,0,1)
-        self.top_right_grid.addWidget(self.count_all_btn, 2,0)
+        self.top_right_grid.addWidget(self.count_all_btn, 3,1)
+        self.top_right_grid.addWidget(self.toggle_display_btn, 2,0)
         self.top_right_grid.addWidget(self.output_count_txt,2,1,1,4)
         #self.top_right_grid.addWidget(self.save_output_link, 2, 0)
 
-        self.count_maxima_btn = QtGui.QPushButton('Count Maxima')
+        self.count_maxima_btn = QtWidgets.QPushButton('Count Maxima')
         self.count_maxima_btn.setEnabled(False)
         self.top_right_grid.addWidget(self.count_maxima_btn, 2, 1)
         self.count_maxima_btn.clicked.connect(self.count_maxima_btn_fn)
@@ -534,33 +539,33 @@ class Eval_disp_im_win(QtGui.QWidget):
 
 
 
-        self.count_replot_btn = QtGui.QPushButton('Replot')
-        self.count_replot_btn_all = QtGui.QPushButton('Replot All')
+        self.count_replot_btn = QtWidgets.QPushButton('Replot')
+        self.count_replot_btn_all = QtWidgets.QPushButton('Replot All')
 
 
 
 
-        self.count_txt_1 = QtGui.QLineEdit(str(par_obj.min_distance[0]))
+        self.count_txt_1 = QtWidgets.QLineEdit(str(par_obj.min_distance[0]))
         self.count_txt_1.setFixedWidth(20)
-        self.count_txt_2 = QtGui.QLineEdit(str(par_obj.min_distance[1]))
+        self.count_txt_2 = QtWidgets.QLineEdit(str(par_obj.min_distance[1]))
         self.count_txt_2.setFixedWidth(20)
-        self.count_txt_3 = QtGui.QLineEdit(str(par_obj.min_distance[2]))
+        self.count_txt_3 = QtWidgets.QLineEdit(str(par_obj.min_distance[2]))
         self.count_txt_3.setFixedWidth(20)
 
-        abs_thr_lbl = QtGui.QLabel('Abs Thr:')
-        self.abs_thr_txt = QtGui.QLineEdit(str(par_obj.abs_thr))
+        abs_thr_lbl = QtWidgets.QLabel('Abs Thr:')
+        self.abs_thr_txt = QtWidgets.QLineEdit(str(par_obj.abs_thr))
         self.abs_thr_txt.setFixedWidth(25)
-        rel_thr_lbl = QtGui.QLabel('Rel Thr:')
-        self.rel_thr_txt = QtGui.QLineEdit(str(par_obj.rel_thr))
+        rel_thr_lbl = QtWidgets.QLabel('Rel Thr:')
+        self.rel_thr_txt = QtWidgets.QLineEdit(str(par_obj.rel_thr))
         self.rel_thr_txt.setFixedWidth(25)
 
 
-        self.min_distance_panel = QtGui.QHBoxLayout()
-        self.min_distance_panel.addWidget(QtGui.QLabel("x:"))
+        self.min_distance_panel = QtWidgets.QHBoxLayout()
+        self.min_distance_panel.addWidget(QtWidgets.QLabel("x:"))
         self.min_distance_panel.addWidget(self.count_txt_1)
-        self.min_distance_panel.addWidget(QtGui.QLabel("y:"))
+        self.min_distance_panel.addWidget(QtWidgets.QLabel("y:"))
         self.min_distance_panel.addWidget(self.count_txt_2 )
-        self.min_distance_panel.addWidget(QtGui.QLabel("z:"))
+        self.min_distance_panel.addWidget(QtWidgets.QLabel("z:"))
         self.min_distance_panel.addWidget(self.count_txt_3 )
         self.min_distance_panel.addWidget(abs_thr_lbl)
         self.min_distance_panel.addWidget(self.abs_thr_txt)
@@ -574,24 +579,24 @@ class Eval_disp_im_win(QtGui.QWidget):
 
         self.top_right_grid.setRowStretch(3,2)
 
-        #self.top_panel = QtGui.QHBoxLayout()
-        self.activate_roi_btn = QtGui.QPushButton('Toggle ROI tool')
+        #self.top_panel = QtWidgets.QHBoxLayout()
+        self.activate_roi_btn = QtWidgets.QPushButton('Toggle ROI tool')
         self.activate_roi_btn.clicked.connect(self.activate_roi_btn_fn)
 
-        self.compl_btn = QtGui.QPushButton('Save ROI')
+        self.compl_btn = QtWidgets.QPushButton('Save ROI')
         self.compl_btn.clicked.connect(self.cursor.complete_roi)
 
-        self.clear_btn = QtGui.QPushButton('Clear ROI')
+        self.clear_btn = QtWidgets.QPushButton('Clear ROI')
         self.clear_btn.clicked.connect(self.cursor.clear_ROI)
 
-        self.interpolate_btn = QtGui.QPushButton('Interpolate (z)')
+        self.interpolate_btn = QtWidgets.QPushButton('Interpolate (z)')
         self.interpolate_btn.clicked.connect(self.interpolate_roi_fn)
 
-        self.interpolate_time_btn = QtGui.QPushButton('Interpolate (t)')
+        self.interpolate_time_btn = QtWidgets.QPushButton('Interpolate (t)')
         self.interpolate_time_btn.clicked.connect(self.interpolate_roi_in_time_fn)
 
 
-        roi_panel = QtGui.QVBoxLayout()
+        roi_panel = QtWidgets.QVBoxLayout()
         roi_panel.addWidget(self.activate_roi_btn)
         roi_panel.addWidget(self.compl_btn)
         roi_panel.addWidget(self.clear_btn)
@@ -604,22 +609,22 @@ class Eval_disp_im_win(QtGui.QWidget):
 
 
         #Sets up the image panel splitter.
-        image_panel = QtGui.QSplitter(QtCore.Qt.Horizontal)
+        image_panel = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         image_panel.addWidget(self.canvas1)
         image_panel.addWidget(self.canvas2)
 
 
 
         #Splitter which separates the controls at the top and the images below.
-        splitter = QtGui.QSplitter(QtCore.Qt.Vertical)
-        hbox1 = QtGui.QWidget()
+        splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        hbox1 = QtWidgets.QWidget()
         hbox1.setLayout(top_panel)
         splitter.addWidget(hbox1)
         splitter.addWidget(image_panel)
         box.addWidget(splitter)
 
         #Status bar which is located beneath images.
-        self.image_status_text = QtGui.QStatusBar()
+        self.image_status_text = QtWidgets.QStatusBar()
         box.addWidget(toolbar)
         box.addWidget(self.image_status_text)
         self.image_status_text.showMessage('Status: Please Select a Region and Click \'Save ROI\'. ')
@@ -627,11 +632,11 @@ class Eval_disp_im_win(QtGui.QWidget):
 
 
 
-        self.modelLoadedText = QtGui.QLabel(self)
+        self.modelLoadedText = QtWidgets.QLabel(self)
 
-        self.imageNumText = QtGui.QLabel(self)
+        self.imageNumText = QtWidgets.QLabel(self)
 
-        self.evalStatusText = QtGui.QLabel(self)
+        self.evalStatusText = QtWidgets.QLabel(self)
         self.canvas1.mpl_connect('motion_notify_event', self.cursor.motion_notify_callback)
         self.canvas1.mpl_connect('button_press_event', self.cursor.button_press_callback)
         self.canvas1.mpl_connect('button_release_event', self.cursor.button_release_callback)
@@ -668,6 +673,17 @@ class Eval_disp_im_win(QtGui.QWidget):
             self.Btn_fns.prev_time(par_obj)
         elif ev.key() == QtCore.Qt.Key_Right:
             self.Btn_fns.next_time(par_obj)
+    def wheelEvent(self, event):
+        """When the mousewheel is rotated"""
+        if event.angleDelta().y() > 3:
+            self.Btn_fns.next_im(par_obj)
+        if event.angleDelta().y() < -3:
+            self.Btn_fns.prev_im(par_obj)
+        if event.angleDelta().x() > 10:
+            self.Btn_fns.next_time(par_obj)
+        if event.angleDelta().x() < -10:
+            self.Btn_fns.prev_time(par_obj)
+            
 
     def activate_roi_btn_fn(self):
         self.cursor.roi_active = not self.cursor.roi_active
@@ -690,6 +706,7 @@ class Eval_disp_im_win(QtGui.QWidget):
                 v2.count_maxima(par_obj,tpt,fileno)
         par_obj.show_pts = 1
         self.kernel_btn_fn()
+        self.report_progress('Maxima calculated. Save output data or change maxima parameters.')
     def kernel_btn_fn(self):
         """Shows the kernels on the image."""
 
@@ -730,6 +747,8 @@ class Eval_disp_im_win(QtGui.QWidget):
         par_obj.feat_arr = {}
         par_obj.pred_arr = {}
         par_obj.sum_pred = {}
+        par_obj.maxPred = 0 #resets scaling for display between models
+        par_obj.minPred = 100
         '''
         for fileno in range(par_obj.max_file):
             for tpt in par_obj.tpt_list:
@@ -747,16 +766,19 @@ class Eval_disp_im_win(QtGui.QWidget):
                 v2.count_maxima(par_obj,tpt,fileno)
                 time.sleep(0.001)
         '''
-        for fileno,imfile in enumerate(par_obj.filehandlers):
+        for fileno,imfile in par_obj.filehandlers.iteritems():
             for tpt in range(imfile.max_t+1):
                     frames = range(imfile.max_z+1)
                     #try to make it threadable
                     #v2.im_pred_inline_fn_eval(par_obj, self,outer_loop=b,inner_loop=frames,threaded=True)
+                    #TODO rework to put threading on outside
                     v2.im_pred_inline_fn_new(par_obj, self,frames,[tpt],[fileno],True)
-
                     for i in frames:
-                        v2.evaluate_forest_new(par_obj,self,False,0,[i],[tpt],[fileno])
                         
+                        v2.evaluate_forest_new(par_obj,self,False,0,[i],[tpt],[fileno])
+                        if par_obj.double_train==False:
+                            par_obj.data_store['feat_arr'][fileno][tpt][i] = []
+                            
                     if par_obj.double_train==True:
                         v2.im_pred_inline_fn_new(par_obj, self,frames,[tpt],[fileno],threaded='auto')
                         par_obj.data_store['feat_arr'][fileno][tpt] = {}
@@ -765,7 +787,7 @@ class Eval_disp_im_win(QtGui.QWidget):
                         par_obj.data_store['double_feat_arr'][fileno][tpt] = {}
                     else:
                         par_obj.data_store['feat_arr'][fileno][tpt] = {}
-                    v2.count_maxima(par_obj,tpt,fileno)
+                    #v2.count_maxima(par_obj,tpt,fileno)
                     time.sleep(0.001)
         #set count maxima parameters from model
         self.count_txt_1.setText(str(par_obj.min_distance[0]))
@@ -786,8 +808,8 @@ class Eval_disp_im_win(QtGui.QWidget):
         par_obj.curr_t= 0
         #TODO check why this is not using the local version of goto_img
         par_obj.show_pts=1
-        v2.goto_img_fn_new(par_obj, self)
-
+        #v2.goto_img_fn_new(par_obj, self)
+        self.goto_img_fn()
         #v2.eval_pred_show_fn(par_obj,self,par_obj.curr_z,par_obj.time_pt)
     def save_output_data(self):
         v2.save_output_data_fn(par_obj,self)
@@ -802,8 +824,8 @@ class Eval_disp_im_win(QtGui.QWidget):
         pass
     def loadTrainFn(self):
         #Win_fn()
-        channel_wid = QtGui.QWidget()
-        channel_lay = QtGui.QHBoxLayout()
+        channel_wid = QtWidgets.QWidget()
+        channel_lay = QtWidgets.QHBoxLayout()
         ChannelGroup=create_channel_objects(self,par_obj,par_obj.numCH)
         for chbx,contrast,brightness in ChannelGroup:
             channel_lay.addWidget(chbx)
@@ -815,7 +837,7 @@ class Eval_disp_im_win(QtGui.QWidget):
         channel_lay.addStretch()
         channel_wid.setLayout(channel_lay)
         
-        self.top_left_grid.setMargin(0)
+        #self.top_left_grid.setMargin(0)
         self.top_left_grid.addWidget(channel_wid,1,0,1,3)
 
     def goto_img_fn(self,zslice=None,tpt=None,imno=None):
@@ -847,9 +869,9 @@ class Eval_disp_im_win(QtGui.QWidget):
         #v2.eval_goto_img_fn(im_num,par_obj,self)
         v2.goto_img_fn_new(par_obj, self)
 
-class checkBoxCH(QtGui.QCheckBox):
+class checkBoxCH(QtWidgets.QCheckBox):
     def __init__(self):
-        QtGui.QCheckBox.__init__(self)
+        QCheckBox.__init__(self)
         self.stateChanged.connect(self.stateChange)
         self.type = None;
     def stateChange(self):
@@ -859,7 +881,7 @@ class checkBoxCH(QtGui.QCheckBox):
             Eval_disp_im_win.goto_img_fn(evalImWin)
 
 
-class File_Dialog(QtGui.QMainWindow):
+class File_Dialog(QtWidgets.QMainWindow):
 
     def __init__(self,par_obj,int_obj,modelTabObj):
         super(File_Dialog, self).__init__()
@@ -873,11 +895,11 @@ class File_Dialog(QtGui.QMainWindow):
 
     def initUI(self):
 
-        self.textEdit = QtGui.QTextEdit()
+        self.textEdit = QtWidgets.QTextEdit()
         self.setCentralWidget(self.textEdit)
         self.statusBar()
 
-        openFile = QtGui.QAction(QtGui.QIcon('open.png'), 'Open', self)
+        openFile = QtWidgets.QAction(QtGui.QIcon('open.png'), 'Open', self)
 
         openFile.setShortcut('Ctrl+O')
         openFile.setStatusTip('Open new File')
@@ -899,11 +921,15 @@ class File_Dialog(QtGui.QMainWindow):
 
     def showDialog(self):
         self.int_obj.selIntButton.setEnabled(False)
-        #filepath = QtGui.QFileDialog.getOpenFileName(self, 'Open file', '/home')
+        #filepath = QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', '/home')
         par_obj.file_array =[]
+        
+        path = None
+        for path in QtWidgets.QFileDialog.getOpenFileNames(self, 'Open file', self.par_obj.filepath, 'Images(*.tif *.tiff);;'):
+            if path <> '':
+                par_obj.file_array.append(path[0])
+        if path==None:return
 
-        for path in QtGui.QFileDialog.getOpenFileNames(self, 'Open file', self.par_obj.filepath,'Images(*.tif *.tiff);;'):
-            par_obj.file_array.append(path)
         if len(par_obj.file_array)>0:
             self.par_obj.config['evalpath'] = str(QtCore.QFileInfo(path).absolutePath())+'/'
             pickle.dump(self.par_obj.config, open(str(os.path.expanduser('~')+'/.densitycount/config.p'), "w" ))
@@ -937,14 +963,14 @@ class File_Dialog(QtGui.QMainWindow):
                 btn.setText('Click to Remove')
                 self.modelTabObj.setCellWidget(c, 0, btn)
 
-                text1 = QtGui.QLabel(self.modelTabObj)
+                text1 = QtWidgets.QLabel(self.modelTabObj)
                 text1.setText(str(self.par_obj.file_array[i]).split('/')[-1])
                 self.modelTabObj.setCellWidget(c,1,text1)
-                self.par_obj.input_range = QtGui.QLineEdit(self.modelTabObj)
+                self.par_obj.input_range = QtWidgets.QLineEdit(self.modelTabObj)
                 self.par_obj.input_range.setText('1-'+str(self.par_obj.max_t+1))
 
                 self.modelTabObj.setCellWidget(c,2,self.par_obj.input_range)
-                text3 = QtGui.QLabel(self.modelTabObj)
+                text3 = QtWidgets.QLabel(self.modelTabObj)
                 text3.setText(str(self.par_obj.file_array[i]))
                 self.modelTabObj.setCellWidget(c,3,text3)
 
@@ -957,9 +983,9 @@ class File_Dialog(QtGui.QMainWindow):
 
 
 
-class loadModelBtn(QtGui.QPushButton):
+class loadModelBtn(QtWidgets.QPushButton):
     def __init__(self,par_obj,int_obj,parent,idnum,fileName):
-        QtGui.QPushButton.__init__(self,parent)
+        QtWidgets.QPushButton.__init__(self,parent)
         self.par_obj = par_obj
         self.int_obj = int_obj
         self.modelNum = idnum
@@ -970,9 +996,9 @@ class loadModelBtn(QtGui.QPushButton):
         self.int_obj.loadModelFn(self.par_obj,self.fileName)
 
 
-class removeImBtn(QtGui.QPushButton):
+class removeImBtn(QtWidgets.QPushButton):
     def __init__(self,parent,par_obj,table,idnum):
-        QtGui.QPushButton.__init__(self,parent)
+        QtWidgets.QPushButton.__init__(self,parent)
         self.modelNum = idnum
         self.par_obj = par_obj
         self.clicked.connect(self.onClick)
@@ -982,39 +1008,54 @@ class removeImBtn(QtGui.QPushButton):
         self.table.refreshTable()
 
 #Creates win, an instance of QWidget
-class widgetSP(QtGui.QWidget):
+class widgetSP(QtWidgets.QWidget):
     def __init__(self):
-        QtGui.QWidget.__init__(self)
+        QtWidgets.QWidget.__init__(self)
         self.par_obj =[]
     def keyPressEvent(self, ev):
+        """When the . and , keys are pressed"""
         if ev.key() == QtCore.Qt.Key_Period:
-            im_num = self.par_obj.curr_z + 1
-        if ev.key() == QtCore.Qt.Key_Comma:
-            im_num = self.par_obj.curr_z - 1
-        v2.evalGotoImgFn(im_num,self.par_obj, self)
+            self.Btn_fns.next_file(par_obj)
+        elif ev.key() == QtCore.Qt.Key_Comma:
+            self.Btn_fns.prev_file(par_obj)
+        elif ev.key() == QtCore.Qt.Key_Up:
+            self.Btn_fns.next_im(par_obj)
+        elif ev.key() == QtCore.Qt.Key_Down:
+            self.Btn_fns.prev_im(par_obj)
+        elif ev.key() == QtCore.Qt.Key_Left:
+            self.Btn_fns.prev_time(par_obj)
+        elif ev.key() == QtCore.Qt.Key_Right:
+            self.Btn_fns.next_time(par_obj)
+            
     def wheelEvent(self, event):
-        super(widgetSP, self).wheelEvent(event)
-        if event.delta() < 0:
-            im_num = self.par_obj.curr_z + 1
-        if event.delta() > 0:
-            im_num = self.par_obj.curr_z - 1
-        v2.evalGotoImgFn(im_num,self.par_obj, self)
+        """When the mousewheel is rotated"""
+        if event.angleDelta().y() > 3:
+            self.Btn_fns.next_im(par_obj)
+        if event.angleDelta().y() < -3:
+            self.Btn_fns.prev_im(par_obj)
+        if event.angleDelta().x() > 10:
+            self.Btn_fns.next_time(par_obj)
+        if event.angleDelta().x() < -10:
+            self.Btn_fns.prev_time(par_obj)
 
 
+timer = QtCore.QTimer()
+timer.timeout.connect(lambda: None)
+timer.start(200)
 
 #generate layout
-app = QtGui.QApplication([])
+app = QtWidgets.QApplication([])
 
 # Create and display the splash screen
-splash_pix = QtGui.QPixmap('splash_loading.png')
-splash = QtGui.QSplashScreen(splash_pix, QtCore.Qt.WindowStaysOnTopHint)
+splash_pix = QtGui .QPixmap('splash_loading.png')
+splash = QtWidgets.QSplashScreen(splash_pix, QtCore.Qt.WindowStaysOnTopHint)
 splash.setMask(splash_pix.mask())
 splash.show()
 app.processEvents()
 
 
 #Creates tab widget.
-win_tab = QtGui.QTabWidget()
+win_tab = QtWidgets.QTabWidget()
 
 #Intialises counter object.
 par_obj = ParameterClass()
@@ -1035,6 +1076,9 @@ win_tab.resize(1200, 800)
 time.sleep(2.0)
 splash.finish(win_tab)
 
+
+
+
 #Initalises load screen.
 #eval_load_im_win_fn(par_obj,evalLoadImWin)
 #evalLoadModelWinFn(par_obj,evalLoadModelWin)
@@ -1043,5 +1087,6 @@ win_tab.show()
 # Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
     import sys
+
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
-        QtGui.QApplication.instance().exec_()
+        QtWidgets.QApplication.instance().exec_()
