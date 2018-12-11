@@ -7,47 +7,48 @@ Created on Sat Apr  2 18:03:50 2016
 Common colour checkboxes and 4D navigation functions
  Currently must import directly, need to tidy this up later
 """
-from PyQt4 import QtGui,QtCore
+from PyQt5 import QtGui,QtCore,QtWidgets
 from gnu import return_license
 import numpy as np
+
 
 def navigation_setup(self,par_obj):
 
     #Sets up the button which changes to the prev image
-    self.prev_im_btn = QtGui.QPushButton('Z ('+unichr(8595)+')')
+    self.prev_im_btn = QtWidgets.QPushButton('Z ('+unichr(8595)+')')
     self.prev_im_btn.setEnabled(True)
 
     #Sets up the button which changes to the next Image.
-    self.next_im_btn = QtGui.QPushButton('Z ('+unichr(8593)+')')
+    self.next_im_btn = QtWidgets.QPushButton('Z ('+unichr(8593)+')')
     self.next_im_btn.setEnabled(True)
 
     #Sets up the button which changes to the prev image
-    self.first_im_btn = QtGui.QPushButton('Z (bottom)')
+    self.first_im_btn = QtWidgets.QPushButton('Z (bottom)')
     self.first_im_btn.setEnabled(True)
 
     #Sets up the button which changes to the next Image.
-    self.last_im_btn = QtGui.QPushButton('Z (top)')
+    self.last_im_btn = QtWidgets.QPushButton('Z (top)')
     self.last_im_btn.setEnabled(True)
 
      #Sets up the button which changes to the prev image
-    self.prev_time_btn = QtGui.QPushButton('Time ('+unichr(8592)+')')
+    self.prev_time_btn = QtWidgets.QPushButton('Time ('+unichr(8592)+')')
     self.prev_time_btn.setEnabled(True)
 
     #Sets up the button which changes to the next Image.
-    self.next_time_btn = QtGui.QPushButton('Time ('+unichr(8594)+')')
+    self.next_time_btn = QtWidgets.QPushButton('Time ('+unichr(8594)+')')
     self.next_time_btn.setEnabled(True)
 
     #Sets up the button which changes to the next File.
-    self.prev_file_btn = QtGui.QPushButton('File (<)')
+    self.prev_file_btn = QtWidgets.QPushButton('File (<)')
     self.prev_file_btn.setEnabled(True)
 
     #Sets up the button which changes to the next File.
-    self.next_file_btn = QtGui.QPushButton('File (>)')
+    self.next_file_btn = QtWidgets.QPushButton('File (>)')
     self.next_file_btn.setEnabled(True)
 
-    self.output_count_txt = QtGui.QLabel()
+    self.output_count_txt = QtWidgets.QLabel()
 
-    self.panel_buttons = QtGui.QHBoxLayout()
+    self.panel_buttons = QtWidgets.QHBoxLayout()
     self.panel_buttons.addWidget(self.prev_im_btn)
     self.panel_buttons.addWidget(self.next_im_btn)
     self.panel_buttons.addSpacing(5)
@@ -133,7 +134,7 @@ class btn_fn:
                     break;
 
 def on_about(self):
-    self.about_win = QtGui.QWidget()
+    self.about_win = QtWidgets.QWidget()
     self.about_win.setWindowTitle('About QBrain Software v2.0')
 
     license = return_license()
@@ -142,7 +143,7 @@ def on_about(self):
     #    license.append(data)
 
     # And give it a layout
-    layout = QtGui.QVBoxLayout()
+    layout = QtWidgets.QVBoxLayout()
 
     self.view = QtWebKit.QWebView()
     self.view.setHtml('''
@@ -166,9 +167,9 @@ def on_about(self):
     self.about_win.show()
     self.about_win.raise_()
 
-class checkBoxCH(QtGui.QCheckBox):
+class checkBoxCH(QtWidgets.QCheckBox):
     def __init__(self,par_obj,Win,ID,feature_select,text=None):
-        QtGui.QCheckBox.__init__(self,text)
+        QtWidgets.QCheckBox.__init__(self,text)
         self.stateChanged.connect(self.stateChange)
         self.feature_select = feature_select
         self.ID=ID
@@ -210,9 +211,9 @@ class checkBoxCH(QtGui.QCheckBox):
                     del par_obj.ch_display[par_obj.ch_display.index(self.ID)]
             Win.goto_img_fn(par_obj.curr_z,par_obj.curr_t)
 
-class contrast_controller(QtGui.QSlider):
+class contrast_controller(QtWidgets.QSlider):
     def __init__(self,par_obj,Win,ID,brightness=False):
-        QtGui.QSlider.__init__(self)
+        QtWidgets.QSlider.__init__(self)
         self.ID=ID
         self.Win=Win
         self.par_obj=par_obj
@@ -252,7 +253,13 @@ class contrast_controller(QtGui.QSlider):
 def create_channel_objects(self,par_obj,num,feature_select=False,parent=None):
     #Object factory for channel selection.
     parent=[]
-    self.CH_cbx = []
+    if hasattr(self,'CH_cbx'):
+        for cbx in self.CH_cbx:
+            cbx.hide()
+            cbx.destroy()
+        self.CH_cbx = []
+    else:
+        self.CH_cbx = []
 
     for chID in range(0,num):
         cbx=checkBoxCH(par_obj,self,chID,feature_select,'CH '+str(chID+1)+':')
@@ -268,3 +275,32 @@ def create_channel_objects(self,par_obj,num,feature_select=False,parent=None):
             parent.append([cbx])
 
     return parent
+
+
+class Worker(QtCore.QRunnable):
+    '''
+    Worker thread
+
+    Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
+
+    :param callback: The function callback to run on this worker thread. Supplied args and 
+                     kwargs will be passed through to the runner.
+    :type callback: function
+    :param args: Arguments to pass to the callback function
+    :param kwargs: Keywords to pass to the callback function
+
+    '''
+
+    def __init__(self, fn, *args, **kwargs):
+        super(Worker, self).__init__()
+        # Store constructor arguments (re-used for processing)
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
+    @QtCore.pyqtSlot()
+    def run(self):
+        '''
+        Initialise the runner function with passed args, kwargs.
+        '''
+        self.fn(*self.args, **self.kwargs)
