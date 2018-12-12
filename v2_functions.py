@@ -1089,7 +1089,7 @@ for thresholding and the like'''
 
 def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threaded=False):
     """Accesses TIFF file slice (from open tiffarray. Calculates features to slices specified"""
-    # consider cropping
+    # consider cropping   
     if par_obj.to_crop is False:
         par_obj.crop_x1 = 0
         par_obj.crop_x2 = par_obj.width
@@ -1180,7 +1180,19 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
                         lcount = lcount+1
                         feat = featlist[lcount]
                         int_obj.report_progress('Calculating Features for File:'+str(imno+1)+ ' Timepoint: '+str(tpt+1) +' Z: '+str(zslice+1))
-
+                        if 0==1:
+                            featwithzt = np.zeros((feat.shape[0],feat.shape[1],8+feat.shape[2]))
+                            featwithzt[:,:,8:]=feat
+                            if zslice>1:
+                                featwithzt[:,:,0:2] = par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice-2], width, height, par_obj.ch_active)+par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice-1], width, height, par_obj.ch_active)-2*par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice], width, height, par_obj.ch_active)
+                            if zslice<(par_obj.max_z-1):
+                                featwithzt[:,:,2:4] = par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice+2], width, height, par_obj.ch_active)+par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice+1], width, height, par_obj.ch_active)-2*par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice], width, height, par_obj.ch_active)
+                            if tpt>5:
+                                featwithzt[:,:,4:6] = par_obj.filehandlers[imno].get_tiff_slice([tpt-5], [zslice], width, height, par_obj.ch_active)+par_obj.filehandlers[imno].get_tiff_slice([tpt-4], [zslice], width, height, par_obj.ch_active)-2*par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice], width, height, par_obj.ch_active)
+                            if tpt<(par_obj.max_t-5):
+                                featwithzt[:,:,6:8] = par_obj.filehandlers[imno].get_tiff_slice([tpt+5], [zslice], width, height, par_obj.ch_active)+par_obj.filehandlers[imno].get_tiff_slice([tpt+4], [zslice], width, height, par_obj.ch_active)-2*par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice], width, height, par_obj.ch_active)
+                            feat=featwithzt
+                        
                         par_obj.num_of_feat[0] = feat.shape[2]
                         #print 'for test'
                         par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat
