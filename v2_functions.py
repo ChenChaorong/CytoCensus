@@ -1182,7 +1182,7 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
                         int_obj.report_progress('Calculating Features for File:'+str(imno+1)+ ' Timepoint: '+str(tpt+1) +' Z: '+str(zslice+1))
 
                         par_obj.num_of_feat[0] = feat.shape[2]
-
+                        #print 'for test'
                         par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat
         int_obj.report_progress('Features calculated')
     return
@@ -1222,11 +1222,10 @@ def return_rgb_slice(par_obj, zslice, tpt, imno):
     return imRGB
 
 
-def evaluate_forest_new(par_obj, int_obj, withGT, model_num, zsliceList, tptList, curr_file, arr='feat_arr'):
+def evaluate_forest_new(par_obj, int_obj, withGT, model_num, zsliceList, tptList, curr_file, arr='feat_arr',threaded=False):
 
     #Finds the current frame and file.
-    par_obj.maxPred = 0 #resets scaling for display between models
-    par_obj.minPred = 100
+
     for imno in curr_file:
         for tpt in tptList:
             for zslice in zsliceList:
@@ -1240,9 +1239,12 @@ def evaluate_forest_new(par_obj, int_obj, withGT, model_num, zsliceList, tptList
 
                 else:
                 '''
-                mimg_lin = np.reshape(par_obj.data_store[arr][imno][tpt][zslice], (par_obj.height * par_obj.width, par_obj.data_store[arr][imno][tpt][zslice].shape[2]))
+                if par_obj.p_size==1:
+                    mimg_lin = np.reshape(par_obj.data_store[arr][imno][tpt][zslice], (par_obj.height * par_obj.width, par_obj.data_store[arr][imno][tpt][zslice].shape[2]))
+                if par_obj.p_size==2:
+                    mimg_lin= par_obj.data_store[arr][imno][tpt][zslice]
                 t2 = time.time()
-                linPred = par_obj.RF[model_num].predict(mimg_lin)
+                linPred = par_obj.RF[model_num].predict(mimg_lin).astype('uint16')
                 #linPred=linPred[:,1]-linPred[:,0]
                 t1 = time.time()
 
@@ -1250,13 +1252,14 @@ def evaluate_forest_new(par_obj, int_obj, withGT, model_num, zsliceList, tptList
 
                 maxPred = np.max(linPred)
                 minPred = np.min(linPred)
-                par_obj.maxPred = max([par_obj.maxPred, maxPred])
-                par_obj.minPred = min([par_obj.minPred, minPred])
+
+                par_obj.maxPred = max(par_obj.maxPred, maxPred)
+                par_obj.minPred = min(par_obj.minPred, minPred)
+
                 sum_pred = np.sum(linPred/255)
                 par_obj.data_store['sum_pred'][imno][tpt][zslice] = sum_pred
 
-                print 'prediction time taken', t1 - t2
-                print 'Predicted i:', par_obj.data_store['sum_pred'][imno][tpt][zslice]
+                print 'prediction time taken', t1 - t2,  ' Predicted i:', par_obj.data_store['sum_pred'][imno][tpt][zslice]
                 int_obj.report_progress('Making Prediction for File: '+str(imno+1)+' T: '+str(tpt+1)+' Z: ' +str(zslice+1))
 
 
