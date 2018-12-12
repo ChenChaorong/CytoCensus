@@ -1569,7 +1569,7 @@ def save_output_hess_fn(par_obj, int_obj):
 
 def save_output_mask_fn(par_obj,int_obj):
     #funky ordering TZCYX
-    for fileno,imfile in enumerate(par_obj.filehandlers):
+    for fileno,imfile in par_obj.filehandlers.iteritems():
         filename = imfile.full_name
         image = np.zeros([imfile.max_t+1,imfile.max_z+1,1,par_obj.height,par_obj.width], 'uint8')
         for tpt in range(imfile.max_t+1):
@@ -1584,7 +1584,7 @@ def save_output_mask_fn(par_obj,int_obj):
 
 def save_output_ROI(par_obj, int_obj):
     #funky ordering TZCYX
-    for fileno, imfile in enumerate(par_obj.filehandlers):
+    for fileno, imfile in par_obj.filehandlers.iteritems():
         filename = imfile.base_name
         with open(par_obj.csvPath+filename+'_outputROI.pickle', 'wb') as afile:
             pickle.dump([par_obj.data_store['roi_stkint_x'][fileno], par_obj.data_store['roi_stkint_y'][fileno]], afile)
@@ -1593,7 +1593,7 @@ def save_output_ROI(par_obj, int_obj):
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Z: ')]+[str('Regions(x): ')]+[str('Regions(y): ')])
 
-        for fileno, imfile in enumerate(par_obj.filehandlers):
+        for fileno, imfile in par_obj.filehandlers.iteritems():
             filename = imfile.full_name
             for tpt in range(imfile.max_t+1):
                 ppt_x = par_obj.data_store['roi_stkint_x'][fileno][tpt]
@@ -1629,7 +1629,7 @@ def save_output_data_fn(par_obj, int_obj):
 
 def save_user_ROI(par_obj, int_obj):
     #funky ordering TZCYX
-    for fileno, imfile in enumerate(par_obj.filehandlers):
+    for fileno, imfile in par_obj.filehandlers.iteritems():
         filename = imfile.base_name
         with open(par_obj.csvPath+filename+'_outputROI.pickle', 'wb') as afile:
             data = [par_obj.data_store['roi_stkint_x'][fileno], par_obj.data_store['roi_stkint_y'][fileno],\
@@ -1640,7 +1640,7 @@ def save_user_ROI(par_obj, int_obj):
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Z: ')]+[str('Regions(x): ')]+[str('Regions(y): ')])
 
-        for fileno, imfile in enumerate(par_obj.filehandlers):
+        for fileno, imfile in par_obj.filehandlers.iteritems():
             filename = imfile.full_name
             for tpt in range(imfile.max_t+1):
                 ppt_x = par_obj.data_store['roi_stk_x'][fileno][tpt]
@@ -1655,7 +1655,7 @@ def save_ROI_area(par_obj, int_obj):
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Area')])
 
-        for fileno, imfile in enumerate(par_obj.filehandlers):
+        for fileno, imfile in par_obj.filehandlers.iteritems():
             filename = imfile.full_name
             for tpt in range(imfile.max_t+1):
                 ppt_x = par_obj.data_store['roi_stkint_x'][fileno][tpt]
@@ -1685,7 +1685,7 @@ def load_user_ROI(par_obj, int_obj):
     #fileName = QtGui.QFileDialog.getOpenFileName(None, "Load ROIs", filter="QuantiFly ROI files (*.outputROI)")
     #filename, file_ext = os.path.splitext(os.path.basename(fileName[0:-18]))
 
-    for fileno, imfile in enumerate(par_obj.filehandlers):
+    for fileno, imfile in par_obj.filehandlers.iteritems():
         name = imfile.full_name +'_outputROI.pickle'
         if os.path.isfile(name):
 
