@@ -1014,7 +1014,7 @@ def refresh_all_density(par_obj):
         zslice = int(par_obj.saved_ROI[it][0])
         fileno = int(par_obj.saved_ROI[it][6])
         update_com_fn(par_obj, tpt, zslice, fileno)
-
+    
 def update_com_fn(par_obj, tpt, zslice, fileno):
 
     #Construct empty array for current image.
@@ -1082,7 +1082,7 @@ def update_com_fn(par_obj, tpt, zslice, fileno):
     '''NORMALISE GAUSSIANS. THIS MAKES IT USELESS FOR DOING 2D DENSITY ESTIMATION,
  but super useful if you want a probability output between 0 and 1 at the end of the day
 for thresholding and the like'''
-    dense_im = dense_im/kernel.max()*1000
+    dense_im = dense_im/kernel.max()*256
     par_obj.gaussian_im_max = kernel.max()
 
     par_obj.data_store['dense_arr'][fileno][tpt][zslice] = dense_im
