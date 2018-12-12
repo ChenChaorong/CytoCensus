@@ -1725,8 +1725,8 @@ def setup_parameters(self, par_obj):
     """Loads parameters and initiates data structure"""
     #Resets everything should this be another patch of images loaded.
 
-    par_obj.height = par_obj.ori_height/par_obj.resize_factor
-    par_obj.width = par_obj.ori_width/par_obj.resize_factor
+    par_obj.height = int (par_obj.ori_height/par_obj.resize_factor)
+    par_obj.width = int (par_obj.ori_width/par_obj.resize_factor)
 
     par_obj.curr_t = par_obj.tpt_list[0]
     par_obj.curr_z = par_obj.user_min_z
