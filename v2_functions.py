@@ -1311,6 +1311,7 @@ def evaluate_forest_auto(par_obj, int_obj, withGT, model_num, zsliceList, tptLis
 
 def goto_img_fn_new(par_obj, int_obj):
     """Loads up current image and displays it"""
+
     tpt = par_obj.curr_t
     zslice = par_obj.curr_z
     imno = par_obj.curr_file
@@ -1320,7 +1321,9 @@ def goto_img_fn_new(par_obj, int_obj):
     par_obj.save_im = newImg
     #deals with displaying different channels
     if par_obj.overlay and zslice in par_obj.data_store['pred_arr'][imno][tpt]:
-        newImg[:, :, 2] = (par_obj.data_store['pred_arr'][imno][tpt][zslice])/par_obj.maxPred
+        pred_img=(par_obj.data_store['pred_arr'][imno][tpt][zslice])/par_obj.maxPred
+        pred_img[pred_img<0]=0
+        newImg[:, :, 2] = pred_img
 
     #sets image for display
     int_obj.plt1.images[0].set_data(newImg)
@@ -1336,14 +1339,15 @@ def goto_img_fn_new(par_obj, int_obj):
 
     """Deals with displaying Kernel/Prediction/Counts"""
     #im2draw = None
-
+    
     if par_obj.show_pts == 0:
         if zslice in par_obj.data_store['dense_arr'][imno][tpt]:
 
             im2draw = par_obj.data_store['dense_arr'][imno][tpt][zslice]
-            int_obj.plt2.images[0].autoscale()
+
             int_obj.plt2_is_clear = False
             int_obj.plt2.images[0].set_data(im2draw)
+            int_obj.plt2.images[0].autoscale()
             int_obj.canvas2.draw()
 
         elif int_obj.plt2_is_clear is not True:
@@ -1379,7 +1383,7 @@ def goto_img_fn_new(par_obj, int_obj):
             #if pt2d[3] == 0:
             #    break
 
-            if pt2d[2] == ind:
+            if pt2d[2] == ind or par_obj.z_project:
                 pt_x.append(pt2d[1])
                 pt_y.append(pt2d[0])
 
