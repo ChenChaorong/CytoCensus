@@ -1413,7 +1413,8 @@ def load_and_initiate_plots(par_obj, int_obj):
     int_obj.plt1.axis("off")
     newImg = np.zeros((int(par_obj.height), int(par_obj.width), 3))
     int_obj.plt2.cla()
-    int_obj.plt2.imshow(newImg, interpolation='none')
+    int_obj.plt2.imshow(newImg, interpolation='none',cmap='jet')
+
     #modest_image.imshow(int_obj.plt2.axes,newImg,interpolation='none')
     int_obj.plt2.axis("off")
     int_obj.plt2.autoscale()
