@@ -1362,8 +1362,9 @@ def goto_img_fn_new(par_obj, int_obj):
         else:
             im2draw = np.zeros((par_obj.height, par_obj.width))
 
-        int_obj.plt2.images[0].set_clim(None, par_obj.maxPred)
+        int_obj.plt2.images[0].set_clim(0, par_obj.maxPred)
         int_obj.plt2.images[0].set_data(im2draw)
+        #int_obj.plt2.autoscale()
         int_obj.canvas2.draw()
 
     elif par_obj.show_pts == 2:
