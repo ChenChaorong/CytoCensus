@@ -967,7 +967,7 @@ def update_training_samples_fn_auto(par_obj, int_obj, rects):
                 par_obj.limit_size = round(mImRegion.shape[0]*mImRegion.shape[1]/calc_ratio, 0)
 
                 if STRATIFY is True:
-                    indices = stratified_sample(par_obj, binlength, samples_indices, imhist, samples_at_tiers, mImRegion, denseRegion)
+                    indices = stratified_sample(binlength, samples_indices, imhist, samples_at_tiers, denseRegion)
                 else:
                     indices = np.random.choice(int(mImRegion.shape[0]*mImRegion.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
             else:
@@ -984,8 +984,8 @@ def update_training_samples_fn_auto(par_obj, int_obj, rects):
 
 def train_forest(par_obj, int_obj, model_num):
 
-    if par_obj.max_features > par_obj.num_of_feat[model_num]:
-        par_obj.max_features = par_obj.num_of_feat[model_num]
+    #if par_obj.max_features > par_obj.num_of_feat[model_num]:
+    par_obj.max_features = int(par_obj.num_of_feat[model_num]/2)
 
     #assigns model type
     par_obj.RF[model_num] = lf.RF(par_obj, 'ETR')
