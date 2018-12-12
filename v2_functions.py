@@ -1399,8 +1399,18 @@ def goto_img_fn_new(par_obj, int_obj):
 
     int_obj.draw_saved_dots_and_roi()
     int_obj.cursor.draw_ROI()
-
+    buffereddraw(int_obj)
     print time.time() -t0
+def buffereddraw(int_obj):
+    
+    if int_obj.threadpool.activeThreadCount()>1:
+        return
+    else: 
+        from common_navigation import Worker
+        worker = Worker(int_obj.canvas1.draw)
+        worker.run()
+        return
+    
 
 def load_and_initiate_plots(par_obj, int_obj):
     """prepare plots and data for display"""
