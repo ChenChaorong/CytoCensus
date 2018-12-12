@@ -1563,9 +1563,10 @@ def save_output_hess_fn(par_obj, int_obj):
         for tpt in range(imfile.max_t+1):
             for zslice in range(imfile.max_z+1):
                 image[tpt, zslice, 0, :, :] = par_obj.data_store['maxi_arr'][fileno][tpt][zslice].astype('float32')
-        print 'Prediction written to disk'
-        imsave(par_obj.csvPath+par_obj.file_name[fileno]+'_'+par_obj.modelName+'_Hess.tif', image, imagej=True)
-        int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
+
+        print 'Saving Hessian image to disk'
+        imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Hess.tif', image, imagej=True)
+        int_obj.report_progress('Hessian written to disk '+ par_obj.csvPath)
 
 def save_output_mask_fn(par_obj,int_obj):
     #funky ordering TZCYX
@@ -1578,9 +1579,6 @@ def save_output_mask_fn(par_obj,int_obj):
                 [x,y,z,W]=par_obj.data_store['pts'][fileno][tpt][i]
                 if W:
                     image[tpt,z,0,x,y]=255
-
-        imsave(filename+'_'+par_obj.modelName+'_Hess.tif',image, imagej=True)
-        int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
 
 def save_output_ROI(par_obj, int_obj):
     #funky ordering TZCYX
