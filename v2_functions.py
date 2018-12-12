@@ -1202,7 +1202,7 @@ def return_rgb_slice(par_obj, zslice, tpt, imno):
                 if i == 3: break #can only display 3 channels
 
                 input_im = imfile.get_tiff_slice([tpt], [zslice], width, height, [ch])
-                imRGB[:, :, i] = (input_im.astype('float32')/par_obj.filehandlers[imno].tiffarraymax)*clim[i][1]-clim[i][0]
+                imRGB[:, :, i] = (input_im.astype('float32')/par_obj.filehandlers[imno].tiffarraymax)*clim[ch][1]-clim[ch][0]
         else:
             for i, ch in enumerate(par_obj.ch_display):
 
