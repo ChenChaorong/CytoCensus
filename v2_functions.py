@@ -1557,7 +1557,7 @@ def save_output_prediction_fn(par_obj, int_obj):
 
 def save_output_hess_fn(par_obj, int_obj):
     """Saves hessian map to tiff file using tiffiles imsave"""
-    for fileno, imfile in enumerate(par_obj.filehandlers):
+    for fileno, imfile in par_obj.filehandlers.iteritems():
         #funky ordering TZCYX
         image = np.zeros([imfile.max_t+1, imfile.max_z+1, 1, par_obj.height, par_obj.width], 'float32')
         for tpt in range(imfile.max_t+1):
@@ -1579,6 +1579,9 @@ def save_output_mask_fn(par_obj,int_obj):
                 [x,y,z,W]=par_obj.data_store['pts'][fileno][tpt][i]
                 if W:
                     image[tpt,z,0,x,y]=255
+        image = filters.maximum_filter(image,size=(0,3,0,3,3))
+        imsave(filename+'_'+par_obj.modelName+'_Points.tif',image, imagej=True)
+        int_obj.report_progress('Point mask written to disk '+ par_obj.csvPath)
 
 def save_output_ROI(par_obj, int_obj):
     #funky ordering TZCYX
