@@ -10,6 +10,7 @@ Common parameterObject from Evaluate and Release
 """
 import os
 import errno
+import numpy as np
 #import shelve
 #import UserDict
 class Data(object):
@@ -42,6 +43,8 @@ class ParameterClass(object):
         self.crop_x2 = 0
         self.crop_y1 = 0
         self.crop_y2 = 0
+        self.ori_width = None
+        self.ori_height = None
         #historical-remove in future
         self.left2calc = 0
         self.fresh_features = True
@@ -49,6 +52,7 @@ class ParameterClass(object):
         self.prev_img = []
         self.oldImg = []
         self.newImg = []
+        self.save_im = np.empty(0)
         self.auto = True        #Auto mode. #what is this??
         self.kernel_toggle = False
         self.c = 0
@@ -58,6 +62,7 @@ class ParameterClass(object):
         #store high level file data and metadata
         self.file_name = {}
         self.file_array = []
+        self.filehandlers = {}
         self.tiffarray = [] #memmap object list
         #self.z_calibration={}
         #self.z_calibration[0]=1
