@@ -16,6 +16,7 @@
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 """
+from __future__ import division
 #from PyQt4 import QtGui, QtCore, Qt
 #import PIL.Image
 import os
@@ -26,10 +27,16 @@ from multiprocessing.dummy import Pool as ThreadPool
 
 import functools
 import itertools as itt
-
+import copy
 import numpy as np
 
-from scipy.ndimage import filters
+
+import skimage
+import scipy as sp
+
+from sklearn import ensemble
+
+from scipy.ndimage import filters, measurements
 from tifffile import imsave #Install with pip install tifffile.
 import modest_image
 
@@ -38,8 +45,7 @@ import matplotlib.image as pylab
 
 import local_features as lf
 from File_handler import File_handler
-
-import pdb
+import scipy.cluster.hierarchy as hcluster
 
 def peak_local_max(image, min_distance=10, threshold_abs=0, threshold_rel=0.1,
                    exclude_border=False, indices=True, num_peaks=np.inf,
@@ -190,49 +196,33 @@ Original author: Lee Kamentstky
 """
 #import trackpy as tp
 
-def quick_bandpass(image, sigma_l, threshold=None):
-
-    #if threshold is None:
-    #    if np.issubdtype(image.dtype, np.integer):
-    #        threshold = 1
-    #    else:
-    #        threshold = 1/256.
-    #result = filters.uniform_filter(image,sigma_s,mode='constant')
-    #boxcar = filters.gaussian_filter(image,sigma_l,mode='constant')
-    #result -= boxcar
-    output = filters.gaussian_laplace(image, sigma_l, mode='constant')
-    return -output
-
-def count_maxima_trackpy(par_obj, time_pt, fileno):
+def count_maxima_laplace(par_obj, time_pt, fileno, reset_max=False):
     #count maxima won't work properly if have selected a random set of Z
     min_d = par_obj.min_distance
     imfile = par_obj.filehandlers[fileno]
-    if par_obj.min_distance[2] == 0 or par_obj.max_z == 0:
-        count_maxima_2d(par_obj, time_pt, fileno)
-        return
+    #if par_obj.min_distance[2] == 0 or par_obj.max_z == 0:
+    #    count_maxima_2d(par_obj, time_pt, fileno)
+    #    return
     predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
     for i in range(imfile.max_z+1):
         predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
-
-    radius = [min_d[0], min_d[1], 2*(par_obj.resize_factor* min_d[2]/imfile.z_calibration)]
-
-    min_radius = [min_d[0], min_d[1], par_obj.resize_factor* min_d[2]/imfile.z_calibration]
-    #gau_stk = filters.gaussian_filter(predMtx,radius,mode='mirror')
-    #bp=tp.bandpass(predMtx,(rad_2),(radius))
-    bp = quick_bandpass(predMtx, radius, threshold=None)
+    
+    laplace = -filters.gaussian_laplace(predMtx, min_d, mode='constant')
+    
     #if not already set, create. This is then used for the entire image and all subsequent training.
     #A little hacky, but otherwise the normalisation screws everything up
     if not par_obj.max_det:
-        par_obj.max_det = np.max(bp)
+        par_obj.max_det = np.max(laplace)
+    elif reset_max:
+        par_obj.max_det = np.max(laplace)
 
-    bp = bp/par_obj.max_det
+    laplace = laplace/par_obj.max_det
     par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
     for i in range(imfile.max_z+1):
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = bp[:, :, i]
+        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = laplace[:, :, i]
 
-    pts = peak_local_max(bp, min_distance=min_radius, threshold_abs=par_obj.abs_thr)
+    pts = peak_local_max(laplace, min_distance=min_d, threshold_abs=par_obj.abs_thr)
 
-    #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
     pts2keep = []
     for pt2d in pts:
         #determinants of submatrices
@@ -261,7 +251,65 @@ def count_maxima_trackpy(par_obj, time_pt, fileno):
         pts = pts2keep
 
     par_obj.data_store['pts'][fileno][time_pt] = pts
+def count_maxima_laplace_variable(par_obj, time_pt, fileno, reset_max=False):
+    #count maxima won't work properly if have selected a random set of Z
+    min_d = [x for x in par_obj.min_distance]
+    imfile = par_obj.filehandlers[fileno]
+    #if par_obj.min_distance[2] == 0 or par_obj.max_z == 0:
+    #    count_maxima_2d(par_obj, time_pt, fileno)
+    #    return
+    predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
+    for i in range(imfile.max_z+1):
+        predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
+    
+    l1=filters.gaussian_laplace(predMtx, [0,0,min_d[2]], mode='constant')  
+    l2=filters.gaussian_laplace(predMtx, [0,0,min_d[2]*2], mode='constant') *2 
+    l3=filters.gaussian_laplace(predMtx, [0,0,min_d[2]*.5], mode='constant')  *.5
+    '''l1=-filters.gaussian_laplace(predMtx, min_d, mode='constant')   
+    l2=-filters.gaussian_laplace(predMtx, [x*.5 for x in min_d], mode='constant')
+    l3=-filters.gaussian_laplace(predMtx, [x*2 for x in min_d], mode='constant')
+    '''
+    l3=filters.gaussian_laplace((l1+l2+l3), [min_d[0],min_d[1],0], mode='constant')/3
+    #if not already set, create. This is then used for the entire image and all subsequent training.
+    #A little hacky, but otherwise the normalisation screws everything up
+    if not par_obj.max_det or reset_max:
+        par_obj.max_det = np.max(l3)
 
+    l3 = l3/par_obj.max_det
+    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
+    for i in range(imfile.max_z+1):
+        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = l3[:, :, i]
+        
+    pts = peak_local_max(l3, min_distance=min_d, threshold_abs=par_obj.abs_thr)
+
+    pts2keep = []
+    for pt2d in pts:
+        #determinants of submatrices
+        pts2keep.append([pt2d[0], pt2d[1], pt2d[2], 1])
+    pts = pts2keep
+    par_obj.show_pts = 1
+
+    #Filter those which are not inside the region.
+    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
+        pts2keep = []
+
+        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
+            for pt2d in pts:
+
+                if pt2d[2] == i:
+                    #Find the region of interest.
+                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
+                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
+                    #Reformat to make the path object.
+                    pot = []
+                    for b in range(0, ppt_x.__len__()):
+                        pot.append([ppt_x[b], ppt_y[b]])
+                    p = Path(pot)
+                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
+                        pts2keep.append(pt2d)
+        pts = pts2keep
+
+    par_obj.data_store['pts'][fileno][time_pt] = pts
 def det_hess_3d(predMtx, min_distance):
     gau_stk = filters.gaussian_filter(predMtx, min_distance, mode='mirror')
 
@@ -275,16 +323,93 @@ def det_hess_3d(predMtx, min_distance):
 
     return det3, det2, det1
 
-def count_maxima(par_obj, time_pt, fileno):
+def count_maxima_thresh(par_obj, time_pt, fileno,reset_max=False):
 
     #count maxima won't work properly if have selected a random set of Z
     imfile = par_obj.filehandlers[fileno]
     if par_obj.min_distance[2] == 0 or imfile.max_z == 0:
-        count_maxima_2d(par_obj, time_pt, fileno)
+        count_maxima_2d(par_obj, time_pt, fileno,reset_max)
         return
-    if par_obj.count_maxima_small is True:
-        count_maxima_trackpy(par_obj, time_pt, fileno)
+    predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
+    for i in range(imfile.max_z+1):
+        predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
+
+    radius = [par_obj.min_distance[0], par_obj.min_distance[1], par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration]
+
+    [det3, det2, det1] = det_hess_3d(predMtx, radius)
+
+
+    #if not already set, create. This is then used for the entire image and all subsequent training.
+    #A little hacky, but otherwise the normalisation screws everything up
+    if not par_obj.max_det:
+        par_obj.max_det = np.max(det3)
+    # normalise
+    det3 = det3/par_obj.max_det
+    det3=det3>par_obj.abs_thr
+    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
+    for i in range(imfile.max_z+1):
+        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = det3[:, :, i]
+
+    det_bin = det3>par_obj.abs_thr
+
+    det_label,no_obj = measurements.label(det_bin)
+
+    #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
+    pts2keep = []
+    print no_obj
+    
+    det_com = measurements.center_of_mass(det_bin, det_label, range(1,no_obj+1))
+    
+    for pt2d in det_com:
+        ptuple = tuple(np.round(x).astype('uint') for x in pt2d)
+
+        #determinants of submatrices
+        dp = det1[ptuple]
+        dp2 = det2[ptuple]
+        #dp3 = det3[ptuple]
+            #negative definite, therefore maximum (note signs in det calculation)
+        #if dp >= 0 and dp2 >= 0: # and dp3>=par_obj.abs_thr:
+            #print 'point retained', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
+        pts2keep.append([ptuple[0], ptuple[1], ptuple[2], 1])
+    pts = pts2keep
+    par_obj.show_pts = 1
+
+    #Filter those which are not inside the region.
+    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
+        pts2keep = []
+
+        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
+            for pt2d in pts:
+
+                if pt2d[2] == i:
+                    #Find the region of interest.
+                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
+                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
+                    #Reformat to make the path object.
+                    pot = []
+                    for b in range(0, ppt_x.__len__()):
+                        pot.append([ppt_x[b], ppt_y[b]])
+                    p = Path(pot)
+                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
+                        pts2keep.append(pt2d)
+        pts = pts2keep
+
+    par_obj.data_store['pts'][fileno][time_pt] = pts
+    
+def count_maxima(par_obj, time_pt, fileno, reset_max=False):
+
+    #count maxima won't work properly if have selected a random set of Z
+    imfile = par_obj.filehandlers[fileno]
+    if par_obj.min_distance[2] == 0 or imfile.max_z == 0:
+        count_maxima_2d(par_obj, time_pt, fileno, reset_max)
         return
+    if par_obj.count_maxima_laplace == 'cluster':
+        count_maxima_2d_v2(par_obj, time_pt, fileno, reset_max)
+        return
+    elif par_obj.count_maxima_laplace is True:
+        count_maxima_laplace(par_obj, time_pt, fileno, reset_max)
+        return
+
     predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
     for i in range(imfile.max_z+1):
         predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
@@ -354,7 +479,71 @@ def det_hess_2d(predIm, min_distance):
 
     return det, xx
 
-def count_maxima_2d(par_obj, time_pt, fileno):
+def count_maxima_2d(par_obj, time_pt, fileno, reset_max):
+    #count maxima won't work properly if have selected a random set of Z
+    imfile = par_obj.filehandlers[fileno]
+    par_obj.min_distance[2] = 0
+    det = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
+    xx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
+    for i in range(imfile.max_z+1):
+        predIm = par_obj.data_store['pred_arr'][fileno][time_pt][i].astype('float32')
+        [deti, xxi] = det_hess_2d(predIm, par_obj.min_distance)
+        det[:, :, i] = deti
+        xx[:, :, i] = xxi
+
+    # if not already set, create. This is then used for the entire image and all
+    #subsequent training. A little hacky, but otherwise the normalisation screws everything up
+    if not par_obj.max_det or reset_max==True:
+        par_obj.max_det = np.max(det)
+
+    detn = det/par_obj.max_det
+    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
+    for i in range(imfile.max_z+1):
+
+        #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
+        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = detn[:, :, i]
+
+    pts = peak_local_max(detn, min_distance=par_obj.min_distance, threshold_abs=par_obj.abs_thr)
+
+    pts2keep = []
+    for pt2d in pts:
+
+        T = xx[pt2d[0], pt2d[1], pt2d[2]]
+        #D=det[pt2d[0],pt2d[1],pt2d[2]]
+        # Removes points that are positive definite and therefore minima
+        if T > 0: # and D>0:
+            pass
+            #print 'point removed'
+        else:
+            pts2keep.append([pt2d[0], pt2d[1], pt2d[2], 1])
+
+    pts = pts2keep
+
+
+    #Filter those which are not inside the region.
+    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
+        pts2keep = []
+
+        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
+            for pt2d in pts:
+                if pt2d[2] == i:
+                    #Find the region of interest.
+                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
+                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
+                    #Reformat to make the path object.
+                    pot = []
+                    for b in range(0, ppt_x.__len__()):
+                        pot.append([ppt_x[b], ppt_y[b]])
+                    p = Path(pot)
+                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
+                        pts2keep.append(pt2d)
+
+        pts = pts2keep
+
+
+    par_obj.data_store['pts'][fileno][time_pt] = pts
+    
+def count_maxima_2d_v2(par_obj, time_pt, fileno, reset_max):
     #count maxima won't work properly if have selected a random set of Z
     imfile = par_obj.filehandlers[fileno]
     par_obj.min_distance[2] = 0
@@ -368,7 +557,7 @@ def count_maxima_2d(par_obj, time_pt, fileno):
 
     # if not already set, create. This is then used for the entire image and all
     #subsequent training. A little hacky, but otherwise the normalisation screws everything up
-    if not par_obj.max_det:
+    if not par_obj.max_det or reset_max==True:
         par_obj.max_det = np.max(det)
 
     detn = det/par_obj.max_det
@@ -414,9 +603,107 @@ def count_maxima_2d(par_obj, time_pt, fileno):
 
         pts = pts2keep
 
+    thresh = 2
+    
+    clusters = hcluster.fclusterdata(pts, thresh, criterion='distance')
+    
+    pts2keep = []
+    
+    pts = np.array(pts,dtype='float')
+    pts[:,2] = pts[:,2] * par_obj.z_cal/1
+    
+    for clno in range(1,clusters.max()+1):
+        
+        cluster_pts = pts[np.where(clusters == clno)[0],:]
+        centroid = np.mean(cluster_pts,axis=0)
+        centroid[2] = centroid[2]/par_obj.z_cal*1
+        centroid = np.round(centroid).astype('int')
+        pts2keep.append([centroid[0],centroid[1],centroid[2],centroid[3]])
+        
+    pts=pts2keep
+    
+    par_obj.data_store['pts'][fileno][time_pt] = pts
+    
+def det_hess_2_5d(predIm, min_distance,):
+    gau_Im = filters.gaussian_filter(predIm, min_distance)-filters.gaussian_filter(predIm, [min_distance[0]*2,min_distance[0]*2,min_distance[2]])
+    deti=np.zeros_like(predIm)
+    xxi=np.zeros_like(predIm)
+    for i in range(predIm.shape[2]):
+        y, x = np.gradient(gau_Im[:,:,i], 1)
+        xy, xx = np.gradient(x)
+        yy, yx = np.gradient(y)
+
+        deti[:,:,i] = xx*yy-xy*yx
+        xxi[:,:,i] = xx
+#    z = np.gradient(deti,axis=2)
+    #zz = np.gradient(deti,axis=2)*gau_Im
+    return deti, xxi
+    
+def count_maxima_2_5d(par_obj, time_pt, fileno, reset_max):
+    #count maxima won't work properly if have selected a random set of Z
+    imfile = par_obj.filehandlers[fileno]
+    
+    predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
+    for i in range(imfile.max_z+1):
+        predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
+    
+    
+    [det, xx] = det_hess_2_5d(predMtx, par_obj.min_distance)
+    #[det2, xx] = det_hess_2_5d(predMtx, [par_obj.min_distance[0:2],par_obj.min_distance[2]/2])
+    #[det3, xx] = det_hess_2_5d(predMtx, [par_obj.min_distance[0:2],par_obj.min_distance[2]*2])
+    #det=det2+det+det3
+
+    # if not already set, create. This is then used for the entire image and all
+    #subsequent training. A little hacky, but otherwise the normalisation screws everything up
+    if not par_obj.max_det or reset_max==True:
+        par_obj.max_det = np.max(det)
+
+    detn = det/par_obj.max_det
+    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
+    for i in range(imfile.max_z+1):
+        #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
+        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = detn[:, :, i]
+
+    pts = peak_local_max(detn, min_distance=par_obj.min_distance, threshold_abs=par_obj.abs_thr)
+
+    pts2keep = []
+    for pt2d in pts:
+
+        T = xx[pt2d[0], pt2d[1], pt2d[2]]
+        #D = z[pt2d[0],pt2d[1],pt2d[2]]
+        # Removes points that are positive definite and therefore minima
+        if T > 0:# and D>0:
+            pass
+            #print 'point removed'
+        else:
+            pts2keep.append([pt2d[0], pt2d[1], pt2d[2], 1])
+
+    pts = pts2keep
+
+
+    #Filter those which are not inside the region.
+    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
+        pts2keep = []
+
+        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
+            for pt2d in pts:
+                if pt2d[2] == i:
+                    #Find the region of interest.
+                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
+                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
+                    #Reformat to make the path object.
+                    pot = []
+                    for b in range(0, ppt_x.__len__()):
+                        pot.append([ppt_x[b], ppt_y[b]])
+                    p = Path(pot)
+                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
+                        pts2keep.append(pt2d)
+
+        pts = pts2keep
+
 
     par_obj.data_store['pts'][fileno][time_pt] = pts
-
+    
 def rank_order(image):
     """Return an image of the same shape where each pixel is the
     index of the pixel value in the ascending order of the unique
@@ -542,7 +829,7 @@ def save_roi_fn(par_obj):
 
     return False
 
-def stratified_sample(par_obj, binlength, samples_indices, imhist, samples_at_tiers, mImRegion, denseRegion):
+def stratified_sample(binlength, samples_indices, imhist, samples_at_tiers, denseRegion):
     #preallocate array rather than extend, size corrects for rounding errors
     indices = np.zeros(samples_indices[-1], 'uint32')
     #Randomly sample from input ROI or im a certain number (par_obj.limit_size) patches.
@@ -610,7 +897,7 @@ def update_training_samples_fn_new_only(par_obj, int_obj, rects, arr='feat_arr')
                 par_obj.limit_size = round(im_region.shape[0]*im_region.shape[1]/calc_ratio, 0)
 
                 if STRATIFY is True:
-                    indices = stratified_sample(par_obj, binlength, samples_indices, imhist, samples_at_tiers, im_region, p_region)
+                    indices = stratified_sample(binlength, samples_indices, imhist, samples_at_tiers, p_region)
                 else:
                     indices = np.random.choice(int(im_region.shape[0]*im_region.shape[1]), size=int(par_obj.limit_size), replace=True, p=None)
             else:
@@ -624,6 +911,14 @@ def update_training_samples_fn_new_only(par_obj, int_obj, rects, arr='feat_arr')
             par_obj.f_matrix.extend(mimg_lin)
             #And the the output matrix, output patches
             par_obj.o_patches.extend(dense_lin)
+            
+    if par_obj.p_size == 2:
+        
+        im_region = par_obj.data_store[arr][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4], rects[1]+1:rects[1]+rects[3], :]
+        par_obj.f_matrix.append(im_region)        
+        p_region = par_obj.data_store['dense_arr'][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4], rects[1]+1:rects[1]+rects[3]]
+        par_obj.o_patches.append(p_region)
+        
 def update_training_samples_fn_auto(par_obj, int_obj, rects):
     """Collects the pixels or patches which will be used for training and
     trains the forest."""
