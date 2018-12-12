@@ -142,7 +142,7 @@ class ROI:
                             self.line.append(Line2D([cppt_x[i-1], cppt_x[i]], [cppt_y[i-1], cppt_y[i]], color='red'))
                             self.int_obj.plt1.add_line(self.line[-1])
 
-        self.int_obj.canvas1.draw()
+        #self.int_obj.canvas1.draw()
     def reparse_ROI(self,im_num):
         #So that we can compare the ROI we resample them to have many more points.
         #This sounds straightforward but first we have to measure the distance between existing points.
@@ -214,7 +214,7 @@ class ROI:
 
 
         #self.int_obj.plt1.plot(nppt_x,nppt_y,'-')
-        #self.int_obj.canvas1.draw()
+        self.int_obj.canvas1.draw()
 
     def interpolate_ROI(self):
         imno=self.par_obj.curr_file
@@ -307,7 +307,7 @@ class ROI:
                     self.par_obj.data_store['roi_stkint_x'][imno][self.par_obj.curr_t][b] = nppt_x
                     self.par_obj.data_store['roi_stkint_y'][imno][self.par_obj.curr_t][b] = nppt_y
 
-            self.int_obj.canvas1.draw()
+            #self.int_obj.canvas1.draw()
     def interpolate_ROI_in_time(self):
         imno=self.par_obj.curr_file
 
