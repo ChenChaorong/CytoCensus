@@ -1487,16 +1487,18 @@ def import_data_fn(par_obj, file_array, file_array_offset=0):
 
     par_obj.max_file = file_array.__len__()
 
-    par_obj.filehandlers = [None]*(par_obj.max_file+file_array_offset)
+    par_obj.filehandlers = {}
 
-    for imno, imfile in enumerate(file_array):
+    for im_n, imfile in enumerate(file_array):
+        imno=im_n+file_array_offset
 
         par_obj.filehandlers[imno] = File_handler(str(imfile))
         #currently doesn't check if multiple filetypes, on the basis only loads tiffs
         #check number of channels is consistent
         if imno == 0:
             par_obj.numCH = max(par_obj.filehandlers[imno].numCH,1)
-                
+
+            par_obj.clim = [[0,1] for x in range(par_obj.numCH)]
         elif par_obj.numCH == max(par_obj.filehandlers[imno].numCH,1):
             pass
         else:
@@ -1522,6 +1524,8 @@ def import_data_fn(par_obj, file_array, file_array_offset=0):
         if imno == 0:
             par_obj.bitDepth = par_obj.filehandlers[imno].bitDepth
             par_obj.tiffarray_typemax = par_obj.filehandlers[imno].tiffarray_typemax
+            if par_obj.bitDepth in ['float32']:
+                par_obj.tiffarray_typemax=par_obj.filehandlers[imno].tiffarraymax
 
         elif par_obj.bitDepth == par_obj.filehandlers[imno].bitDepth:
             pass
@@ -1534,27 +1538,59 @@ def import_data_fn(par_obj, file_array, file_array_offset=0):
     par_obj.max_t = par_obj.filehandlers[par_obj.curr_file].max_t
 
     #Prepare RGB example image
-    par_obj.height = par_obj.ori_height/par_obj.resize_factor
-    par_obj.width = par_obj.ori_width/par_obj.resize_factor
+    par_obj.height = int(par_obj.ori_height/par_obj.resize_factor)
+    par_obj.width = int(par_obj.ori_width/par_obj.resize_factor)
     par_obj.ch_display = range(0, min(par_obj.numCH, 3))
     par_obj.ex_img = return_rgb_slice(par_obj, 0, 0, 0)
 
     statusText = str(file_array.__len__())+' Files Loaded.'
     return True, statusText
-
-def save_output_prediction_fn(par_obj, int_obj):
-    """Saves prediction to tiff file using tiffiles imsave"""
-    for fileno, imfile in enumerate(par_obj.filehandlers):
+    
+def filter_prediction_fn(par_obj, int_obj):
+    for fileno, imfile in par_obj.filehandlers.iteritems():
         #funky ordering TZCYX
         image = np.zeros([imfile.max_t+1, imfile.max_z+1, 1, par_obj.height, par_obj.width], 'float32')
         for tpt in range(imfile.max_t+1):
             for zslice in range(imfile.max_z+1):
                 image[tpt, zslice, 0, :, :] = par_obj.data_store['pred_arr'][fileno][tpt][zslice].astype(np.float32)
-        imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
+        image = image - filters.uniform_filter1d(image,15,axis=0)
+        for tpt in range(imfile.max_t+1):
+            for zslice in range(imfile.max_z+1):
+                par_obj.data_store['pred_arr'][fileno][tpt][zslice] = np.squeeze(image[tpt, zslice, 0, :, :])
+        int_obj.report_progress('Prediction filtered')
+        
+def save_output_prediction_fn(par_obj, int_obj,subtract_background=False):
+    """Saves prediction to tiff file using tiffiles imsave"""
+    for fileno, imfile in par_obj.filehandlers.iteritems():
+        #funky ordering TZCYX
+        image = np.zeros([imfile.max_t+1, imfile.max_z+1, 1, par_obj.height, par_obj.width], 'uint16')
+        for tpt in range(imfile.max_t+1):
+            for zslice in range(imfile.max_z+1):
+                image[tpt, zslice, 0, :, :] = par_obj.data_store['pred_arr'][fileno][tpt][zslice].astype(np.float32)
+        if subtract_background:
+            image = image - filters.uniform_filter1d(image,10,axis=0)
+            imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
+        else:
+            imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
 
         print 'Prediction written to disk'
         int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
+        
+def save_kernels_fn(par_obj, int_obj):
+    """Saves prediction to tiff file using tiffiles imsave"""
+    for fileno, imfile in par_obj.filehandlers.iteritems():
+        #funky ordering TZCYX
 
+        image = np.zeros([imfile.max_t+1, imfile.max_z+1, 1, par_obj.height, par_obj.width], 'uint16')
+        for tpt in range(imfile.max_t):
+            for zslice in range(imfile.max_z+1):
+                if zslice in par_obj.data_store['dense_arr'][fileno][tpt]:
+                    image[tpt, zslice, 0, :, :] = par_obj.data_store['dense_arr'][fileno][tpt][zslice].astype(np.float32)
+        imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Kernels.tif', image, imagej=True)
+
+        print 'Prediction written to disk'
+        int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
+        
 def save_output_hess_fn(par_obj, int_obj):
     """Saves hessian map to tiff file using tiffiles imsave"""
     for fileno, imfile in par_obj.filehandlers.iteritems():
