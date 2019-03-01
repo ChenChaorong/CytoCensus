@@ -15,11 +15,11 @@ import numpy as np
 def navigation_setup(self,par_obj):
 
     #Sets up the button which changes to the prev image
-    self.prev_im_btn = QtWidgets.QPushButton('Z ('+unichr(8595)+')')
+    self.prev_im_btn = QtWidgets.QPushButton('Z ('+chr(8595)+')')
     self.prev_im_btn.setEnabled(True)
 
     #Sets up the button which changes to the next Image.
-    self.next_im_btn = QtWidgets.QPushButton('Z ('+unichr(8593)+')')
+    self.next_im_btn = QtWidgets.QPushButton('Z ('+chr(8593)+')')
     self.next_im_btn.setEnabled(True)
 
     #Sets up the button which changes to the prev image
@@ -31,11 +31,11 @@ def navigation_setup(self,par_obj):
     self.last_im_btn.setEnabled(True)
 
      #Sets up the button which changes to the prev image
-    self.prev_time_btn = QtWidgets.QPushButton('Time ('+unichr(8592)+')')
+    self.prev_time_btn = QtWidgets.QPushButton('Time ('+chr(8592)+')')
     self.prev_time_btn.setEnabled(True)
 
     #Sets up the button which changes to the next Image.
-    self.next_time_btn = QtWidgets.QPushButton('Time ('+unichr(8594)+')')
+    self.next_time_btn = QtWidgets.QPushButton('Time ('+chr(8594)+')')
     self.next_time_btn.setEnabled(True)
 
     #Sets up the button which changes to the next File.
@@ -243,7 +243,7 @@ class contrast_controller(QtWidgets.QSlider):
     def change_brightness(self,value):
 
         value = float(value)/10-0.5
-        print self.ID
+        print (self.ID)
         self.par_obj.clim[self.ID][0]=value
 
         self.Win.goto_img_fn()

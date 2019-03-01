@@ -58,7 +58,7 @@ def get_feature_lengths(feature_type):
                     'daisy':[200,local_shape_features_daisy],
                     'minmax':[31,local_shape_features_minmax]}
 
-    if feature_dict.has_key(feature_type):
+    if feature_type in feature_dict:
         feat_length = feature_dict[feature_type][0]
         feat_func = feature_dict[feature_type][1]
     else:
@@ -327,7 +327,7 @@ def local_shape_features_radial(im, scaleStart):
         f[:, :, layer * 5 + 5] = scipy.ndimage.gaussian_filter(frst, (layer+1)*2)
 
         # get next layer
-        a = pyr.next()
+        a = next(pyr)
 
     return f
 def strided_sliding_std_dev(data, radius=5):
@@ -352,9 +352,9 @@ def rolling_window_lastaxis(a, window):
     """Directly taken from Erik Rigtorp's post to numpy-discussion.
     <http://www.mail-archive.com/numpy-discussion@scipy.org/msg29450.html>"""
     if window < 1:
-       raise ValueError, "`window` must be at least 1."
+       raise ValueError( "`window` must be at least 1.")
     if window > a.shape[-1]:
-       raise ValueError, "`window` is too long."
+       raise ValueError( "`window` is too long.")
     shape = a.shape[:-1] + (a.shape[-1] - window + 1, window)
     strides = a.strides + (a.strides[-1],)
     return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
@@ -410,7 +410,7 @@ def local_shape_features_std(im, scaleStart):
         f[:, :, layer * 5 + 5] = up
 
         # get next layer
-        a = pyr.next()
+        a = next(pyr)
 
     return f
     
@@ -468,14 +468,14 @@ def local_shape_features_minmax(im, scaleStart):
         f[:, :, layer * 6 + 5] = minim
         f[:, :, layer * 6 + 6] = maxim
         # get next layer
-        a = pyr.next()
+        a = next(pyr)
 
     return f
 def local_shape_features_daisy(im, scaleStart):
     radius=6
     feat = skfeat.daisy(np.pad(im,radius,mode='edge'),step=2,radius=radius,normalization='off')
     feat = feat.reshape((feat.shape[0],feat.shape[1],-1))
-    print feat.shape   
+    print (feat.shape) 
     f = scipy.ndimage.interpolation.zoom(feat,(float(im.shape[0])/feat.shape[0],float(im.shape[1])/feat.shape[1],1),order=1)
     
     return f
@@ -530,7 +530,7 @@ def local_shape_features_pyramid(im, scaleStart):
         f[:, :, layer * 5 + 5] = up
 
         # get next layer
-        a = pyr.next()
+        a = next(pyr)
 
     return f
 
@@ -574,7 +574,7 @@ def local_shape_features_fine_imhist(im, scaleStart):
         f[:, :, layer * 5 + 3] = st0
         f[:, :, layer * 5 + 4] = st1
         f[:, :, layer * 5 + 5] = up
-        a = pyr.next()
+        a = next(pyr)
     return f
 
 

@@ -22,7 +22,7 @@ from __future__ import division
 import os
 import csv
 import time
-import cPickle as pickle
+import pickle
 from multiprocessing.dummy import Pool as ThreadPool
 
 import functools
@@ -38,13 +38,12 @@ from sklearn import ensemble
 
 from scipy.ndimage import filters, measurements
 from tifffile import imsave #Install with pip install tifffile.
-import modest_image
 
 from matplotlib.path import Path
 import matplotlib.image as pylab
 
-import local_features as lf
-from File_handler import File_handler
+import features.local_features as lf
+from fileio.file_handler import File_handler
 import scipy.cluster.hierarchy as hcluster
 
 def peak_local_max(image, min_distance=10, threshold_abs=0, threshold_rel=0.1,
@@ -356,7 +355,7 @@ def count_maxima_thresh(par_obj, time_pt, fileno,reset_max=False):
 
     #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
     pts2keep = []
-    print no_obj
+    print (no_obj)
     
     det_com = measurements.center_of_mass(det_bin, det_label, range(1,no_obj+1))
     
@@ -985,7 +984,7 @@ def update_training_samples_fn_auto(par_obj, int_obj, rects):
 def train_forest(par_obj, int_obj, model_num):
 
     #if par_obj.max_features > par_obj.num_of_feat[model_num]:
-    par_obj.max_features = int(par_obj.num_of_feat[model_num]/2)
+    par_obj.max_features = int(par_obj.num_of_feat[model_num]/3)
 
     #assigns model type
     par_obj.RF[model_num] = lf.RF(par_obj, 'ETR')
@@ -1138,7 +1137,7 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
                 pool.join()
                 tee2 = time.time()
                 #feat =feature_create(par_obj,imRGB,imStr,i)
-                print tee2-tee1
+                print (tee2-tee1)
                 lcount = -1
 
                 for zslice in zsliceList:
@@ -1172,7 +1171,7 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
                 pool.join()
                 tee2 = time.time()
                 #feat =feature_create(par_obj,imRGB,imStr,i)
-                print tee2-tee1
+                print (tee2-tee1)
                 lcount = -1
 
                 for zslice in zsliceList:
@@ -1271,7 +1270,7 @@ def evaluate_forest_new(par_obj, int_obj, withGT, model_num, zsliceList, tptList
                 sum_pred = np.sum(linPred/255)
                 par_obj.data_store['sum_pred'][imno][tpt][zslice] = sum_pred
 
-                print 'prediction time taken', t1 - t2,  ' Predicted i:', par_obj.data_store['sum_pred'][imno][tpt][zslice]
+                print ('prediction time taken', t1 - t2,  ' Predicted i:', par_obj.data_store['sum_pred'][imno][tpt][zslice])
                 int_obj.report_progress('Making Prediction for File: '+str(imno+1)+' T: '+str(tpt+1)+' Z: ' +str(zslice+1))
 
 
@@ -1319,8 +1318,8 @@ def evaluate_forest_auto(par_obj, int_obj, withGT, model_num, zsliceList, tptLis
                 sum_pred = np.sum(linPred/255)
                 par_obj.data_store['sum_pred'][imno][tpt][zslice] = sum_pred
 
-                print 'prediction time taken', t1 - t2
-                print 'Predicted i:', par_obj.data_store['sum_pred'][imno][tpt][zslice]
+                print ('prediction time taken', t1 - t2)
+                print ('Predicted i:', par_obj.data_store['sum_pred'][imno][tpt][zslice])
                 int_obj.report_progress('Making Prediction for Image: '\
                 +str(imno+1)+' Frame: ' +str(zslice+1)+' Timepoint: '+str(tpt+1))
 
@@ -1420,7 +1419,7 @@ def goto_img_fn_new(par_obj, int_obj):
     int_obj.draw_saved_dots_and_roi()
     int_obj.cursor.draw_ROI()
     buffereddraw(int_obj)
-    print time.time() -t0
+    print (time.time() -t0)
 def buffereddraw(int_obj):
     
     if int_obj.threadpool.activeThreadCount()>1:
@@ -1438,7 +1437,7 @@ def load_and_initiate_plots(par_obj, int_obj):
     newImg = np.zeros((int(par_obj.height), int(par_obj.width), 3), 'uint8')
     #newImg[:,:,3]=1
     int_obj.plt1.cla()
-    modest_image.imshow(int_obj.plt1.axes, newImg, interpolation='nearest', vmin=0, vmax=255)
+    int_obj.plt1.imshow(newImg, interpolation='nearest', vmin=0, vmax=255)
     #int_obj.plt1.imshow(newImg,interpolation='nearest')
     int_obj.plt1.axis("off")
     newImg = np.zeros((int(par_obj.height), int(par_obj.width), 3))
@@ -1571,14 +1570,14 @@ def import_data_fn(par_obj, file_array, file_array_offset=0):
     #Prepare RGB example image
     par_obj.height = int(par_obj.ori_height/par_obj.resize_factor)
     par_obj.width = int(par_obj.ori_width/par_obj.resize_factor)
-    par_obj.ch_display = range(0, min(par_obj.numCH, 3))
+    par_obj.ch_display = list(range(0, min(par_obj.numCH, 3)))
     par_obj.ex_img = return_rgb_slice(par_obj, 0, 0, 0)
 
     statusText = str(file_array.__len__())+' Files Loaded.'
     return True, statusText
     
 def filter_prediction_fn(par_obj, int_obj):
-    for fileno, imfile in par_obj.filehandlers.iteritems():
+    for fileno, imfile in par_obj.filehandlers.items():
         #funky ordering TZCYX
         image = np.zeros([imfile.max_t+1, imfile.max_z+1, 1, par_obj.height, par_obj.width], 'float32')
         for tpt in range(imfile.max_t+1):
@@ -1592,7 +1591,7 @@ def filter_prediction_fn(par_obj, int_obj):
         
 def save_output_prediction_fn(par_obj, int_obj,subtract_background=False):
     """Saves prediction to tiff file using tiffiles imsave"""
-    for fileno, imfile in par_obj.filehandlers.iteritems():
+    for fileno, imfile in par_obj.filehandlers.items():
         #funky ordering TZCYX
         image = np.zeros([imfile.max_t+1, imfile.max_z+1, 1, par_obj.height, par_obj.width], 'uint16')
         for tpt in range(imfile.max_t+1):
@@ -1604,12 +1603,12 @@ def save_output_prediction_fn(par_obj, int_obj,subtract_background=False):
         else:
             imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
 
-        print 'Prediction written to disk'
+        print ('Prediction written to disk')
         int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
         
 def save_kernels_fn(par_obj, int_obj):
     """Saves prediction to tiff file using tiffiles imsave"""
-    for fileno, imfile in par_obj.filehandlers.iteritems():
+    for fileno, imfile in par_obj.filehandlers.items():
         #funky ordering TZCYX
 
         image = np.zeros([imfile.max_t+1, imfile.max_z+1, 1, par_obj.height, par_obj.width], 'uint16')
@@ -1619,25 +1618,25 @@ def save_kernels_fn(par_obj, int_obj):
                     image[tpt, zslice, 0, :, :] = par_obj.data_store['dense_arr'][fileno][tpt][zslice].astype(np.float32)
         imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Kernels.tif', image, imagej=True)
 
-        print 'Prediction written to disk'
+        print ('Prediction written to disk')
         int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
         
 def save_output_hess_fn(par_obj, int_obj):
     """Saves hessian map to tiff file using tiffiles imsave"""
-    for fileno, imfile in par_obj.filehandlers.iteritems():
+    for fileno, imfile in par_obj.filehandlers.items():
         #funky ordering TZCYX
         image = np.zeros([imfile.max_t+1, imfile.max_z+1, 1, par_obj.height, par_obj.width], 'float32')
         for tpt in range(imfile.max_t+1):
             for zslice in range(imfile.max_z+1):
                 image[tpt, zslice, 0, :, :] = par_obj.data_store['maxi_arr'][fileno][tpt][zslice].astype('float32')
 
-        print 'Saving Hessian image to disk'
+        print ('Saving Hessian image to disk')
         imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Hess.tif', image, imagej=True)
         int_obj.report_progress('Hessian written to disk '+ par_obj.csvPath)
 
 def save_output_mask_fn(par_obj,int_obj):
     #funky ordering TZCYX
-    for fileno,imfile in par_obj.filehandlers.iteritems():
+    for fileno,imfile in par_obj.filehandlers.items():
         filename = imfile.full_name
         image = np.zeros([imfile.max_t+1,imfile.max_z+1,1,par_obj.height,par_obj.width], 'uint8')
         for tpt in range(imfile.max_t+1):
@@ -1652,7 +1651,7 @@ def save_output_mask_fn(par_obj,int_obj):
 
 def save_output_ROI(par_obj, int_obj):
     #funky ordering TZCYX
-    for fileno, imfile in par_obj.filehandlers.iteritems():
+    for fileno, imfile in par_obj.filehandlers.items():
         filename = imfile.base_name
         with open(par_obj.csvPath+filename+'_outputROI.pickle', 'wb') as afile:
             pickle.dump([par_obj.data_store['roi_stkint_x'][fileno], par_obj.data_store['roi_stkint_y'][fileno]], afile)
@@ -1661,7 +1660,7 @@ def save_output_ROI(par_obj, int_obj):
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Z: ')]+[str('Regions(x): ')]+[str('Regions(y): ')])
 
-        for fileno, imfile in par_obj.filehandlers.iteritems():
+        for fileno, imfile in par_obj.filehandlers.items():
             filename = imfile.full_name
             for tpt in range(imfile.max_t+1):
                 ppt_x = par_obj.data_store['roi_stkint_x'][fileno][tpt]
@@ -1697,7 +1696,7 @@ def save_output_data_fn(par_obj, int_obj):
 
 def save_user_ROI(par_obj, int_obj):
     #funky ordering TZCYX
-    for fileno, imfile in par_obj.filehandlers.iteritems():
+    for fileno, imfile in par_obj.filehandlers.items():
         filename = imfile.base_name
         with open(par_obj.csvPath+filename+'_outputROI.pickle', 'wb') as afile:
             data = [par_obj.data_store['roi_stkint_x'][fileno], par_obj.data_store['roi_stkint_y'][fileno],\
@@ -1708,7 +1707,7 @@ def save_user_ROI(par_obj, int_obj):
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Z: ')]+[str('Regions(x): ')]+[str('Regions(y): ')])
 
-        for fileno, imfile in par_obj.filehandlers.iteritems():
+        for fileno, imfile in par_obj.filehandlers.items():
             filename = imfile.full_name
             for tpt in range(imfile.max_t+1):
                 ppt_x = par_obj.data_store['roi_stk_x'][fileno][tpt]
@@ -1723,7 +1722,7 @@ def save_ROI_area(par_obj, int_obj):
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Area')])
 
-        for fileno, imfile in par_obj.filehandlers.iteritems():
+        for fileno, imfile in par_obj.filehandlers.items():
             filename = imfile.full_name
             for tpt in range(imfile.max_t+1):
                 ppt_x = par_obj.data_store['roi_stkint_x'][fileno][tpt]
@@ -1753,7 +1752,7 @@ def load_user_ROI(par_obj, int_obj):
     #fileName = QtGui.QFileDialog.getOpenFileName(None, "Load ROIs", filter="QuantiFly ROI files (*.outputROI)")
     #filename, file_ext = os.path.splitext(os.path.basename(fileName[0:-18]))
 
-    for fileno, imfile in par_obj.filehandlers.iteritems():
+    for fileno, imfile in par_obj.filehandlers.items():
         name = imfile.full_name +'_outputROI.pickle'
         if os.path.isfile(name):
 

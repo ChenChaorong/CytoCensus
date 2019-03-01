@@ -152,7 +152,7 @@ class File_handler(object):
                 print('z_scale_factor', self.z_calibration)
             except:
                 #might need to modify this to work with OME-TIFFs
-                print 'tiff resolution not recognised'
+                print ('tiff resolution not recognised')
 
             self.order = meta.axes
             for n,b in enumerate(self.order):
@@ -172,7 +172,7 @@ class File_handler(object):
 
             self.bitDepth = meta.dtype
 
-            self.array=self.Tiff.asarray(memmap=True)
+            self.array=self.Tiff.asarray()#memmap=True)
 
             self.tiffarraymax = self.array.max()
 
@@ -211,7 +211,7 @@ class Intermediate_handler():
             self.tif = TiffWriter(self.filename, bigtiff=True,append=True)
         if self.read:
             self.tif = TiffFile(self.filename)
-            self.array = self.tif.asarray(memmap=True)
+            self.array = self.tif.asarray()#memmap=True)
 
         return self
 

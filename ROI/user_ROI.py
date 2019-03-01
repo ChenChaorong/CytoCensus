@@ -91,7 +91,7 @@ class ROI:
     def button_release_callback(self, event):
         self.flag = False
     def complete_roi(self):
-        print 'ROI completed.'
+        print ('ROI completed.')
         self.complete = True
         self.draw_ROI()
         self.reparse_ROI(self.par_obj.curr_z)
@@ -316,7 +316,7 @@ class ROI:
             if self.par_obj.data_store['roi_stkint_x'][imno][it_time_pt].__len__() > 0:
                 time_pts_with_roi.append(it_time_pt)
 
-        print 'time_pts_with_roi',time_pts_with_roi
+        print ('time_pts_with_roi',time_pts_with_roi)
         for it_pt in range(0,time_pts_with_roi.__len__()-1):
             tab = time_pts_with_roi[it_pt]
             tac = time_pts_with_roi[it_pt+1]
@@ -455,7 +455,7 @@ class DV_Controller:
 
         # endian-ness test
         if not struct.unpack_from("<H", self.dvdata, 96)[0] == 0xc0a0:
-            print "unsupported endian-ness"
+            print ("unsupported endian-ness")
             return
 
         dvImageWidth=struct.unpack_from("<I", self.dvdata, 0)[0]
@@ -483,7 +483,7 @@ class DV_Controller:
         sectionSize = 4*(dvExtendedHeaderNumFloats+dvExtendedHeaderNumInts)
         sections = dvExtendedHeaderSize/sectionSize
         if (sections < dvNumOfImages):
-            print "number of sections is less than the number of images"
+            print ("number of sections is less than the number of images")
             return
         self.maxFrames = dvNumOfImages
         self.numCH = rawSizeC
