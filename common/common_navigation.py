@@ -8,7 +8,7 @@ Common colour checkboxes and 4D navigation functions
  Currently must import directly, need to tidy this up later
 """
 from PyQt5 import QtGui,QtCore,QtWidgets
-from gnu import return_license
+from CytoCensus.gnu import return_license
 import numpy as np
 
 

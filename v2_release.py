@@ -32,11 +32,11 @@ import numpy as np
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-import v2_functions as v2
+import CytoCensus.v2_functions as v2
 #import numdifftools as ndt
-from common_navigation import navigation_setup, create_channel_objects, btn_fn, on_about
-from parameters.parameter_object import ParameterClass
-from ROI.user_ROI import ROI
+from CytoCensus.common.common_navigation import navigation_setup, create_channel_objects, btn_fn, on_about
+from CytoCensus.parameters.parameter_object import ParameterClass
+from CytoCensus.ROI.user_ROI import ROI
 
 
 
