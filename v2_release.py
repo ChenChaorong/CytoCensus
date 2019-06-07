@@ -92,11 +92,14 @@ class fileDialog(QtWidgets.QMainWindow):
         par_obj.file_array = []
         path = None
         for path in QtWidgets.QFileDialog.getOpenFileNames(self, 'Open file', self.parent.filepath, 'Images(*.tif *.tiff);;'):
-            if path != '':
-                par_obj.file_array.append(path[0])
+            if path != '' and path !='Images(*.tif *.tiff)':
+                if type(path) is not list:
+                    par_obj.file_array.append(path)
+                else:
+                    par_obj.file_array
+                    par_obj.file_array=par_obj.file_array+path
         if path is None:
             return
-
         self.parent.config['filepath'] = str(
             QtCore.QFileInfo(path).absolutePath())+'/'
         pickle.dump(self.parent.config, open(
