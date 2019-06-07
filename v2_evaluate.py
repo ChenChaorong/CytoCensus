@@ -327,7 +327,7 @@ class Eval_load_model_win(QtWidgets.QWidget):
             par_obj.min_distance = save_file["min_distance"]
             par_obj.abs_thr = save_file["abs_thr"]
             par_obj.rel_thr = save_file["rel_thr"]
-
+            par_obj.count_maxima_laplace = save_file["count_maxima_laplace"]
             #par_obj.gt_vec = save_file["gt_vec"]
             #par_obj.error_vec = save_file["error_vec"]
             save_im = save_file["imFile"]
