@@ -25,8 +25,6 @@ from sklearn.pipeline import Pipeline
 
 from scipy.ndimage.filters import generic_filter
 
-
-
 def RF(par_obj, RF_type='ETR'):
     """Choose regression method. Must implement fit and predict. Can use sklearn pipeline"""
     if RF_type == 'ETR':
@@ -76,7 +74,7 @@ def feature_create_threadable(par_obj, imRGB):
     '''feat = np.zeros(((int(par_obj.crop_y2) - int(par_obj.crop_y1)), (int(par_obj.crop_x2) -
     int(par_obj.crop_x1)), feat_length * (par_obj.ch_active.__len__())))'''
     feat = np.zeros((par_obj.height, par_obj.width, feat_length * (par_obj.ch_active.__len__())))
-    
+
     if par_obj.numCH == 1:
         imG = imRGB[:, :].astype(np.float32)/par_obj.tiffarray_typemax
 
@@ -123,9 +121,9 @@ def calculate_skfeat_eigenvalues(im,s):
     gim = scipy.ndimage.filters.gaussian_filter(im, 0.5*s, mode='reflect', truncate=4)
     x, y, z = skfeat.structure_tensor(gim, 1*s, mode='reflect')
     st_skfeat = skfeat.structure_tensor_eigvals(x, y, z)
-    
+
     return ((st_skfeat[0]/(50+s)),(st_skfeat[1]/(50+s)))
-    
+
 def local_shape_features_fine(im, scaleStart):
     """ Creates features. Exactly as in the Luca Fiaschi paper but on 5 scales, and a truncated gaussian"""
     s = scaleStart
@@ -145,29 +143,29 @@ def local_shape_features_fine(im, scaleStart):
     f[:, :, 2] = st08[0]
     f[:, :, 3] = st08[1]
     f[:, :, 4] = scipy.ndimage.gaussian_laplace(im, s, truncate=2.5)
-    
+
     f[:, :, 5] = scipy.ndimage.gaussian_gradient_magnitude(im, s*2, truncate=2.5)
     f[:, :, 6] = st16[0]
     f[:, :, 7] = st16[1]
     f[:, :, 8] = scipy.ndimage.gaussian_laplace(im, s*2, truncate=2.5)
-    
+
     f[:, :, 9] = scipy.ndimage.gaussian_gradient_magnitude(im, s*4, truncate=2.5)
     f[:, :, 10] = st32[0]
     f[:, :, 11] = st32[1]
     f[:, :, 12] = scipy.ndimage.gaussian_laplace(im, s*4, truncate=2.5)
-    
+
     f[:, :, 13] = scipy.ndimage.gaussian_gradient_magnitude(im, s*8, truncate=2.5)
     f[:, :, 14] = st64[0]
     f[:, :, 15] = st64[1]
     f[:, :, 16] = scipy.ndimage.gaussian_laplace(im, s*8, truncate=2.5)
-    
+
     f[:, :, 17] = scipy.ndimage.gaussian_gradient_magnitude(im, s*16, truncate=2.5)
     f[:, :, 18] = st128[0]
     f[:, :, 19] = st128[1]
     f[:, :, 20] = scipy.ndimage.gaussian_laplace(im, s*16, truncate=2.5)
-    
+
     return f
-    
+
 def local_shape_features_gradient(im, scaleStart):
     """ Creates features. Exactly as in the Luca Fiaschi paper but on 5 scales, and a truncated gaussian"""
     s = scaleStart
@@ -181,34 +179,34 @@ def local_shape_features_gradient(im, scaleStart):
     f[:, :, 2] = np.gradient(scipy.ndimage.gaussian_filter(im,s),axis=0)
     f[:, :, 3] = np.gradient(scipy.ndimage.gaussian_filter(im,s),axis=1)
     f[:, :, 4] = scipy.ndimage.gaussian_laplace(im, s, truncate=2.5)
-    
+
     f[:, :, 5] = scipy.ndimage.gaussian_gradient_magnitude(im, s*2, truncate=2.5)
     f[:, :, 6] = np.gradient(scipy.ndimage.gaussian_filter(im,s*2),axis=0)
     f[:, :, 7] = np.gradient(scipy.ndimage.gaussian_filter(im,s*2),axis=1)
     f[:, :, 8] = scipy.ndimage.gaussian_laplace(im, s*2, truncate=2.5)
-    
+
     f[:, :, 9] = scipy.ndimage.gaussian_gradient_magnitude(im, s*4, truncate=2.5)
     f[:, :, 10] = np.gradient(scipy.ndimage.gaussian_filter(im,s*4),axis=0)
     f[:, :, 11] = np.gradient(scipy.ndimage.gaussian_filter(im,s*4),axis=1)
     f[:, :, 12] = scipy.ndimage.gaussian_laplace(im, s*4, truncate=2.5)
-    
+
     f[:, :, 13] = scipy.ndimage.gaussian_gradient_magnitude(im, s*8, truncate=2.5)
     f[:, :, 14] = np.gradient(scipy.ndimage.gaussian_filter(im,s*8),axis=0)
     f[:, :, 15] = np.gradient(scipy.ndimage.gaussian_filter(im,s*8),axis=1)
     f[:, :, 16] = scipy.ndimage.gaussian_laplace(im, s*8, truncate=2.5)
-    
+
     f[:, :, 17] = scipy.ndimage.gaussian_gradient_magnitude(im, s*16, truncate=2.5)
     f[:, :, 18] = np.gradient(scipy.ndimage.gaussian_filter(im,s*16),axis=0)
     f[:, :, 19] = np.gradient(scipy.ndimage.gaussian_filter(im,s*16),axis=1)
     f[:, :, 20] = scipy.ndimage.gaussian_laplace(im, s*16, truncate=2.5)
-    
+
     return f
-    
+
 def frst2d(image, radii, alpha, stdFactor, mode,discard=0):
-    
+
     image = image.astype('float32')
     sizex, sizey = image.shape
-    
+
     gx =  scipy.ndimage.filters.sobel(image, axis=0)
     gy = scipy.ndimage.filters.sobel(image, axis=1)
 
@@ -224,9 +222,9 @@ def frst2d(image, radii, alpha, stdFactor, mode,discard=0):
         dark = True
     else:
         raise Exception("invalid mode!");
- 
+
     maxRadius = int(np.ceil(max(radii)));
-    
+
     filtered = np.zeros((sizex + 2 * maxRadius, sizey + 2 * maxRadius))
     S_n = np.zeros((sizex + 2 * maxRadius, sizey + 2 * maxRadius))
     #S = np.zeros((len(radii), sizex + 2 * maxRadius, sizey + 2 * maxRadius))
@@ -253,13 +251,13 @@ def frst2d(image, radii, alpha, stdFactor, mode,discard=0):
             idy2change = indices[1]+glyn+maxRadius
             np.add.at(O_n,(idx2change.flat,idy2change.flat),1)
             np.add.at(M_n,(idx2change.flat,idy2change.flat),gnormMat[indices])
-        
+
         if dark:
             idx2change_neg = indices[0]-glxn+maxRadius
             idy2change_neg = indices[1]-glyn+maxRadius
             np.add.at(O_n,(idx2change_neg.flat,idy2change_neg.flat),-1)
             np.add.at(M_n,(idx2change_neg.flat,idy2change_neg.flat),-gnormMat[indices])
-        
+
         O_n = np.abs(O_n)
         M_n = np.abs(M_n)
         if n==1:
@@ -269,13 +267,13 @@ def frst2d(image, radii, alpha, stdFactor, mode,discard=0):
         #print O_n.max()
         #print O_n.mean()
         S_n += np.power(O_n,alpha) * M_n
-        
+
 
 
     output = S_n[maxRadius:sizex+maxRadius, maxRadius:sizey+maxRadius]
 
     return output
-    
+
 def local_shape_features_radial(im, scaleStart):
     """ Creates features based on those in the Luca Fiaschi paper but on 5 scales independent of object size,
     but using a gaussian pyramid to calculate at multiple scales more efficiently
@@ -292,7 +290,7 @@ def local_shape_features_radial(im, scaleStart):
     frst = frst2d(im,range(1,50,3),1.5,.1,'both',discard=.01)
     # create pyramid structure
     pyr = skimage.transform.pyramid_gaussian(
-        im, sigma=1.5, max_layer=5, downscale=2)
+        im, sigma=1.5, max_layer=5, downscale=2, multichannel=False)
 
     a = im
     for layer in range(0, 5):
@@ -309,7 +307,7 @@ def local_shape_features_radial(im, scaleStart):
 
         x, y, z = skfeat.structure_tensor(a, 1)
         st = skfeat.structure_tensor_eigvals(x, y, z)
-        
+
 
 
         # upsample features to original image
@@ -317,7 +315,7 @@ def local_shape_features_radial(im, scaleStart):
         ggm = scipy.ndimage.interpolation.zoom(ggm, scale, order=1)
         st0 = scipy.ndimage.interpolation.zoom(st[0], scale, order=1)
         st1 = scipy.ndimage.interpolation.zoom(st[1], scale, order=1)
-        
+
         #up = scipy.ndimage.interpolation.zoom(a, scale, order=1)
 
         f[:, :, layer * 5 + 1] = lap
@@ -330,6 +328,7 @@ def local_shape_features_radial(im, scaleStart):
         a = next(pyr)
 
     return f
+
 def strided_sliding_std_dev(data, radius=5):
     windowed = rolling_window(data, (2*radius, 2*radius))
     shape = windowed.shape
@@ -358,7 +357,7 @@ def rolling_window_lastaxis(a, window):
     shape = a.shape[:-1] + (a.shape[-1] - window + 1, window)
     strides = a.strides + (a.strides[-1],)
     return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
-    
+
 def local_shape_features_std(im, scaleStart):
     """ Creates features based on those in the Luca Fiaschi paper but on 5 scales independent of object size,
     but using a gaussian pyramid to calculate at multiple scales more efficiently
@@ -375,7 +374,7 @@ def local_shape_features_std(im, scaleStart):
 
     # create pyramid structure
     pyr = skimage.transform.pyramid_gaussian(
-        im, sigma=1.5, max_layer=5, downscale=2)
+        im, sigma=1.5, max_layer=5, downscale=2, multichannel=False)
 
     a = im
     for layer in range(0, 5):
@@ -392,15 +391,15 @@ def local_shape_features_std(im, scaleStart):
 
         x, y, z = skfeat.structure_tensor(a, 1)
         st = skfeat.structure_tensor_eigvals(x, y, z)
-        
+
         up = np.pad(strided_sliding_std_dev(a, radius=3),(3,0),'edge')
-        
+
         # upsample features to original image
         lap = scipy.ndimage.interpolation.zoom(lap, scale, order=1)
         ggm = scipy.ndimage.interpolation.zoom(ggm, scale, order=1)
         st0 = scipy.ndimage.interpolation.zoom(st[0], scale, order=1)
         st1 = scipy.ndimage.interpolation.zoom(st[1], scale, order=1)
-        
+
         up = scipy.ndimage.interpolation.zoom(up, scale, order=1)
 
         f[:, :, layer * 5 + 1] = lap
@@ -413,7 +412,7 @@ def local_shape_features_std(im, scaleStart):
         a = next(pyr)
 
     return f
-    
+
 def local_shape_features_minmax(im, scaleStart):
     """ Creates features based on those in the Luca Fiaschi paper but on 5 scales independent of object size,
     but using a gaussian pyramid to calculate at multiple scales more efficiently
@@ -430,7 +429,7 @@ def local_shape_features_minmax(im, scaleStart):
 
     # create pyramid structure
     pyr = skimage.transform.pyramid_gaussian(
-        im, sigma=1.5, max_layer=5, downscale=2)
+        im, sigma=1.5, max_layer=5, downscale=2, multichannel=False)
 
     a = im
     for layer in range(0, 5):
@@ -447,10 +446,10 @@ def local_shape_features_minmax(im, scaleStart):
 
         x, y, z = skfeat.structure_tensor(a, 1)
         st = skfeat.structure_tensor_eigvals(x, y, z)
-        
+
         maxim = scipy.ndimage.maximum_filter(a,3)
         minim = scipy.ndimage.minimum_filter(a,3)
-        
+
         # upsample features to original image
         lap = scipy.ndimage.interpolation.zoom(lap, scale, order=1)
         ggm = scipy.ndimage.interpolation.zoom(ggm, scale, order=1)
@@ -458,7 +457,7 @@ def local_shape_features_minmax(im, scaleStart):
         st1 = scipy.ndimage.interpolation.zoom(st[1], scale, order=1)
         maxim = scipy.ndimage.interpolation.zoom(maxim, scale, order=1)
         minim = scipy.ndimage.interpolation.zoom(minim, scale, order=1)
-        
+
 
 
         f[:, :, layer * 6 + 1] = lap
@@ -475,9 +474,9 @@ def local_shape_features_daisy(im, scaleStart):
     radius=6
     feat = skfeat.daisy(np.pad(im,radius,mode='edge'),step=2,radius=radius,normalization='off')
     feat = feat.reshape((feat.shape[0],feat.shape[1],-1))
-    print (feat.shape) 
+    print (feat.shape)
     f = scipy.ndimage.interpolation.zoom(feat,(float(im.shape[0])/feat.shape[0],float(im.shape[1])/feat.shape[1],1),order=1)
-    
+
     return f
 def local_shape_features_pyramid(im, scaleStart):
     """ Creates features based on those in the Luca Fiaschi paper but on 5 scales independent of object size,
@@ -495,7 +494,7 @@ def local_shape_features_pyramid(im, scaleStart):
 
     # create pyramid structure
     pyr = skimage.transform.pyramid_gaussian(
-        im, sigma=1.5, max_layer=5, downscale=2)
+        im, sigma=1.5, max_layer=5, downscale=2, multichannel=False)
 
     a = im
     for layer in range(0, 5):
@@ -512,7 +511,7 @@ def local_shape_features_pyramid(im, scaleStart):
 
         x, y, z = skfeat.structure_tensor(a, 1)
         st = skfeat.structure_tensor_eigvals(x, y, z)
-        
+
 
 
         # upsample features to original image
@@ -520,7 +519,7 @@ def local_shape_features_pyramid(im, scaleStart):
         ggm = scipy.ndimage.interpolation.zoom(ggm, scale, order=1)
         st0 = scipy.ndimage.interpolation.zoom(st[0], scale, order=1)
         st1 = scipy.ndimage.interpolation.zoom(st[1], scale, order=1)
-        
+
         up = scipy.ndimage.interpolation.zoom(a, scale, order=1)
 
         f[:, :, layer * 5 + 1] = lap
@@ -547,7 +546,7 @@ def local_shape_features_fine_imhist(im, scaleStart):
 
     # set up pyramid
     pyr = skimage.transform.pyramid_gaussian(
-        im, sigma=1.5, max_layer=5, downscale=2)
+        im, sigma=1.5, max_layer=5, downscale=2, multichannel=False)
     a = im
 
     for layer in range(0, 5):
@@ -595,15 +594,15 @@ def local_shape_features_basic(im, scaleStart):
     f[:, :, 2] = st08[0]
     f[:, :, 3] = st08[1]
     f[:, :, 4] = scipy.ndimage.gaussian_laplace(im, s, truncate=2.5)
-    
+
     f[:, :, 5] = scipy.ndimage.gaussian_gradient_magnitude(im, s*2, truncate=2.5)
     f[:, :, 6] = st16[0]
     f[:, :, 7] = st16[1]
     f[:, :, 8] = scipy.ndimage.gaussian_laplace(im, s*2, truncate=2.5)
-    
+
     f[:, :, 9] = scipy.ndimage.gaussian_gradient_magnitude(im, s*4, truncate=2.5)
     f[:, :, 10] = st32[0]
     f[:, :, 11] = st32[1]
     f[:, :, 12] = scipy.ndimage.gaussian_laplace(im, s*4, truncate=2.5)
-    
+
     return f
