@@ -7,8 +7,8 @@ Created on Sat Apr  2 18:03:50 2016
 Common colour checkboxes and 4D navigation functions
  Currently must import directly, need to tidy this up later
 """
-from PyQt5 import QtGui,QtCore,QtWidgets
-from CytoCensus.gnu import return_license
+from PyQt5 import QtGui, QtCore, QtWidgets
+from gnu import return_license
 import numpy as np
 
 
@@ -131,7 +131,7 @@ class btn_fn:
                     if par_obj.curr_t>par_obj.max_t: par_obj.curr_t = par_obj.max_t
                     self.goto_img_fn(imno=par_obj.curr_file+1)
 
-                    break;
+                    break
 
 def on_about(self):
     self.about_win = QtWidgets.QWidget()
