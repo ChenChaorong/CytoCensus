@@ -25,7 +25,8 @@ import copy
 import pickle
 import datetime
 import time
-
+from multiprocessing import freeze_support
+freeze_support()
 from PyQt5 import QtGui, QtCore  # , Qt, QtWebKit
 from PyQt5 import QtWidgets
 
@@ -35,10 +36,10 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-from common_navigation import navigation_setup, create_channel_objects, btn_fn, on_about
+from common.common_navigation import navigation_setup, create_channel_objects, btn_fn, on_about
 from parameters.parameter_object import ParameterClass
 from ROI.user_ROI import ROI
-import v2_functions as v2
+from functions import v2_functions as v2
 
 
 class Eval_load_im_win(QtWidgets.QWidget):
