@@ -568,8 +568,8 @@ class Win_fn(QtWidgets.QWidget):
         top_panel = QtWidgets.QHBoxLayout()
 
         # Top left and right widget panels
-        top_left_panel = QtWidgets.QGroupBox('Basic Controls')
-        top_right_panel = QtWidgets.QGroupBox('Advanced Controls')
+        top_left_panel = QtWidgets.QGroupBox('Navigation and Annotation')
+        top_right_panel = QtWidgets.QGroupBox('Detection and Model')
 
         # Grid layouts for the top and left panels.
         self.top_left_grid = QtWidgets.QGridLayout()
@@ -594,7 +594,7 @@ class Win_fn(QtWidgets.QWidget):
         self.save_ROI_btn = QtWidgets.QPushButton('1. Save ROI')
 
         self.save_ROI_btn.setToolTip(
-            'Right-click and drag to make ROI. Then Save ROI (Space)')
+            'Right-click or Ctrl-click and drag to make ROI. Then Save ROI (Space)')
         self.save_ROI_btn.setEnabled(True)
 
         # Sets up the button which saves the ROI.
@@ -610,7 +610,13 @@ class Win_fn(QtWidgets.QWidget):
         self.train_model_btn.setEnabled(False)
 
         # Selects and reactivates an existing ROI.
-        self.sel_ROI_btn = QtWidgets.QPushButton('Select ROI')
+        self.delete_ROI_btn = QtWidgets.QPushButton('Delete ROI')
+        self.delete_ROI_btn.setToolTip(
+            'Delete selected ROI')
+        self.delete_ROI_btn.setEnabled(False)
+
+        # Selects and reactivates an existing ROI.
+        self.sel_ROI_btn = QtWidgets.QPushButton('Edit ROI')
         self.sel_ROI_btn.setToolTip(
             'Click on ROI to select- Select ROI highlighted in yellow')
         self.sel_ROI_btn.setEnabled(True)
@@ -648,15 +654,16 @@ class Win_fn(QtWidgets.QWidget):
         self.top_left_grid.addWidget(self.save_dots_btn, 4, 1)
         self.top_left_grid.addWidget(self.train_model_btn, 4, 2)
         self.top_left_grid.addWidget(self.sel_ROI_btn, 5, 0)
-        self.top_left_grid.addWidget(self.remove_dots_btn, 5, 1)
-        self.top_left_grid.addWidget(self.load_gt_btn, 6, 0, 1, 1)
-        self.top_left_grid.addWidget(self.save_gt_btn, 6, 1, 1, 1)
 
+        self.top_left_grid.addWidget(self.remove_dots_btn, 5, 1)
+        self.top_left_grid.addWidget(self.load_gt_btn, 6, 2, 1, 1)
+        self.top_left_grid.addWidget(self.save_gt_btn, 6, 1, 1, 1)
+        self.top_left_grid.addWidget(self.delete_ROI_btn, 6, 0, 1, 1 )
         # SigmaData input Label.
         self.sigma_data_text = QtWidgets.QLabel(self)
         self.sigma_data_text.setText('Object size (pixels):')
         self.sigma_data_text.setToolTip(
-            'Set this smaller than the object size. Map on right hand side should show similar size objects to those in your image')
+            'Set this smaller than the object size.\n Map on right hand side should show similar size objects to those in your image.\n If your object size is >10 you should resize your images')
         self.top_right_grid.addWidget(self.sigma_data_text, 0, 0)
 
         # SigmaData input field.
@@ -731,6 +738,7 @@ class Win_fn(QtWidgets.QWidget):
         self.overlay_prediction_btn.setEnabled(True)
         self.top_right_grid.addWidget(self.overlay_prediction_btn, 0, 2)
 
+
         # common navigation buttons
 
         self.count_replot_btn = QtWidgets.QPushButton('Replot')
@@ -752,6 +760,12 @@ class Win_fn(QtWidgets.QWidget):
         self.z_cal_txt = QtWidgets.QLabel(str(par_obj.z_cal))
         self.z_cal_txt.setFixedWidth(50)
 
+        self.strictness_btn = QtWidgets.QCheckBox()
+        self.strictness_btn.setChecked(True)
+        strictness_btn_lbl = QtWidgets.QLabel('Strict')
+        self.strictness_btn.setToolTip('Set whether to enforce size strictness')
+
+
         self.min_distance_panel = QtWidgets.QHBoxLayout()
         self.min_distance_panel.addStretch()
         self.min_distance_panel.addWidget(QtWidgets.QLabel("x:"))
@@ -764,6 +778,9 @@ class Win_fn(QtWidgets.QWidget):
         self.min_distance_panel.addWidget(self.abs_thr_txt)
         self.min_distance_panel.addWidget(z_cal_lbl)
         self.min_distance_panel.addWidget(self.z_cal_txt)
+
+        self.min_distance_panel.addWidget(strictness_btn_lbl)
+        self.min_distance_panel.addWidget(self.strictness_btn)
 
         self.top_right_grid.addLayout(self.min_distance_panel, 4, 1, 1, 2)
         # self.top_right_grid.addWidget(self.count_maxima_plot_on,4,2)
@@ -809,6 +826,8 @@ class Win_fn(QtWidgets.QWidget):
         self.save_dots_btn.clicked.connect(self.save_dots_fn)
 
         self.sel_ROI_btn.clicked.connect(self.sel_ROI_btn_fn)
+        self.delete_ROI_btn.clicked.connect(self.delete_roi_fn)
+
         self.remove_dots_btn.clicked.connect(self.remove_dots_btn_fn)
         self.train_model_btn.clicked.connect(self.train_model_btn_fn)
         self.count_maxima_btn.clicked.connect(self.count_maxima_btn_fn)
@@ -816,6 +835,7 @@ class Win_fn(QtWidgets.QWidget):
         self.save_gt_btn.clicked.connect(self.save_gt_fn)
         self.overlay_prediction_btn.clicked.connect(
             self.overlay_prediction_btn_fn)
+        self.strictness_btn.clicked.connect(self.strictness_btn_fn)
         # self.feat_scale_change_btn.clicked.connect(self.feat_scale_change_btn_fn)
         self.kernel_show_btn.clicked.connect(self.kernel_btn_fn)
         self.clear_dots_btn.clicked.connect(self.clear_dots_fn)
@@ -942,6 +962,9 @@ class Win_fn(QtWidgets.QWidget):
     def overlay_prediction_btn_fn(self):
         par_obj.overlay = not par_obj.overlay
         self.goto_img_fn(par_obj.curr_z, par_obj.curr_t)
+
+    def strictness_btn_fn(self):
+        par_obj.count_maxima_laplace = not par_obj.count_maxima_laplace
 
     def count_maxima_btn_fn(self):
         t0 = time.time()
