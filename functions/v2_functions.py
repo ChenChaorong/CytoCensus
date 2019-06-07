@@ -1,6 +1,6 @@
-"""QuantiFly3d Software v0.1
+"""CytoCensus Software v0.1
 
-    Copyright (C) 2016  Dominic Waithe Martin Hailstone
+    Copyright (C) 2016-2018  Dominic Waithe Martin Hailstone
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 """
 from __future__ import division
 #from PyQt4 import QtGui, QtCore, Qt
+from PyQt5 import QtCore
 #import PIL.Image
 import os
 import csv
@@ -41,767 +42,9 @@ from tifffile import imsave #Install with pip install tifffile.
 
 from matplotlib.path import Path
 import matplotlib.image as pylab
-
-import CytoCensus.features.local_features as lf
-from CytoCensus.fileio.file_handler import File_handler
-import scipy.cluster.hierarchy as hcluster
-
-def peak_local_max(image, min_distance=10, threshold_abs=0, threshold_rel=0.1,
-                   exclude_border=False, indices=True, num_peaks=np.inf,
-                   footprint=None, labels=None):
-    """
-    Find peaks in an image, and return them as coordinates or a boolean array.
-
-    Peaks are the local maxima in a region of `2 * min_distance + 1`
-    (i.e. peaks are separated by at least `min_distance`).
-
-    NOTE: If peaks are flat (i.e. multiple adjacent pixels have identical
-    intensities), the coordinates of all such pixels are returned.
-
-    Parameters
-    ----------
-    image : ndarray of floats
-        Input image.
-    min_distance : int
-        Minimum number of pixels separating peaks in a region of `2 *
-        min_distance + 1` (i.e. peaks are separated by at least
-        `min_distance`). If `exclude_border` is True, this value also excludes
-        a border `min_distance` from the image boundary.
-        To find the maximum number of peaks, use `min_distance=1`.
-    threshold_abs : float
-        Minimum intensity of peaks.
-    threshold_rel : float
-        Minimum intensity of peaks calculated as `max(image) * threshold_rel`.
-    exclude_border : bool
-        If True, `min_distance` excludes peaks from the border of the image as
-        well as from each other.
-    indices : bool
-        If True, the output will be an array representing peak coordinates.
-        If False, the output will be a boolean array shaped as `image.shape`
-        with peaks present at True elements.
-    num_peaks : int
-        Maximum number of peaks. When the number of peaks exceeds `num_peaks`,
-        return `num_peaks` peaks based on highest peak intensity.
-    footprint : ndarray of bools, optional
-        If provided, `footprint == 1` represents the local region within which
-        to search for peaks at every point in `image`.  Overrides
-        `min_distance`, except for border exclusion if `exclude_border=True`.
-    labels : ndarray of ints, optional
-        If provided, each unique region `labels == value` represents a unique
-        region to search for peaks. Zero is reserved for background.
-
-    Returns
-    -------
-    output : ndarray or ndarray of bools
-
-        * If `indices = True`  : (row, column, ...) coordinates of peaks.
-        * If `indices = False` : Boolean array shaped like `image`, with peaks
-          represented by True values.
-
-    Notes
-    -----
-    The peak local maximum function returns the coordinates of local peaks
-    (maxima) in a image. A maximum filter is used for finding local maxima.
-    This operation dilates the original image. After comparison between
-    dilated and original image, peak_local_max function returns the
-    coordinates of peaks where dilated image = original.
-
-    Examples
-    --------
-    >>> img1 = np.zeros((7, 7))
-    >>> img1[3, 4] = 1
-    >>> img1[3, 2] = 1.5
-    >>> img1
-    array([[ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ],
-           [ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ],
-           [ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ],
-           [ 0. ,  0. ,  1.5,  0. ,  1. ,  0. ,  0. ],
-           [ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ],
-           [ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ],
-           [ 0. ,  0. ,  0. ,  0. ,  0. ,  0. ,  0. ]])
-
-    >>> peak_local_max(img1, min_distance=1)
-    array([[3, 2],
-           [3, 4]])
-
-    >>> peak_local_max(img1, min_distance=2)
-    array([[3, 2]])
-
-    >>> img2 = np.zeros((20, 20, 20))
-    >>> img2[10, 10, 10] = 1
-    >>> peak_local_max(img2, exclude_border=False)
-    array([[10, 10, 10]])
-
-    """
-    out = np.zeros_like(image, dtype=np.bool)
-
-
-    if np.all(image == image.flat[0]):
-        if indices is True:
-            return []
-        else:
-            return out
-
-    image = image.copy()
-    # Non maximum filter
-    if footprint is not None:
-        image_max = filters.maximum_filter(image, footprint=footprint, mode='constant')
-    else:
-        size = np.array(min_distance)*2.3548
-        image_max = filters.maximum_filter(image, size=size, mode='constant')
-    mask = (image == image_max)
-    image *= mask
-
-    if exclude_border:
-        # zero out the image borders
-        for i in range(image.ndim):
-
-            image = image.swapaxes(0, i)
-            min_d = np.floor(min_distance[i])
-
-            image[:min_d] = 0
-            image[-min_d:] = 0
-            image = image.swapaxes(0, i)
-
-    # find top peak candidates above a threshold
-    peak_threshold = max(np.max(image.ravel()) * threshold_rel, threshold_abs)
-
-    # get coordinates of peaks
-    coordinates = np.argwhere(image > peak_threshold)
-
-    if coordinates.shape[0] > num_peaks:
-        intensities = image.flat[np.ravel_multi_index(coordinates.transpose(), image.shape)]
-        idx_maxsort = np.argsort(intensities)[::-1]
-        coordinates = coordinates[idx_maxsort][:num_peaks]
-
-    if indices is True:
-        return coordinates
-    else:
-        nd_indices = tuple(coordinates.T)
-        out[nd_indices] = True
-
-
-        return out
-        #return out
-"""rankorder.py - convert an image of any type to an image of ints whose
-pixels have an identical rank order compared to the original image
-
-Originally part of CellProfiler, code licensed under both GPL and BSD licenses.
-Website: http://www.cellprofiler.org
-Copyright (c) 2003-2009 Massachusetts Institute of Technology
-Copyright (c) 2009-2011 Broad Institute
-All rights reserved.
-Original author: Lee Kamentstky
-"""
-#import trackpy as tp
-
-def count_maxima_laplace(par_obj, time_pt, fileno, reset_max=False):
-    #count maxima won't work properly if have selected a random set of Z
-    min_d = par_obj.min_distance
-    imfile = par_obj.filehandlers[fileno]
-    #if par_obj.min_distance[2] == 0 or par_obj.max_z == 0:
-    #    count_maxima_2d(par_obj, time_pt, fileno)
-    #    return
-    predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
-    for i in range(imfile.max_z+1):
-        predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
-    
-    laplace = -filters.gaussian_laplace(predMtx, min_d, mode='constant')
-    
-    #if not already set, create. This is then used for the entire image and all subsequent training.
-    #A little hacky, but otherwise the normalisation screws everything up
-    if not par_obj.max_det:
-        par_obj.max_det = np.max(laplace)
-    elif reset_max:
-        par_obj.max_det = np.max(laplace)
-
-    laplace = laplace/par_obj.max_det
-    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
-    for i in range(imfile.max_z+1):
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = laplace[:, :, i]
-
-    pts = peak_local_max(laplace, min_distance=min_d, threshold_abs=par_obj.abs_thr)
-
-    pts2keep = []
-    for pt2d in pts:
-        #determinants of submatrices
-        pts2keep.append([pt2d[0], pt2d[1], pt2d[2], 1])
-    pts = pts2keep
-    par_obj.show_pts = 1
-
-    #Filter those which are not inside the region.
-    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
-        pts2keep = []
-
-        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
-            for pt2d in pts:
-
-                if pt2d[2] == i:
-                    #Find the region of interest.
-                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
-                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
-                    #Reformat to make the path object.
-                    pot = []
-                    for b in range(0, ppt_x.__len__()):
-                        pot.append([ppt_x[b], ppt_y[b]])
-                    p = Path(pot)
-                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
-                        pts2keep.append(pt2d)
-        pts = pts2keep
-
-    par_obj.data_store['pts'][fileno][time_pt] = pts
-def count_maxima_laplace_variable(par_obj, time_pt, fileno, reset_max=False):
-    #count maxima won't work properly if have selected a random set of Z
-    min_d = [x for x in par_obj.min_distance]
-    imfile = par_obj.filehandlers[fileno]
-    #if par_obj.min_distance[2] == 0 or par_obj.max_z == 0:
-    #    count_maxima_2d(par_obj, time_pt, fileno)
-    #    return
-    predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
-    for i in range(imfile.max_z+1):
-        predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
-    
-    l1=filters.gaussian_laplace(predMtx, [0,0,min_d[2]], mode='constant')  
-    l2=filters.gaussian_laplace(predMtx, [0,0,min_d[2]*2], mode='constant') *2 
-    l3=filters.gaussian_laplace(predMtx, [0,0,min_d[2]*.5], mode='constant')  *.5
-    '''l1=-filters.gaussian_laplace(predMtx, min_d, mode='constant')   
-    l2=-filters.gaussian_laplace(predMtx, [x*.5 for x in min_d], mode='constant')
-    l3=-filters.gaussian_laplace(predMtx, [x*2 for x in min_d], mode='constant')
-    '''
-    l3=filters.gaussian_laplace((l1+l2+l3), [min_d[0],min_d[1],0], mode='constant')/3
-    #if not already set, create. This is then used for the entire image and all subsequent training.
-    #A little hacky, but otherwise the normalisation screws everything up
-    if not par_obj.max_det or reset_max:
-        par_obj.max_det = np.max(l3)
-
-    l3 = l3/par_obj.max_det
-    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
-    for i in range(imfile.max_z+1):
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = l3[:, :, i]
-        
-    pts = peak_local_max(l3, min_distance=min_d, threshold_abs=par_obj.abs_thr)
-
-    pts2keep = []
-    for pt2d in pts:
-        #determinants of submatrices
-        pts2keep.append([pt2d[0], pt2d[1], pt2d[2], 1])
-    pts = pts2keep
-    par_obj.show_pts = 1
-
-    #Filter those which are not inside the region.
-    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
-        pts2keep = []
-
-        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
-            for pt2d in pts:
-
-                if pt2d[2] == i:
-                    #Find the region of interest.
-                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
-                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
-                    #Reformat to make the path object.
-                    pot = []
-                    for b in range(0, ppt_x.__len__()):
-                        pot.append([ppt_x[b], ppt_y[b]])
-                    p = Path(pot)
-                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
-                        pts2keep.append(pt2d)
-        pts = pts2keep
-
-    par_obj.data_store['pts'][fileno][time_pt] = pts
-def det_hess_3d(predMtx, min_distance):
-    gau_stk = filters.gaussian_filter(predMtx, min_distance, mode='mirror')
-
-    y, x, z = np.gradient(gau_stk, 1)
-    xy, xx, xz = np.gradient(x)
-    yy, yx, yz = np.gradient(y)
-    zy, zx, zz = np.gradient(z)
-    det3 = -1*((((yy*zz)-(yz*yz))*xx)-(((xy*zz)-(yz*xz))*xy)+(((xy*yz)-(yy*xz))*xz))
-    det2 = xx*yy-xy*yx
-    det1 = -1*xx
-
-    return det3, det2, det1
-
-def count_maxima_thresh(par_obj, time_pt, fileno,reset_max=False):
-
-    #count maxima won't work properly if have selected a random set of Z
-    imfile = par_obj.filehandlers[fileno]
-    if par_obj.min_distance[2] == 0 or imfile.max_z == 0:
-        count_maxima_2d(par_obj, time_pt, fileno,reset_max)
-        return
-    predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
-    for i in range(imfile.max_z+1):
-        predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
-
-    radius = [par_obj.min_distance[0], par_obj.min_distance[1], par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration]
-
-    [det3, det2, det1] = det_hess_3d(predMtx, radius)
-
-
-    #if not already set, create. This is then used for the entire image and all subsequent training.
-    #A little hacky, but otherwise the normalisation screws everything up
-    if not par_obj.max_det:
-        par_obj.max_det = np.max(det3)
-    # normalise
-    det3 = det3/par_obj.max_det
-    det3=det3>par_obj.abs_thr
-    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
-    for i in range(imfile.max_z+1):
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = det3[:, :, i]
-
-    det_bin = det3>par_obj.abs_thr
-
-    det_label,no_obj = measurements.label(det_bin)
-
-    #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-    pts2keep = []
-    print (no_obj)
-    
-    det_com = measurements.center_of_mass(det_bin, det_label, range(1,no_obj+1))
-    
-    for pt2d in det_com:
-        ptuple = tuple(np.round(x).astype('uint') for x in pt2d)
-
-        #determinants of submatrices
-        dp = det1[ptuple]
-        dp2 = det2[ptuple]
-        #dp3 = det3[ptuple]
-            #negative definite, therefore maximum (note signs in det calculation)
-        #if dp >= 0 and dp2 >= 0: # and dp3>=par_obj.abs_thr:
-            #print 'point retained', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
-        pts2keep.append([ptuple[0], ptuple[1], ptuple[2], 1])
-    pts = pts2keep
-    par_obj.show_pts = 1
-
-    #Filter those which are not inside the region.
-    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
-        pts2keep = []
-
-        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
-            for pt2d in pts:
-
-                if pt2d[2] == i:
-                    #Find the region of interest.
-                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
-                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
-                    #Reformat to make the path object.
-                    pot = []
-                    for b in range(0, ppt_x.__len__()):
-                        pot.append([ppt_x[b], ppt_y[b]])
-                    p = Path(pot)
-                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
-                        pts2keep.append(pt2d)
-        pts = pts2keep
-
-    par_obj.data_store['pts'][fileno][time_pt] = pts
-    
-def count_maxima(par_obj, time_pt, fileno, reset_max=False):
-
-    #count maxima won't work properly if have selected a random set of Z
-    imfile = par_obj.filehandlers[fileno]
-    if par_obj.min_distance[2] == 0 or imfile.max_z == 0:
-        count_maxima_2d(par_obj, time_pt, fileno, reset_max)
-        return
-    if par_obj.count_maxima_laplace == 'cluster':
-        count_maxima_2d_v2(par_obj, time_pt, fileno, reset_max)
-        return
-    elif par_obj.count_maxima_laplace is True:
-        count_maxima_laplace(par_obj, time_pt, fileno, reset_max)
-        return
-
-    predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
-    for i in range(imfile.max_z+1):
-        predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
-
-    radius = [par_obj.min_distance[0], par_obj.min_distance[1], par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration]
-
-    [det3, det2, det1] = det_hess_3d(predMtx, radius)
-
-
-    #if not already set, create. This is then used for the entire image and all subsequent training.
-    #A little hacky, but otherwise the normalisation screws everything up
-    if not par_obj.max_det:
-        par_obj.max_det = np.max(det3)
-    # normalise
-    det3 = det3/par_obj.max_det
-
-    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
-    for i in range(imfile.max_z+1):
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = det3[:, :, i]
-
-    pts = peak_local_max(det3, min_distance=radius, threshold_abs=par_obj.abs_thr)
-
-    #par_obj.pts = v2._prune_blobs(par_obj.pts, min_distance=[int(self.count_txt_1.text()),int(self.count_txt_2.text()),int(self.count_txt_3.text())])
-    pts2keep = []
-    for pt2d in pts:
-        ptuple = tuple(pt2d)
-        #determinants of submatrices
-        dp = det1[ptuple]
-        dp2 = det2[ptuple]
-        #dp3 = det3[ptuple]
-            #negative definite, therefore maximum (note signs in det calculation)
-        if dp >= 0 and dp2 >= 0: # and dp3>=par_obj.abs_thr:
-            #print 'point retained', det[ptuple]<0 , det2[ptuple]<0 , det3[ptuple]<0
-            pts2keep.append([pt2d[0], pt2d[1], pt2d[2], 1])
-    pts = pts2keep
-    par_obj.show_pts = 1
-
-    #Filter those which are not inside the region.
-    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
-        pts2keep = []
-
-        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
-            for pt2d in pts:
-
-                if pt2d[2] == i:
-                    #Find the region of interest.
-                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
-                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
-                    #Reformat to make the path object.
-                    pot = []
-                    for b in range(0, ppt_x.__len__()):
-                        pot.append([ppt_x[b], ppt_y[b]])
-                    p = Path(pot)
-                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
-                        pts2keep.append(pt2d)
-        pts = pts2keep
-
-    par_obj.data_store['pts'][fileno][time_pt] = pts
-
-def det_hess_2d(predIm, min_distance):
-    gau_Im = filters.gaussian_filter(predIm, (min_distance[0], min_distance[1]))
-    y, x = np.gradient(gau_Im, 1)
-    xy, xx = np.gradient(x)
-    yy, yx = np.gradient(y)
-
-    det = xx*yy-xy*yx
-
-    return det, xx
-
-def count_maxima_2d(par_obj, time_pt, fileno, reset_max):
-    #count maxima won't work properly if have selected a random set of Z
-    imfile = par_obj.filehandlers[fileno]
-    par_obj.min_distance[2] = 0
-    det = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
-    xx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
-    for i in range(imfile.max_z+1):
-        predIm = par_obj.data_store['pred_arr'][fileno][time_pt][i].astype('float32')
-        [deti, xxi] = det_hess_2d(predIm, par_obj.min_distance)
-        det[:, :, i] = deti
-        xx[:, :, i] = xxi
-
-    # if not already set, create. This is then used for the entire image and all
-    #subsequent training. A little hacky, but otherwise the normalisation screws everything up
-    if not par_obj.max_det or reset_max==True:
-        par_obj.max_det = np.max(det)
-
-    detn = det/par_obj.max_det
-    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
-    for i in range(imfile.max_z+1):
-
-        #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = detn[:, :, i]
-
-    pts = peak_local_max(detn, min_distance=par_obj.min_distance, threshold_abs=par_obj.abs_thr)
-
-    pts2keep = []
-    for pt2d in pts:
-
-        T = xx[pt2d[0], pt2d[1], pt2d[2]]
-        #D=det[pt2d[0],pt2d[1],pt2d[2]]
-        # Removes points that are positive definite and therefore minima
-        if T > 0: # and D>0:
-            pass
-            #print 'point removed'
-        else:
-            pts2keep.append([pt2d[0], pt2d[1], pt2d[2], 1])
-
-    pts = pts2keep
-
-
-    #Filter those which are not inside the region.
-    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
-        pts2keep = []
-
-        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
-            for pt2d in pts:
-                if pt2d[2] == i:
-                    #Find the region of interest.
-                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
-                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
-                    #Reformat to make the path object.
-                    pot = []
-                    for b in range(0, ppt_x.__len__()):
-                        pot.append([ppt_x[b], ppt_y[b]])
-                    p = Path(pot)
-                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
-                        pts2keep.append(pt2d)
-
-        pts = pts2keep
-
-
-    par_obj.data_store['pts'][fileno][time_pt] = pts
-    
-def count_maxima_2d_v2(par_obj, time_pt, fileno, reset_max):
-    #count maxima won't work properly if have selected a random set of Z
-    imfile = par_obj.filehandlers[fileno]
-    par_obj.min_distance[2] = 0
-    det = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
-    xx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
-    for i in range(imfile.max_z+1):
-        predIm = par_obj.data_store['pred_arr'][fileno][time_pt][i]
-        [deti, xxi] = det_hess_2d(predIm, par_obj.min_distance)
-        det[:, :, i] = deti
-        xx[:, :, i] = xxi
-
-    # if not already set, create. This is then used for the entire image and all
-    #subsequent training. A little hacky, but otherwise the normalisation screws everything up
-    if not par_obj.max_det or reset_max==True:
-        par_obj.max_det = np.max(det)
-
-    detn = det/par_obj.max_det
-    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
-    for i in range(imfile.max_z+1):
-        #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = detn[:, :, i]
-
-    pts = peak_local_max(detn, min_distance=par_obj.min_distance, threshold_abs=par_obj.abs_thr)
-
-    pts2keep = []
-    for pt2d in pts:
-
-        T = xx[pt2d[0], pt2d[1], pt2d[2]]
-        #D=det[pt2d[0],pt2d[1],pt2d[2]]
-        # Removes points that are positive definite and therefore minima
-        if T > 0: # and D>0:
-            pass
-            #print 'point removed'
-        else:
-            pts2keep.append([pt2d[0], pt2d[1], pt2d[2], 1])
-
-    pts = pts2keep
-
-
-    #Filter those which are not inside the region.
-    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
-        pts2keep = []
-
-        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
-            for pt2d in pts:
-                if pt2d[2] == i:
-                    #Find the region of interest.
-                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
-                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
-                    #Reformat to make the path object.
-                    pot = []
-                    for b in range(0, ppt_x.__len__()):
-                        pot.append([ppt_x[b], ppt_y[b]])
-                    p = Path(pot)
-                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
-                        pts2keep.append(pt2d)
-
-        pts = pts2keep
-
-    thresh = 2
-    
-    clusters = hcluster.fclusterdata(pts, thresh, criterion='distance')
-    
-    pts2keep = []
-    
-    pts = np.array(pts,dtype='float')
-    pts[:,2] = pts[:,2] * par_obj.z_cal/1
-    
-    for clno in range(1,clusters.max()+1):
-        
-        cluster_pts = pts[np.where(clusters == clno)[0],:]
-        centroid = np.mean(cluster_pts,axis=0)
-        centroid[2] = centroid[2]/par_obj.z_cal*1
-        centroid = np.round(centroid).astype('int')
-        pts2keep.append([centroid[0],centroid[1],centroid[2],centroid[3]])
-        
-    pts=pts2keep
-    
-    par_obj.data_store['pts'][fileno][time_pt] = pts
-    
-def det_hess_2_5d(predIm, min_distance,):
-    gau_Im = filters.gaussian_filter(predIm, min_distance)-filters.gaussian_filter(predIm, [min_distance[0]*2,min_distance[0]*2,min_distance[2]])
-    deti=np.zeros_like(predIm)
-    xxi=np.zeros_like(predIm)
-    for i in range(predIm.shape[2]):
-        y, x = np.gradient(gau_Im[:,:,i], 1)
-        xy, xx = np.gradient(x)
-        yy, yx = np.gradient(y)
-
-        deti[:,:,i] = xx*yy-xy*yx
-        xxi[:,:,i] = xx
-#    z = np.gradient(deti,axis=2)
-    #zz = np.gradient(deti,axis=2)*gau_Im
-    return deti, xxi
-    
-def count_maxima_2_5d(par_obj, time_pt, fileno, reset_max):
-    #count maxima won't work properly if have selected a random set of Z
-    imfile = par_obj.filehandlers[fileno]
-    
-    predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
-    for i in range(imfile.max_z+1):
-        predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
-    
-    
-    [det, xx] = det_hess_2_5d(predMtx, par_obj.min_distance)
-    #[det2, xx] = det_hess_2_5d(predMtx, [par_obj.min_distance[0:2],par_obj.min_distance[2]/2])
-    #[det3, xx] = det_hess_2_5d(predMtx, [par_obj.min_distance[0:2],par_obj.min_distance[2]*2])
-    #det=det2+det+det3
-
-    # if not already set, create. This is then used for the entire image and all
-    #subsequent training. A little hacky, but otherwise the normalisation screws everything up
-    if not par_obj.max_det or reset_max==True:
-        par_obj.max_det = np.max(det)
-
-    detn = det/par_obj.max_det
-    par_obj.data_store['maxi_arr'][fileno][time_pt] = {}
-    for i in range(imfile.max_z+1):
-        #par_obj.data_store[time_pt]['maxi_arr'][i] = np.sqrt(detn[:,:,i]*par_obj.data_store[time_pt]['pred_arr'][i])
-        par_obj.data_store['maxi_arr'][fileno][time_pt][i] = detn[:, :, i]
-
-    pts = peak_local_max(detn, min_distance=par_obj.min_distance, threshold_abs=par_obj.abs_thr)
-
-    pts2keep = []
-    for pt2d in pts:
-
-        T = xx[pt2d[0], pt2d[1], pt2d[2]]
-        #D = z[pt2d[0],pt2d[1],pt2d[2]]
-        # Removes points that are positive definite and therefore minima
-        if T > 0:# and D>0:
-            pass
-            #print 'point removed'
-        else:
-            pts2keep.append([pt2d[0], pt2d[1], pt2d[2], 1])
-
-    pts = pts2keep
-
-
-    #Filter those which are not inside the region.
-    if par_obj.data_store['roi_stkint_x'][fileno][time_pt].__len__() > 0:
-        pts2keep = []
-
-        for i in par_obj.data_store['roi_stkint_x'][fileno][time_pt]:
-            for pt2d in pts:
-                if pt2d[2] == i:
-                    #Find the region of interest.
-                    ppt_x = par_obj.data_store['roi_stkint_x'][fileno][time_pt][i]
-                    ppt_y = par_obj.data_store['roi_stkint_y'][fileno][time_pt][i]
-                    #Reformat to make the path object.
-                    pot = []
-                    for b in range(0, ppt_x.__len__()):
-                        pot.append([ppt_x[b], ppt_y[b]])
-                    p = Path(pot)
-                    if p.contains_point([pt2d[1], pt2d[0]]) is True:
-                        pts2keep.append(pt2d)
-
-        pts = pts2keep
-
-
-    par_obj.data_store['pts'][fileno][time_pt] = pts
-    
-def rank_order(image):
-    """Return an image of the same shape where each pixel is the
-    index of the pixel value in the ascending order of the unique
-    values of `image`, aka the rank-order value.
-
-    Parameters
-    ----------
-    image: ndarray
-
-    Returns
-    -------
-    labels: ndarray of type np.uint32, of shape image.shape
-        New array where each pixel has the rank-order value of the
-        corresponding pixel in `image`. Pixel values are between 0 and
-        n - 1, where n is the number of distinct unique values in
-        `image`.
-
-    original_values: 1-D ndarray
-        Unique original values of `image`
-
-    Examples
-    --------
-    >>> a = np.array([[1, 4, 5], [4, 4, 1], [5, 1, 1]])
-    >>> a
-    array([[1, 4, 5],
-           [4, 4, 1],
-           [5, 1, 1]])
-    >>> rank_order(a)
-    (array([[0, 1, 2],
-           [1, 1, 0],
-           [2, 0, 0]], dtype=uint32), array([1, 4, 5]))
-    >>> b = np.array([-1., 2.5, 3.1, 2.5])
-    >>> rank_order(b)
-    (array([0, 1, 2, 1], dtype=uint32), array([-1. ,  2.5,  3.1]))
-    """
-    flat_image = image.ravel()
-    sort_order = flat_image.argsort().astype('uint32')
-    flat_image = flat_image[sort_order]
-    sort_rank = np.zeros_like(sort_order)
-    is_different = flat_image[:-1] != flat_image[1:]
-    np.cumsum(is_different, out=sort_rank[1:])
-    original_values = np.zeros((sort_rank[-1] + 1,), image.dtype)
-    original_values[0] = flat_image[0]
-    original_values[1:] = flat_image[1:][is_different]
-    int_image = np.zeros_like(sort_order)
-    int_image[sort_order] = sort_rank
-    return (int_image.reshape(image.shape), original_values)
-
-def _blob_overlap(blob1, blob2, min_distance):
-    """Finds the overlapping area fraction between two blobs.
-    Returns a float representing fraction of overlapped area.
-    """
-
-    d1 = abs(blob1[0] - blob2[0]) > min_distance[0]
-    d2 = abs(blob1[1] - blob2[1]) > min_distance[1]
-    d3 = abs(blob1[2] - blob2[2]) > min_distance[2]
-
-    if d1 is False or d2 is False or d3 is False:
-        #overlap detected
-
-        return True
-
-    return False
-
-def _prune_blobs(blobs_array, min_distance):
-    """Eliminated blobs with area overlap.
-
-    Parameters
-    ----------
-    blobs_array : ndarray
-        A 2d array with each row representing 3 values, ``(y,x,sigma)``
-        where ``(y,x)`` are coordinates of the blob and ``sigma`` is the
-        standard deviation of the Gaussian kernel which detected the blob.
-    overlap : float
-        A value between 0 and 1. If the fraction of area overlapping for 2
-        blobs is greater than `overlap` the smaller blob is eliminated.
-
-    Returns
-    -------
-    A : ndarray
-        `array` with overlapping blobs removed.
-    """
-
-    # iterating again might eliminate more blobs, but one iteration suffices
-    # for most cases
-    for blob1, blob2 in itt.combinations(blobs_array, 2):
-
-        if _blob_overlap(blob1, blob2, min_distance) is True:
-            blob2[2] = -1
-
-            #if blob1[2] > blob2[2]:
-            #    blob2[2] = -1
-            #else:
-            #    blob1[2] = -1
-
-    # return blobs_array[blobs_array[:, 2] > 0]
-    return np.array([b for b in blobs_array if b[2] > 0])
-
-
+from features import local_features as lf
+from fileio.file_handler import File_handler
+from functions.maxima import count_maxima
 
 
 
@@ -910,14 +153,14 @@ def update_training_samples_fn_new_only(par_obj, int_obj, rects, arr='feat_arr')
             par_obj.f_matrix.extend(mimg_lin)
             #And the the output matrix, output patches
             par_obj.o_patches.extend(dense_lin)
-            
+
     if par_obj.p_size == 2:
-        
+
         im_region = par_obj.data_store[arr][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4], rects[1]+1:rects[1]+rects[3], :]
-        par_obj.f_matrix.append(im_region)        
+        par_obj.f_matrix.append(im_region)
         p_region = par_obj.data_store['dense_arr'][imno][tpt][zslice][rects[2]+1:rects[2]+rects[4], rects[1]+1:rects[1]+rects[3]]
         par_obj.o_patches.append(p_region)
-        
+
 def update_training_samples_fn_auto(par_obj, int_obj, rects):
     """Collects the pixels or patches which will be used for training and
     trains the forest."""
@@ -993,6 +236,8 @@ def train_forest(par_obj, int_obj, model_num):
     X = np.array(par_obj.f_matrix)
     Y = np.array(par_obj.o_patches)
     par_obj.RF[model_num].fit(X, Y)
+    
+    
     """
     importances = par_obj.RF[model_num].method.feature_importances_
     indices = np.argsort(importances)[::-1]
@@ -1013,7 +258,7 @@ def refresh_all_density(par_obj):
         zslice = int(par_obj.saved_ROI[it][0])
         fileno = int(par_obj.saved_ROI[it][6])
         update_com_fn(par_obj, tpt, zslice, fileno)
-    
+
 def update_com_fn(par_obj, tpt, zslice, fileno):
 
     #Construct empty array for current image.
@@ -1038,7 +283,7 @@ def update_com_fn(par_obj, tpt, zslice, fileno):
     #print 'Using template matching to generate C-O-M representation'
     dense_im = np.zeros(dots_im.shape).astype(np.float64)
 
-    size_of_kernel = np.ceil(par_obj.sigma_data * 6) #At least the 3-sigma rule.
+    size_of_kernel = np.round(np.ceil(par_obj.sigma_data * 5)).astype('int') #At least the 3-sigma rule.
     if size_of_kernel % 2 == 0:
         size_of_kernel = int(size_of_kernel + 1)
 
@@ -1046,7 +291,7 @@ def update_com_fn(par_obj, tpt, zslice, fileno):
     m_p = int((size_of_kernel-1)/2)
     patch[m_p, m_p] = 1
 
-    kernel = filters.gaussian_filter(patch.astype(np.float32), float(par_obj.sigma_data), order=0, output=None, mode='reflect', cval=0.0)
+    kernel = filters.gaussian_filter(patch.astype(np.float32), float(par_obj.sigma_data), order=0, output=None, mode='constant', cval=0.0)
 
     #Replace member of dense_array with new image.
     r_arr, c_arr = np.where(dots_im > 0)
@@ -1088,7 +333,7 @@ for thresholding and the like'''
 
 def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threaded=False):
     """Accesses TIFF file slice (from open tiffarray. Calculates features to slices specified"""
-    # consider cropping   
+    # consider cropping
     if par_obj.to_crop is False:
         par_obj.crop_x1 = 0
         par_obj.crop_x2 = par_obj.width
@@ -1191,7 +436,7 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
                             if tpt<(par_obj.max_t-5):
                                 featwithzt[:,:,6:8] = par_obj.filehandlers[imno].get_tiff_slice([tpt+5], [zslice], width, height, par_obj.ch_active)+par_obj.filehandlers[imno].get_tiff_slice([tpt+4], [zslice], width, height, par_obj.ch_active)-2*par_obj.filehandlers[imno].get_tiff_slice([tpt], [zslice], width, height, par_obj.ch_active)
                             feat=featwithzt
-                        
+
                         par_obj.num_of_feat[0] = feat.shape[2]
                         #print 'for test'
                         par_obj.data_store['feat_arr'][imno][tpt][zslice] = feat
@@ -1219,16 +464,16 @@ def return_rgb_slice(par_obj, zslice, tpt, imno):
 
                 input_im = imfile.get_tiff_slice([tpt], [zslice], width, height, [ch])
                 imRGB[:, :, ch] = (input_im.astype('float32')/par_obj.filehandlers[imno].tiffarraymax)*clim[ch][1]-clim[ch][0]
-    
+
     elif par_obj.numCH == 1 and len(par_obj.ch_display) == 1:
         input_im = imfile.get_tiff_slice([tpt], [zslice], width, height)
-        
+
         im = ((input_im.astype('float32')/par_obj.filehandlers[imno].tiffarraymax)*clim[0][1]-clim[0][0])
         imRGB[:, :, 0] = im
         imRGB[:, :, 1] = im
         imRGB[:, :, 2] = im
-        
-        
+
+
     imRGB = np.clip(imRGB, 0, 1)
     return imRGB
 
@@ -1318,12 +563,12 @@ def evaluate_forest_auto(par_obj, int_obj, withGT, model_num, zsliceList, tptLis
                 sum_pred = np.sum(linPred/255)
                 par_obj.data_store['sum_pred'][imno][tpt][zslice] = sum_pred
 
-                print ('prediction time taken', t1 - t2)
-                print ('Predicted i:', par_obj.data_store['sum_pred'][imno][tpt][zslice])
+                #print ('prediction time taken', t1 - t2)
+                #print ('Predicted i:', par_obj.data_store['sum_pred'][imno][tpt][zslice])
                 int_obj.report_progress('Making Prediction for Image: '\
                 +str(imno+1)+' Frame: ' +str(zslice+1)+' Timepoint: '+str(tpt+1))
 
-def goto_img_fn_new(par_obj, int_obj):
+def goto_img_fn_new(par_obj, int_obj,keep_roi=False):
     """Loads up current image and displays it"""
 
     tpt = par_obj.curr_t
@@ -1343,7 +588,8 @@ def goto_img_fn_new(par_obj, int_obj):
     int_obj.plt1.images[0].set_data(newImg)
 
     #remove rois
-    int_obj.plt1.lines = []
+    if not keep_roi:
+        int_obj.plt1.lines = []
 
     #update image text
     int_obj.image_num_txt.setText('Current File is : ' + str(par_obj.curr_file+1)\
@@ -1353,7 +599,7 @@ def goto_img_fn_new(par_obj, int_obj):
 
     """Deals with displaying Kernel/Prediction/Counts"""
     #im2draw = None
-    
+
     if par_obj.show_pts == 0:
         if zslice in par_obj.data_store['dense_arr'][imno][tpt]:
 
@@ -1396,15 +642,17 @@ def goto_img_fn_new(par_obj, int_obj):
         for pt2d in pts:
             #if pt2d[3] == 0:
             #    break
-
-            if pt2d[2] == ind or par_obj.z_project:
-                pt_x.append(pt2d[1])
-                pt_y.append(pt2d[0])
+            for i1 in ind:
+                z_range=range(int(i1)-int(par_obj.min_distance[2]),int(i1)+int(par_obj.min_distance[2])+1)
+            
+                if pt2d[2] in z_range or par_obj.z_project:
+                    pt_x.append(pt2d[1])
+                    pt_y.append(pt2d[0])
 
         int_obj.plt2.lines = []
-        int_obj.plt2.axes.plot(pt_x, pt_y, 'wo')
+        int_obj.plt2.axes.plot(pt_x, pt_y, 'wo',markersize=max(2,2*par_obj.min_distance[0]))
         int_obj.plt2.autoscale_view(tight=True)
-        int_obj.plt1.axes.plot(pt_x, pt_y, 'wo')
+        int_obj.plt1.axes.plot(pt_x, pt_y, 'wo',markersize=max(2,2*par_obj.min_distance[0]))
         int_obj.plt1.autoscale_view(tight=True)
 
         if zslice in par_obj.data_store['maxi_arr'][imno][tpt]:
@@ -1420,16 +668,17 @@ def goto_img_fn_new(par_obj, int_obj):
     int_obj.cursor.draw_ROI()
     buffereddraw(int_obj)
     print (time.time() -t0)
+
 def buffereddraw(int_obj):
-    
+
     if int_obj.threadpool.activeThreadCount()>1:
         return
-    else: 
-        from common_navigation import Worker
+    else:
+
         worker = Worker(int_obj.canvas1.draw)
         worker.run()
         return
-    
+
 
 def load_and_initiate_plots(par_obj, int_obj):
     """prepare plots and data for display"""
@@ -1568,14 +817,14 @@ def import_data_fn(par_obj, file_array, file_array_offset=0):
     par_obj.max_t = par_obj.filehandlers[par_obj.curr_file].max_t
 
     #Prepare RGB example image
-    par_obj.height = int(par_obj.ori_height/par_obj.resize_factor)
-    par_obj.width = int(par_obj.ori_width/par_obj.resize_factor)
+    par_obj.height = len(range(0, par_obj.ori_height, int(par_obj.resize_factor)))
+    par_obj.width = len(range(0, par_obj.ori_width, int(par_obj.resize_factor)))
     par_obj.ch_display = list(range(0, min(par_obj.numCH, 3)))
     par_obj.ex_img = return_rgb_slice(par_obj, 0, 0, 0)
-
+    
     statusText = str(file_array.__len__())+' Files Loaded.'
     return True, statusText
-    
+
 def filter_prediction_fn(par_obj, int_obj):
     for fileno, imfile in par_obj.filehandlers.items():
         #funky ordering TZCYX
@@ -1588,7 +837,7 @@ def filter_prediction_fn(par_obj, int_obj):
             for zslice in range(imfile.max_z+1):
                 par_obj.data_store['pred_arr'][fileno][tpt][zslice] = np.squeeze(image[tpt, zslice, 0, :, :])
         int_obj.report_progress('Prediction filtered')
-        
+
 def save_output_prediction_fn(par_obj, int_obj,subtract_background=False):
     """Saves prediction to tiff file using tiffiles imsave"""
     for fileno, imfile in par_obj.filehandlers.items():
@@ -1599,13 +848,13 @@ def save_output_prediction_fn(par_obj, int_obj,subtract_background=False):
                 image[tpt, zslice, 0, :, :] = par_obj.data_store['pred_arr'][fileno][tpt][zslice].astype(np.float32)
         if subtract_background:
             image = image - filters.uniform_filter1d(image,10,axis=0)
-            imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
+            imsave(imfile.path+'/'+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
         else:
-            imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
+            imsave(imfile.path+'/'+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
 
         print ('Prediction written to disk')
-        int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
-        
+        int_obj.report_progress('Prediction written to disk '+ imfile.path)
+
 def save_kernels_fn(par_obj, int_obj):
     """Saves prediction to tiff file using tiffiles imsave"""
     for fileno, imfile in par_obj.filehandlers.items():
@@ -1616,11 +865,11 @@ def save_kernels_fn(par_obj, int_obj):
             for zslice in range(imfile.max_z+1):
                 if zslice in par_obj.data_store['dense_arr'][fileno][tpt]:
                     image[tpt, zslice, 0, :, :] = par_obj.data_store['dense_arr'][fileno][tpt][zslice].astype(np.float32)
-        imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Kernels.tif', image, imagej=True)
+        imsave(imfile.path+'/'+imfile.name+'_'+par_obj.modelName+'_Kernels.tif', image, imagej=True)
 
         print ('Prediction written to disk')
-        int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
-        
+        int_obj.report_progress('Prediction written to disk '+ imfile.path)
+
 def save_output_hess_fn(par_obj, int_obj):
     """Saves hessian map to tiff file using tiffiles imsave"""
     for fileno, imfile in par_obj.filehandlers.items():
@@ -1631,8 +880,8 @@ def save_output_hess_fn(par_obj, int_obj):
                 image[tpt, zslice, 0, :, :] = par_obj.data_store['maxi_arr'][fileno][tpt][zslice].astype('float32')
 
         print ('Saving Hessian image to disk')
-        imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Hess.tif', image, imagej=True)
-        int_obj.report_progress('Hessian written to disk '+ par_obj.csvPath)
+        imsave(imfile.path+'/'+imfile.name+'_'+par_obj.modelName+'_Hess.tif', image, imagej=True)
+        int_obj.report_progress('Hessian written to disk '+ imfile.path)
 
 def save_output_mask_fn(par_obj,int_obj):
     #funky ordering TZCYX
@@ -1647,16 +896,16 @@ def save_output_mask_fn(par_obj,int_obj):
                     image[tpt,z,0,x,y]=255
         image = filters.maximum_filter(image,size=(0,3,0,3,3))
         imsave(filename+'_'+par_obj.modelName+'_Points.tif',image, imagej=True)
-        int_obj.report_progress('Point mask written to disk '+ par_obj.csvPath)
+        int_obj.report_progress('Point mask written to disk '+ imfile.path)
 
 def save_output_ROI(par_obj, int_obj):
     #funky ordering TZCYX
     for fileno, imfile in par_obj.filehandlers.items():
         filename = imfile.base_name
-        with open(par_obj.csvPath+filename+'_outputROI.pickle', 'wb') as afile:
+        with open(imfile.path+filename+'_outputROI.pickle', 'wb') as afile:
             pickle.dump([par_obj.data_store['roi_stkint_x'][fileno], par_obj.data_store['roi_stkint_y'][fileno]], afile)
 
-    with open(par_obj.csvPath+par_obj.modelName+'_outputROI.csv', 'wb') as csvfile:
+    with open(par_obj.filehandlers[0].path+par_obj.modelName+'_outputROI.csv', 'wb') as csvfile:
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Z: ')]+[str('Regions(x): ')]+[str('Regions(y): ')])
 
@@ -1667,24 +916,24 @@ def save_output_ROI(par_obj, int_obj):
                 ppt_y = par_obj.data_store['roi_stkint_y'][fileno][tpt]
                 for i in ppt_x.keys():
                     spamwriter.writerow([str(filename)]+[tpt+1]+[i]+[ppt_x[i]]+[ppt_y[i]])
-    int_obj.report_progress('Data exported to '+ par_obj.csvPath)
+    int_obj.report_progress('Data exported to '+ imfile.path)
 
 def save_output_data_fn(par_obj, int_obj):
     local_time = time.asctime(time.localtime(time.time()))
 
-    with open(par_obj.csvPath+'_'+par_obj.modelName+'outputData.csv', 'a') as csvfile:
+    with open(par_obj.filehandlers[0].path+'/_'+par_obj.modelName+'outputData.csv', 'a') as csvfile:
         spamwriter = csv.writer(csvfile, dialect='excel')
         spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('Predicted count: ')])
 
-        for fileno in range(par_obj.max_file):
+        for fileno, imfile in par_obj.filehandlers.items():
 
             for tpt in par_obj.tpt_list:
                 filename = str(par_obj.file_array[fileno])
                 spamwriter.writerow([local_time]+[str(filename)]+[tpt+1]+[par_obj.data_store['pts'][fileno][tpt].__len__()])
 
 
-    for fileno in range(par_obj.max_file):
-        with open(par_obj.csvPath+par_obj.filehandlers[fileno].name+'_'+par_obj.modelName+'_outputPoints.csv', 'a') as csvfile:
+    for fileno, imfile in par_obj.filehandlers.items():
+        with open(imfile.path+'/'+imfile.name+'_'+par_obj.modelName+'_outputPoints.csv', 'a') as csvfile:
             spamwriter = csv.writer(csvfile)
             spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('X: ')]+[str('Y: ')]+[str('Z: ')])
 
@@ -1692,18 +941,18 @@ def save_output_data_fn(par_obj, int_obj):
                 pts = par_obj.data_store['pts'][fileno][tpt]
                 for i in range(0, par_obj.data_store['pts'][fileno][tpt].__len__()):
                     spamwriter.writerow([local_time]+[str(filename)]+[tpt+1]+[pts[i][0]]+[pts[i][1]]+[pts[i][2]])
-    int_obj.report_progress('Data exported to '+ par_obj.csvPath)
+        int_obj.report_progress('File '+str(fileno)+' Data exported to '+ imfile.path)
 
 def save_user_ROI(par_obj, int_obj):
     #funky ordering TZCYX
     for fileno, imfile in par_obj.filehandlers.items():
         filename = imfile.base_name
-        with open(par_obj.csvPath+filename+'_outputROI.pickle', 'wb') as afile:
+        with open(imfile.path+'/'+filename+'_outputROI.pickle', 'wb') as afile:
             data = [par_obj.data_store['roi_stkint_x'][fileno], par_obj.data_store['roi_stkint_y'][fileno],\
                     par_obj.data_store['roi_stk_x'][fileno], par_obj.data_store['roi_stk_y'][fileno]]
             pickle.dump(data, afile, par_obj.resize_factor)
 
-    with open(par_obj.csvPath+par_obj.modelName+'_outputROI.csv', 'wb') as csvfile:
+    with open(imfile.path+'/'+par_obj.modelName+'_outputROI.csv', 'wb') as csvfile:
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Z: ')]+[str('Regions(x): ')]+[str('Regions(y): ')])
 
@@ -1714,11 +963,11 @@ def save_user_ROI(par_obj, int_obj):
                 ppt_y = par_obj.data_store['roi_stk_y'][fileno][tpt]
                 for i in ppt_x.keys():
                     spamwriter.writerow([str(filename)]+[tpt+1]+[i]+[ppt_x[i]]+[ppt_y[i]])
-    int_obj.report_progress('Data exported to '+ par_obj.csvPath)
+    int_obj.report_progress('Data exported to '+ imfile.path)
 
 def save_ROI_area(par_obj, int_obj):
 
-    with open(par_obj.csvPath+par_obj.modelName+'_outputROI_area.csv', 'wb') as csvfile:
+    with open(par_obj.filehandlers[0].path+'/'+par_obj.modelName+'_outputROI_area.csv', 'wb') as csvfile:
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Area')])
 
@@ -1731,7 +980,7 @@ def save_ROI_area(par_obj, int_obj):
                     area += ROI_area(par_obj, fileno, tpt, i)
                 spamwriter.writerow([str(filename)]+[tpt+1]+[area])
 
-    int_obj.report_progress('Data exported to '+ par_obj.csvPath)
+    int_obj.report_progress('Data exported to '+ par_obj.filehandlers[0].path)
 
 def PolyArea(x, y):
     return 0.5*np.abs(np.dot(x, np.roll(y, 1))-np.dot(y, np.roll(x, 1)))
@@ -1792,8 +1041,8 @@ def setup_parameters(self, par_obj):
     """Loads parameters and initiates data structure"""
     #Resets everything should this be another patch of images loaded.
 
-    par_obj.height = int (par_obj.ori_height/par_obj.resize_factor)
-    par_obj.width = int (par_obj.ori_width/par_obj.resize_factor)
+    par_obj.height = len(range(0, par_obj.ori_height, int(par_obj.resize_factor)))
+    par_obj.width = len(range(0, par_obj.ori_width, int(par_obj.resize_factor)))
 
     par_obj.curr_t = par_obj.tpt_list[0]
     par_obj.curr_z = par_obj.user_min_z
@@ -1805,3 +1054,35 @@ def setup_parameters(self, par_obj):
     par_obj.left_2_calc = []
     par_obj.saved_ROI = []
     par_obj.saved_dots = []
+
+#if __name__ == '__main__':
+    #multiprocessing.freeze_support()
+    #multiprocessing.spawn.freeze_support()
+class Worker(QtCore.QRunnable):
+    '''
+    Worker thread
+
+    Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
+
+    :param callback: The function callback to run on this worker thread. Supplied args and
+                     kwargs will be passed through to the runner.
+    :type callback: function
+    :param args: Arguments to pass to the callback function
+    :param kwargs: Keywords to pass to the callback function
+
+    '''
+
+    def __init__(self, fn, *args, **kwargs):
+        super(Worker, self).__init__()
+        # Store constructor arguments (re-used for processing)
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
+    @QtCore.pyqtSlot()
+    def run(self):
+        '''
+        Initialise the runner function with passed args, kwargs.
+        '''
+        self.fn(*self.args, **self.kwargs)
+
