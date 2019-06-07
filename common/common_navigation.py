@@ -146,7 +146,7 @@ class btn_fn:
                     break;
 
 def on_about(self):
-    self.about_win = QtWidgets.QWidget()
+    self.about_win = QtWidgets.QtWidget()
     self.about_win.setWindowTitle('About QBrain Software v2.0')
 
     license = return_license()
@@ -328,31 +328,3 @@ def create_channel_objects(self,par_obj,num,feature_select=False,parent=None):
 
     return parent
 
-
-class Worker(QtCore.QRunnable):
-    '''
-    Worker thread
-
-    Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
-
-    :param callback: The function callback to run on this worker thread. Supplied args and 
-                     kwargs will be passed through to the runner.
-    :type callback: function
-    :param args: Arguments to pass to the callback function
-    :param kwargs: Keywords to pass to the callback function
-
-    '''
-
-    def __init__(self, fn, *args, **kwargs):
-        super(Worker, self).__init__()
-        # Store constructor arguments (re-used for processing)
-        self.fn = fn
-        self.args = args
-        self.kwargs = kwargs
-
-    @QtCore.pyqtSlot()
-    def run(self):
-        '''
-        Initialise the runner function with passed args, kwargs.
-        '''
-        self.fn(*self.args, **self.kwargs)
