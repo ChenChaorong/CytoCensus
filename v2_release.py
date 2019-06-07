@@ -995,20 +995,19 @@ class Win_fn(QtWidgets.QWidget):
             # define channel brightness controls
             self.ChannelGroup = []
 
-        for chbx, contrast, brightness in self.ChannelGroup:
-            chbx.hide()
-            contrast.hide()
-            brightness.hide()
-            chbx.deleteLater()
-            contrast.deleteLater()
-            brightness.deleteLater()
+        for itemset in self.ChannelGroup:
+            for item in itemset:
+                item.hide()
+                item.deleteLater()
 
         ChannelGroup = create_channel_objects(self, par_obj, par_obj.numCH)
-        for chbx, contrast, brightness in ChannelGroup:
+        for chbx, clabel, contrast, blabel, brightness in ChannelGroup:
             channel_lay.addWidget(chbx)
+            channel_lay.addWidget(clabel)
             channel_lay.addWidget(contrast)
+            channel_lay.addWidget(blabel)
             channel_lay.addWidget(brightness)
-            contrast.show()
+            #contrast.show()
             chbx.show()
             chbx.setChecked(True)
         self.ChannelGroup = ChannelGroup
