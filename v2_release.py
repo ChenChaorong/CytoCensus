@@ -1583,7 +1583,17 @@ class Win_fn(QtWidgets.QWidget):
             self.count_txt_3.setText(str(par_obj.min_distance[2]))
 
             self.update_density_fn()
+            if par_obj.sigma_data>10:
+                self.image_status_text.showMessage("Feature Calculation with large sigma (>10 pix) is inefficient, consider resizing your images before import")
+                self.image_status_text.setStyleSheet("QStatusBar{color: red; font-weight: bold}")
+                #time.sleep(.01)
 
+                self.timer = QtCore.QTimer()
+                self.timer.isSingleShot = True
+                self.timer.timeout.connect(lambda: self.image_status_text.setStyleSheet("QStatusBar{color: black, font-weight: normal}"))
+                self.timer.start(2000)
+
+                #self.image_status_text.setStyleSheet("QStatusBar{color: black, font: normal}")
     def kernel_btn_fn(self, setting=False):
         """Shows the kernels on the image."""
         if setting == 'Kernel':
