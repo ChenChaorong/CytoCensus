@@ -26,20 +26,24 @@ import os.path
 import re
 import pickle
 import sys
-
+from multiprocessing import freeze_support
+freeze_support()
 from PyQt5 import QtGui, QtCore, QtWidgets  # ,QtWebKit
 import numpy as np
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-import v2_functions as v2
+
 #import numdifftools as ndt
 from common.common_navigation import navigation_setup, create_channel_objects, btn_fn, on_about
 from parameters.parameter_object import ParameterClass
 from ROI.user_ROI import ROI
-
-
-
+#from functions import v2_functions
+from features import local_features
+from fileio import file_handler
+from common import common_navigation
+from functions.maxima import count_maxima
+from functions import v2_functions as v2
 
 class fileDialog(QtWidgets.QMainWindow):
     """The dialog for loading images"""
@@ -57,7 +61,7 @@ class fileDialog(QtWidgets.QMainWindow):
         except Exception: #catch all because pickle can throw loads of Exceptions
             self.parent.filepath = os.path.expanduser('~')+'/'
             try:
-                
+
                 os.makedirs(os.path.expanduser('~')+'/.densitycount/')
             except OSError as exc:
                 if exc.errno != errno.EACCES:
@@ -339,7 +343,7 @@ class Load_win_fn(QtWidgets.QWidget):
         Confirm_im_lo.addWidget(self.selIntButton)
         Confirm_im_lo.addStretch()
         self.image_status_text = QtWidgets.QStatusBar()
-        self.image_status_text.setStyleSheet("QLabel {  color : green }")
+        self.image_status_text.setStyleSheet("QLabel { color : green }")
         self.image_status_text.showMessage(
             'Status: Highlight training images in folder. ')
 
@@ -409,9 +413,9 @@ class Load_win_fn(QtWidgets.QWidget):
         self.plt1.cla()
 
         if par_obj.ex_img.max() != 0:
-            self.plt1.imshow(par_obj.ex_img/par_obj.ex_img.max())
+            self.plt1.imshow(par_obj.ex_img[:,:,:3]/par_obj.ex_img.max())
         else:
-            self.plt1.imshow(par_obj.ex_img)
+            self.plt1.imshow(par_obj.ex_img[:,:,:3])
 
         self.plt1.set_xticklabels([])
         self.plt1.set_yticklabels([])
@@ -476,16 +480,17 @@ class Load_win_fn(QtWidgets.QWidget):
         else:
             par_obj.tpt_list = [0]
 
-        if par_obj.max_z > 0:
+        if par_obj.max_z > 0: #if current file has multiple z
+            #this fails if first file has single z
             fmStr = self.linEdit_Frm.text()
             if fmStr != '':  # catch empty limit
                 par_obj.user_max_z = max(self.hyphen_range(fmStr))
                 par_obj.user_min_z = min(self.hyphen_range(fmStr))
-            else:
-                par_obj.user_max_z = []
+            else: #excessively large default max_z for training
+                par_obj.user_max_z = 1000
                 par_obj.user_min_z = 0
         else:
-            par_obj.user_max_z = []
+            par_obj.user_max_z = 0
             par_obj.user_min_z = 0
 
         self.image_status_text.showMessage(
@@ -563,8 +568,8 @@ class Win_fn(QtWidgets.QWidget):
         top_panel = QtWidgets.QHBoxLayout()
 
         # Top left and right widget panels
-        top_left_panel = QtWidgets.QGroupBox('Basic Controls')
-        top_right_panel = QtWidgets.QGroupBox('Advanced Controls')
+        top_left_panel = QtWidgets.QGroupBox('Navigation and Annotation')
+        top_right_panel = QtWidgets.QGroupBox('Detection and Model')
 
         # Grid layouts for the top and left panels.
         self.top_left_grid = QtWidgets.QGridLayout()
@@ -589,7 +594,7 @@ class Win_fn(QtWidgets.QWidget):
         self.save_ROI_btn = QtWidgets.QPushButton('1. Save ROI')
 
         self.save_ROI_btn.setToolTip(
-            'Right-click and drag to make ROI. Then Save ROI (Space)')
+            'Right-click or Ctrl-click and drag to make ROI. Then Save ROI (Space)')
         self.save_ROI_btn.setEnabled(True)
 
         # Sets up the button which saves the ROI.
@@ -605,7 +610,13 @@ class Win_fn(QtWidgets.QWidget):
         self.train_model_btn.setEnabled(False)
 
         # Selects and reactivates an existing ROI.
-        self.sel_ROI_btn = QtWidgets.QPushButton('Select ROI')
+        self.delete_ROI_btn = QtWidgets.QPushButton('Delete ROI')
+        self.delete_ROI_btn.setToolTip(
+            'Delete selected ROI')
+        self.delete_ROI_btn.setEnabled(False)
+
+        # Selects and reactivates an existing ROI.
+        self.sel_ROI_btn = QtWidgets.QPushButton('Edit ROI')
         self.sel_ROI_btn.setToolTip(
             'Click on ROI to select- Select ROI highlighted in yellow')
         self.sel_ROI_btn.setEnabled(True)
@@ -643,15 +654,16 @@ class Win_fn(QtWidgets.QWidget):
         self.top_left_grid.addWidget(self.save_dots_btn, 4, 1)
         self.top_left_grid.addWidget(self.train_model_btn, 4, 2)
         self.top_left_grid.addWidget(self.sel_ROI_btn, 5, 0)
-        self.top_left_grid.addWidget(self.remove_dots_btn, 5, 1)
-        self.top_left_grid.addWidget(self.load_gt_btn, 6, 0, 1, 1)
-        self.top_left_grid.addWidget(self.save_gt_btn, 6, 1, 1, 1)
 
+        self.top_left_grid.addWidget(self.remove_dots_btn, 5, 1)
+        self.top_left_grid.addWidget(self.load_gt_btn, 6, 2, 1, 1)
+        self.top_left_grid.addWidget(self.save_gt_btn, 6, 1, 1, 1)
+        self.top_left_grid.addWidget(self.delete_ROI_btn, 6, 0, 1, 1 )
         # SigmaData input Label.
         self.sigma_data_text = QtWidgets.QLabel(self)
         self.sigma_data_text.setText('Object size (pixels):')
         self.sigma_data_text.setToolTip(
-            'Set this smaller than the object size. Map on right hand side should show similar size objects to those in your image')
+            'Set this smaller than the object size.\n Map on right hand side should show similar size objects to those in your image.\n If your object size is >10 you should resize your images')
         self.top_right_grid.addWidget(self.sigma_data_text, 0, 0)
 
         # SigmaData input field.
@@ -726,6 +738,7 @@ class Win_fn(QtWidgets.QWidget):
         self.overlay_prediction_btn.setEnabled(True)
         self.top_right_grid.addWidget(self.overlay_prediction_btn, 0, 2)
 
+
         # common navigation buttons
 
         self.count_replot_btn = QtWidgets.QPushButton('Replot')
@@ -747,6 +760,12 @@ class Win_fn(QtWidgets.QWidget):
         self.z_cal_txt = QtWidgets.QLabel(str(par_obj.z_cal))
         self.z_cal_txt.setFixedWidth(50)
 
+        self.strictness_btn = QtWidgets.QCheckBox()
+        self.strictness_btn.setChecked(True)
+        strictness_btn_lbl = QtWidgets.QLabel('Strict')
+        self.strictness_btn.setToolTip('Set whether to enforce size strictness')
+
+
         self.min_distance_panel = QtWidgets.QHBoxLayout()
         self.min_distance_panel.addStretch()
         self.min_distance_panel.addWidget(QtWidgets.QLabel("x:"))
@@ -759,6 +778,9 @@ class Win_fn(QtWidgets.QWidget):
         self.min_distance_panel.addWidget(self.abs_thr_txt)
         self.min_distance_panel.addWidget(z_cal_lbl)
         self.min_distance_panel.addWidget(self.z_cal_txt)
+
+        self.min_distance_panel.addWidget(strictness_btn_lbl)
+        self.min_distance_panel.addWidget(self.strictness_btn)
 
         self.top_right_grid.addLayout(self.min_distance_panel, 4, 1, 1, 2)
         # self.top_right_grid.addWidget(self.count_maxima_plot_on,4,2)
@@ -804,6 +826,8 @@ class Win_fn(QtWidgets.QWidget):
         self.save_dots_btn.clicked.connect(self.save_dots_fn)
 
         self.sel_ROI_btn.clicked.connect(self.sel_ROI_btn_fn)
+        self.delete_ROI_btn.clicked.connect(self.delete_roi_fn)
+
         self.remove_dots_btn.clicked.connect(self.remove_dots_btn_fn)
         self.train_model_btn.clicked.connect(self.train_model_btn_fn)
         self.count_maxima_btn.clicked.connect(self.count_maxima_btn_fn)
@@ -811,6 +835,7 @@ class Win_fn(QtWidgets.QWidget):
         self.save_gt_btn.clicked.connect(self.save_gt_fn)
         self.overlay_prediction_btn.clicked.connect(
             self.overlay_prediction_btn_fn)
+        self.strictness_btn.clicked.connect(self.strictness_btn_fn)
         # self.feat_scale_change_btn.clicked.connect(self.feat_scale_change_btn_fn)
         self.kernel_show_btn.clicked.connect(self.kernel_btn_fn)
         self.clear_dots_btn.clicked.connect(self.clear_dots_fn)
@@ -820,7 +845,7 @@ class Win_fn(QtWidgets.QWidget):
         # Initialises the variables for the beginning of the counting.
         par_obj.first_time = True
         par_obj.dots = []
-        par_obj.rects = np.zeros((1, 5))
+        par_obj.rects = None
         par_obj.var = []
         par_obj.saved_dots = []
         par_obj.saved_ROI = []
@@ -938,6 +963,9 @@ class Win_fn(QtWidgets.QWidget):
         par_obj.overlay = not par_obj.overlay
         self.goto_img_fn(par_obj.curr_z, par_obj.curr_t)
 
+    def strictness_btn_fn(self):
+        par_obj.count_maxima_laplace = not par_obj.count_maxima_laplace
+
     def count_maxima_btn_fn(self):
         t0 = time.time()
         par_obj.max_det = []
@@ -945,7 +973,7 @@ class Win_fn(QtWidgets.QWidget):
             self.count_txt_2.text()), float(self.count_txt_3.text())]
         par_obj.abs_thr = float(self.abs_thr_txt.text())/100
         #par_obj.z_cal =float(self.z_cal_txt.text())
-        v2.count_maxima(par_obj, par_obj.curr_t,
+        count_maxima(par_obj, par_obj.curr_t,
                         par_obj.curr_file, reset_max=True)
         par_obj.show_pts = 1
         self.kernel_btn_fn()
@@ -967,20 +995,19 @@ class Win_fn(QtWidgets.QWidget):
             # define channel brightness controls
             self.ChannelGroup = []
 
-        for chbx, contrast, brightness in self.ChannelGroup:
-            chbx.hide()
-            contrast.hide()
-            brightness.hide()
-            chbx.deleteLater()
-            contrast.deleteLater()
-            brightness.deleteLater()
+        for itemset in self.ChannelGroup:
+            for item in itemset:
+                item.hide()
+                item.deleteLater()
 
         ChannelGroup = create_channel_objects(self, par_obj, par_obj.numCH)
-        for chbx, contrast, brightness in ChannelGroup:
+        for chbx, clabel, contrast, blabel, brightness in ChannelGroup:
             channel_lay.addWidget(chbx)
+            channel_lay.addWidget(clabel)
             channel_lay.addWidget(contrast)
+            channel_lay.addWidget(blabel)
             channel_lay.addWidget(brightness)
-            contrast.show()
+            #contrast.show()
             chbx.show()
             chbx.setChecked(True)
         self.ChannelGroup = ChannelGroup
@@ -1128,6 +1155,9 @@ class Win_fn(QtWidgets.QWidget):
 
         # If we are in the dot drawing phase
         elif(par_obj.draw_dots == True and event.button == 1):
+            #catch not initialised
+            if event.xdata == None or event.ydata == None:
+                return
             x = int(np.round(event.xdata, 0))
             y = int(np.round(event.ydata, 0))
 
@@ -1145,9 +1175,9 @@ class Win_fn(QtWidgets.QWidget):
                     i = par_obj.dots[-1]
                     self.plt1.autoscale(False)
                     self.plt1.plot([i[1]-5, i[1]+5],
-                                   [i[2], i[2]], '-', color='r')
+                                   [i[2], i[2]], '-', color='m')
                     self.plt1.plot(
-                        [i[1], i[1]], [i[2]-5, i[2]+5], '-', color='r')
+                        [i[1], i[1]], [i[2]-5, i[2]+5], '-', color='m')
                     self.canvas1.draw()
         elif(par_obj.remove_dots == True and event.button == 1):
             #par_obj.pixMap = QtWidgets.QPixmap(q2r.rgb2qimage(par_obj.imgs[par_obj.curr_z]))
@@ -1268,6 +1298,7 @@ class Win_fn(QtWidgets.QWidget):
             win.save_dots_btn.setEnabled(True)
             win.remove_dots_btn.setEnabled(True)
             win.sel_ROI_btn.setEnabled(False)
+            win.delete_ROI_btn.setEnabled(True)
             par_obj.remove_dots = False
 
     def deleteDotsFn(self, sel_ROI_btn_fn):
@@ -1301,7 +1332,7 @@ class Win_fn(QtWidgets.QWidget):
         par_obj.remove_dots = False
         par_obj.dots_past = par_obj.dots
         par_obj.dots = []
-        par_obj.rects = np.zeros((1, 5))
+        par_obj.rects = None
         par_obj.ori_x = 0
         par_obj.ori_y = 0
         par_obj.rect_w = 0
@@ -1309,6 +1340,41 @@ class Win_fn(QtWidgets.QWidget):
 
         # Now we update a density image of the current Image.
         self.update_density_fn()
+    def delete_roi_fn(self,ev=None,update_display=True):
+        win.image_status_text.showMessage(
+            'Status: Highlight new ROI or train. ')
+        par_obj.rects = None
+        par_obj.ori_x = 0
+        par_obj.ori_y = 0
+        par_obj.rect_w = 0
+        par_obj.rect_h = 0
+        # self.draw_saved_dots_and_roi()
+        self.save_ROI_btn.setEnabled(True)
+        self.save_dots_btn.setEnabled(False)
+        self.remove_dots_btn.setEnabled(False)
+        self.sel_ROI_btn.setEnabled(True)
+        self.clear_dots_btn.setEnabled(True)
+        win.delete_ROI_btn.setEnabled(False)
+        par_obj.draw_ROI = True
+        par_obj.draw_dots = False
+        par_obj.remove_dots = False
+        par_obj.dots_past = par_obj.dots
+        par_obj.dots = []
+        self.plt1.lines=[]
+
+        # Now we update a density image of the current Image.
+        if update_display==True:
+            tpt = par_obj.curr_t
+            zslice = par_obj.curr_z
+            fileno = par_obj.curr_file
+            v2.update_com_fn(par_obj, tpt, zslice, fileno)
+            self.draw_saved_dots_and_roi()
+            self.canvas1.draw()
+            '''
+            #self.draw_saved_dots_and_roi()
+            self.goto_img_fn(keep_roi=True)
+            self.canvas1.draw()
+            self.canvas2.draw()'''
 
     def update_density_fn(self):
         # Construct empty array for current image.
@@ -1321,15 +1387,15 @@ class Win_fn(QtWidgets.QWidget):
 
         self.canvas2.draw()
 
-    def draw_saved_dots_and_roi(self):
+    def draw_saved_dots_and_roi(self,color='w'):
 
         for i in range(0, par_obj.saved_dots.__len__()):
             if(par_obj.saved_ROI[i][0] == par_obj.curr_z and par_obj.saved_ROI[i][5] == par_obj.curr_t and par_obj.saved_ROI[i][6] == par_obj.curr_file):
                 dots = par_obj.saved_dots[i]
                 rects = par_obj.saved_ROI[i]
-                self.dots_and_square(dots, rects, 'w')
+                self.dots_and_square(dots, rects, color)
 
-    def goto_img_fn(self, zslice=None, tpt=None, imno=None):
+    def goto_img_fn(self, zslice=None, tpt=None, imno=None, keep_roi=False):
         # update current image/slice/timepoint if changed
         if zslice != None:
             par_obj.curr_z = zslice
@@ -1337,27 +1403,35 @@ class Win_fn(QtWidgets.QWidget):
             par_obj.curr_t = tpt
         if imno != None:
             par_obj.curr_file = imno
+
+        # reset drawing tools unless just changing channel
+        if keep_roi == False:
+            self.delete_roi_fn(update_display=False)
+            '''
+            # reset controls and box drawing
+            par_obj.dots = []
+            par_obj.rects = None
+            par_obj.select_ROI = False
+            par_obj.draw_ROI = True
+            par_obj.draw_dots = False
+            par_obj.remove_dots = False
+            self.save_ROI_btn.setEnabled(True)
+            self.save_dots_btn.setEnabled(False)
+            self.remove_dots_btn.setEnabled(False)
+            self.sel_ROI_btn.setEnabled(True)
+            par_obj.ROI_index = []
+            '''
+
         # Goto and evaluate image function.
-        v2.goto_img_fn_new(par_obj, self)
+        v2.goto_img_fn_new(par_obj, self, keep_roi=keep_roi)
         # updates Z-cal
         if par_obj.filehandlers[par_obj.curr_file].z_calibration != 0:
             par_obj.z_cal = par_obj.filehandlers[par_obj.curr_file].z_calibration
         self.z_cal_txt.setText(str(par_obj.z_cal)[0:6])
-        # v2.return_imRGB_slice_new(par_obj,zslice,tpt)
-        # self.draw_saved_dots_and_roi()
-        # reset controls and box drawing
-        par_obj.dots = []
-        par_obj.rects = np.zeros((1, 5))
-        par_obj.select_ROI = False
-        par_obj.draw_ROI = True
-        par_obj.draw_dots = False
-        par_obj.remove_dots = False
-        self.save_ROI_btn.setEnabled(True)
-        self.save_dots_btn.setEnabled(False)
-        self.remove_dots_btn.setEnabled(False)
-        self.sel_ROI_btn.setEnabled(True)
-        par_obj.ROI_index = []
-        # app.processEvents()
+
+
+
+
 
     def sel_ROI_btn_fn(self):
         par_obj.ROI_index = []
@@ -1374,11 +1448,13 @@ class Win_fn(QtWidgets.QWidget):
                 dots = par_obj.saved_dots[par_obj.ROI_index[b]]
                 rects = par_obj.saved_ROI[par_obj.ROI_index[b]]
                 self.dots_and_square(dots, rects, 'y')
+            win.delete_ROI_btn.setEnabled(True)
         else:
             self.save_ROI_btn.setEnabled(True)
             par_obj.select_ROI = False
             par_obj.draw_ROI = True
             self.draw_saved_dots_and_roi()
+
 
     def remove_dots_btn_fn(self):
         if par_obj.remove_dots == False:
@@ -1507,7 +1583,17 @@ class Win_fn(QtWidgets.QWidget):
             self.count_txt_3.setText(str(par_obj.min_distance[2]))
 
             self.update_density_fn()
+            if par_obj.sigma_data>10:
+                self.image_status_text.showMessage("Feature Calculation with large sigma (>10 pix) is inefficient, consider resizing your images before import")
+                self.image_status_text.setStyleSheet("QStatusBar{color: red; font-weight: bold}")
+                #time.sleep(.01)
 
+                self.timer = QtCore.QTimer()
+                self.timer.isSingleShot = True
+                self.timer.timeout.connect(lambda: self.image_status_text.setStyleSheet("QStatusBar{color: black, font-weight: normal}"))
+                self.timer.start(2000)
+
+                #self.image_status_text.setStyleSheet("QStatusBar{color: black, font: normal}")
     def kernel_btn_fn(self, setting=False):
         """Shows the kernels on the image."""
         if setting == 'Kernel':
@@ -1615,7 +1701,10 @@ if __name__ == '__main__':
         splash_pix, QtCore.Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
     splash.show()
-    app.processEvents()
+    #app.processEvents()
+    timer = QtCore.QTimer()
+    timer.timeout.connect(lambda: time.sleep(0.001))
+    timer.start(100)
     # Creates tab widget.
     win_tab = QtWidgets.QTabWidget()
     # Creates win, an instance of QWidget
@@ -1632,9 +1721,12 @@ if __name__ == '__main__':
 
     time.sleep(0.2)
     splash.finish(win_tab)
-
     win_tab.showMaximized()
     win_tab.activateWindow()
+
+    sys.exit(app.exec_())
+    '''
     # Automates the loading for testing.
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtWidgets.QApplication.instance().exec_()
+    '''

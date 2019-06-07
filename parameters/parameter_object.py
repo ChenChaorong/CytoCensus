@@ -16,7 +16,7 @@ import numpy as np
 class Data(object):
     def __init__(self):
         self.predictions = []
-        self.hessians = [] 
+        self.hessians = []
 
 class ParameterClass(object):
     def __init__(self):
@@ -32,7 +32,8 @@ class ParameterClass(object):
         self.overlay = False #overlay prediction -better as tickbox?
 
         self.mouse_down = False #ROI drawing
-
+        self.rects = None
+        self.dots = None
         #hard maxima to prevent opening overly huge images
         self.x_limit = 5024
         self.y_limit = 5024
