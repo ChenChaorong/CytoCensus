@@ -368,11 +368,7 @@ class Eval_load_model_win(QtWidgets.QWidget):
             par_obj.eval_load_im_win_eval = False
 
     def gotoEvalButton_fn(self):
-        # for i in range(par_obj.file_array.__len__()):
-        #    par_obj.frames_2_load = range(0,par_obj.max_z) #TODO make max_zslices  a list
-        #    if par_obj.total_time_pt==[]:
-        #        par_obj.total_time_pt=1
-        # TODO make sure this matches up and don't have a +1 error
+
         par_obj.tpt_list = range(0, par_obj.max_t+1)
         par_obj.user_min_z = 0
 
@@ -436,7 +432,7 @@ class Eval_disp_im_win(QtWidgets.QWidget):
         top_panel = QtWidgets.QHBoxLayout()
 
         # Top left and right widget panels
-        top_left_panel = QtWidgets.QGroupBox('Basic Controls')
+        top_left_panel = QtWidgets.QGroupBox('Navigation')
         top_middle_panel = QtWidgets.QGroupBox('ROI Controls')
         top_right_panel = QtWidgets.QGroupBox('Advanced Controls')
 
@@ -529,7 +525,7 @@ class Eval_disp_im_win(QtWidgets.QWidget):
         self.count_txt_3.setFixedWidth(20)
 
         abs_thr_lbl = QtWidgets.QLabel('Abs Thr:')
-        self.abs_thr_txt = QtWidgets.QLineEdit(str(par_obj.abs_thr))
+        self.abs_thr_txt = QtWidgets.QLineEdit(str(par_obj.abs_thr*100))
         self.abs_thr_txt.setFixedWidth(25)
         '''
         rel_thr_lbl = QtWidgets.QLabel('Rel Thr:')
@@ -709,7 +705,7 @@ class Eval_disp_im_win(QtWidgets.QWidget):
         par_obj.min_distance[1] = float(self.count_txt_2.text())
         par_obj.min_distance[2] = float(self.count_txt_3.text())
         par_obj.abs_thr = float(self.abs_thr_txt.text())/100
-        par_obj.rel_thr = float(self.rel_thr_txt.text())
+        #par_obj.rel_thr = float(self.rel_thr_txt.text())
 
         v2.count_maxima(par_obj, par_obj.curr_t, par_obj.curr_file)
         par_obj.show_pts = 1
@@ -773,8 +769,8 @@ class Eval_disp_im_win(QtWidgets.QWidget):
         self.count_txt_1.setText(str(par_obj.min_distance[0]))
         self.count_txt_2.setText(str(par_obj.min_distance[1]))
         self.count_txt_3.setText(str(par_obj.min_distance[2]))
-        self.abs_thr_txt.setText(str(par_obj.abs_thr))
-        self.rel_thr_txt.setText(str(par_obj.rel_thr))
+        self.abs_thr_txt.setText(str(par_obj.abs_thr*100))
+        #self.rel_thr_txt.setText(str(par_obj.rel_thr))
 
         self.count_maxima_btn.setEnabled(True)
         self.count_all_btn.setEnabled(True)
@@ -807,6 +803,7 @@ class Eval_disp_im_win(QtWidgets.QWidget):
         pass
 
     def loadTrainFn(self):
+        # Win_fn()
         # Win_fn()
         channel_wid = QtWidgets.QWidget()
         channel_lay = QtWidgets.QHBoxLayout()
