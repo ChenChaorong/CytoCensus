@@ -199,17 +199,33 @@ class checkBoxCH(QtWidgets.QCheckBox):
             else:
                 if self.ID in par_obj.ch_active:
                     del par_obj.ch_active[par_obj.ch_active.index(self.ID)]
-
+            par_obj.ch_display = par_obj.ch_active
+            
+            if 0 in par_obj.filehandlers:
+                par_obj.numCH = par_obj.filehandlers[0].numCH
+                
             if par_obj.ex_img is not None:
+                newImg = return_rgb_slice(par_obj, 0, 0, 0)
+                '''
                 newImg = np.zeros((par_obj.ex_img.shape[0], par_obj.ex_img.shape[1], 3))
                 if par_obj.ch_active.__len__() > 1:
-                    for b in par_obj.ch_active:
-                        if b==2:break
-                        newImg[:, :, b] = par_obj.ex_img[:, :, b]
-
-                elif par_obj.ch_active.__len__() ==1:
-                    newImg = par_obj.ex_img[:, :, par_obj.ch_active[0]]
-                Win.plt1.images[0].set_data(newImg/par_obj.tiffarraymax)
+                    for ch_count, ch in enumerate(par_obj.ch_active):
+                        if ch_count == 3: break
+                        print (ch_count, ch)
+                        newImg[:, :, ch_count] = img[:, :, ch]
+                '''
+                '''
+                if par_obj.ch_active.__len__() == 2:
+                    print( par_obj.ch_active)
+                    newImg = np.zeros((par_obj.ex_img.shape[0], par_obj.ex_img.shape[1], 3))
+                    
+                    newImg[:,:,:2] = par_obj.filehandlers[0].get_tiff_slice([0], 0, range(par_obj.ex_img.shape[0]), range(par_obj.ex_img.shape[1]), par_obj.ch_active)
+                elif par_obj.ch_active.__len__() == 1:
+                    newImg = par_obj.filehandlers[0].get_tiff_slice([0], 0, range(par_obj.ex_img.shape[0]), range(par_obj.ex_img.shape[1]), par_obj.ch_active)
+                else:
+                    newImg = par_obj.filehandlers[0].get_tiff_slice([0], 0, range(par_obj.ex_img.shape[0]), range(par_obj.ex_img.shape[1]), [par_obj.ch_active[:3]])
+                '''
+                Win.plt1.images[0].set_data(newImg/newImg.max())#/par_obj.tiffarraymax)
                 Win.canvas1.draw()
 
         else: #set visible channels
@@ -221,7 +237,19 @@ class checkBoxCH(QtWidgets.QCheckBox):
             else:#removes channel when unticked
                 if self.ID in par_obj.ch_display:
                     del par_obj.ch_display[par_obj.ch_display.index(self.ID)]
-            Win.goto_img_fn(par_obj.curr_z,par_obj.curr_t)
+                    
+            displayed = 0 #counter for number of displayed channels
+            #Set only 3 displayed channels
+            for ch, objset in enumerate(Win.ChannelGroup):
+                if ch in par_obj.ch_display and displayed<3:
+                    Win.ChannelGroup[ch][2].showall()
+                    Win.ChannelGroup[ch][4].showall()
+                    displayed = displayed+1
+                else:
+                    Win.ChannelGroup[ch][2].hideall()
+                    Win.ChannelGroup[ch][4].hideall()
+                        
+            Win.goto_img_fn(par_obj.curr_z,par_obj.curr_t,keep_roi=True)
 
 class contrast_controller(QtWidgets.QSlider):
     def __init__(self,par_obj,Win,ID,brightness=False):
@@ -229,13 +257,14 @@ class contrast_controller(QtWidgets.QSlider):
         self.ID=ID
         self.Win=Win
         self.par_obj=par_obj
-        self.setTickPosition(1)
+        self.setTickPosition(0)
         self.setTickInterval(5)
         self.setMaximum(11)
         self.setMinimum(1)
         self.setMinimumWidth(50)
         self.setOrientation(QtCore.Qt.Horizontal)
         if brightness==True:
+            self.label = QtWidgets.QLabel(chr(9728))
             self.setToolTip('Adjust Brightness')
             self.setMinimum(0)
             self.setMaximum(10)
@@ -243,6 +272,7 @@ class contrast_controller(QtWidgets.QSlider):
             self.setInvertedAppearance (True)
             self.valueChanged.connect(self.change_brightness)
         else:
+            self.label = QtWidgets.QLabel(chr(9681))
             self.setToolTip('Adjust Contrast')
             self.valueChanged.connect(self.change_contrast)
 
@@ -250,7 +280,7 @@ class contrast_controller(QtWidgets.QSlider):
     def change_contrast(self,value):
         value = float(value)
         self.par_obj.clim[self.ID][1]=value
-        self.Win.goto_img_fn()
+        self.Win.goto_img_fn(keep_roi=True)
 
     def change_brightness(self,value):
 
@@ -258,7 +288,14 @@ class contrast_controller(QtWidgets.QSlider):
         print (self.ID)
         self.par_obj.clim[self.ID][0]=value
 
-        self.Win.goto_img_fn()
+        self.Win.goto_img_fn(keep_roi=True)
+    def hideall(self):
+        self.hide()
+        self.label.hide()
+    def showall(self):
+        self.show()
+        self.label.show()
+        
 
 
 
@@ -282,7 +319,10 @@ def create_channel_objects(self,par_obj,num,feature_select=False,parent=None):
         if feature_select==False:
             contrast=contrast_controller(par_obj,self,chID)
             brightness=contrast_controller(par_obj,self,chID,brightness=True)
-            parent.append([cbx,contrast,brightness])
+            if chID>2:
+                contrast.hideall()
+                brightness.hideall()
+            parent.append([cbx,contrast.label,contrast,brightness.label,brightness])
         else:
             parent.append([cbx])
 
