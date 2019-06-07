@@ -1599,12 +1599,12 @@ def save_output_prediction_fn(par_obj, int_obj,subtract_background=False):
                 image[tpt, zslice, 0, :, :] = par_obj.data_store['pred_arr'][fileno][tpt][zslice].astype(np.float32)
         if subtract_background:
             image = image - filters.uniform_filter1d(image,10,axis=0)
-            imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
+            imsave(imfile.path+'/'+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
         else:
-            imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
+            imsave(imfile.path+'/'+imfile.name+'_'+par_obj.modelName+'_Prediction.tif', image, imagej=True)
 
         print ('Prediction written to disk')
-        int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
+        int_obj.report_progress('Prediction written to disk '+ imfile.path)
         
 def save_kernels_fn(par_obj, int_obj):
     """Saves prediction to tiff file using tiffiles imsave"""
@@ -1616,10 +1616,10 @@ def save_kernels_fn(par_obj, int_obj):
             for zslice in range(imfile.max_z+1):
                 if zslice in par_obj.data_store['dense_arr'][fileno][tpt]:
                     image[tpt, zslice, 0, :, :] = par_obj.data_store['dense_arr'][fileno][tpt][zslice].astype(np.float32)
-        imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Kernels.tif', image, imagej=True)
+        imsave(imfile.path+'/'+imfile.name+'_'+par_obj.modelName+'_Kernels.tif', image, imagej=True)
 
         print ('Prediction written to disk')
-        int_obj.report_progress('Prediction written to disk '+ par_obj.csvPath)
+        int_obj.report_progress('Prediction written to disk '+ imfile.path)
         
 def save_output_hess_fn(par_obj, int_obj):
     """Saves hessian map to tiff file using tiffiles imsave"""
@@ -1631,13 +1631,12 @@ def save_output_hess_fn(par_obj, int_obj):
                 image[tpt, zslice, 0, :, :] = par_obj.data_store['maxi_arr'][fileno][tpt][zslice].astype('float32')
 
         print ('Saving Hessian image to disk')
-        imsave(par_obj.csvPath+imfile.name+'_'+par_obj.modelName+'_Hess.tif', image, imagej=True)
-        int_obj.report_progress('Hessian written to disk '+ par_obj.csvPath)
+        imsave(imfile.path+'/'+imfile.name+'_'+par_obj.modelName+'_Hess.tif', image, imagej=True)
+        int_obj.report_progress('Hessian written to disk '+ imfile.path)
 
 def save_output_mask_fn(par_obj,int_obj):
     #funky ordering TZCYX
     for fileno,imfile in par_obj.filehandlers.items():
-        filename = imfile.full_name
         image = np.zeros([imfile.max_t+1,imfile.max_z+1,1,par_obj.height,par_obj.width], 'uint8')
         for tpt in range(imfile.max_t+1):
 
@@ -1646,17 +1645,16 @@ def save_output_mask_fn(par_obj,int_obj):
                 if W:
                     image[tpt,z,0,x,y]=255
         image = filters.maximum_filter(image,size=(0,3,0,3,3))
-        imsave(filename+'_'+par_obj.modelName+'_Points.tif',image, imagej=True)
-        int_obj.report_progress('Point mask written to disk '+ par_obj.csvPath)
+        imsave(imfile.path+'/'+imfile.name+'_'+par_obj.modelName+'_Points.tif',image, imagej=True)
+        int_obj.report_progress('Point mask written to disk '+ imfile.path)
 
 def save_output_ROI(par_obj, int_obj):
     #funky ordering TZCYX
     for fileno, imfile in par_obj.filehandlers.items():
-        filename = imfile.base_name
-        with open(par_obj.csvPath+filename+'_outputROI.pickle', 'wb') as afile:
+        with open(imfile.path+'/'+imfile.name+'_outputROI.pickle', 'wb') as afile:
             pickle.dump([par_obj.data_store['roi_stkint_x'][fileno], par_obj.data_store['roi_stkint_y'][fileno]], afile)
 
-    with open(par_obj.csvPath+par_obj.modelName+'_outputROI.csv', 'wb') as csvfile:
+    with open(imfile.path+'/'+par_obj.modelName+'_outputROI.csv', 'wb') as csvfile:
         spamwriter = csv.writer(csvfile)
         spamwriter.writerow([str('Filename: ')]+[str('Time point: ')]+[str('Z: ')]+[str('Regions(x): ')]+[str('Regions(y): ')])
 
@@ -1667,24 +1665,23 @@ def save_output_ROI(par_obj, int_obj):
                 ppt_y = par_obj.data_store['roi_stkint_y'][fileno][tpt]
                 for i in ppt_x.keys():
                     spamwriter.writerow([str(filename)]+[tpt+1]+[i]+[ppt_x[i]]+[ppt_y[i]])
-    int_obj.report_progress('Data exported to '+ par_obj.csvPath)
+    int_obj.report_progress('Data exported to '+ imfile.path)
 
 def save_output_data_fn(par_obj, int_obj):
     local_time = time.asctime(time.localtime(time.time()))
-
-    with open(par_obj.csvPath+'_'+par_obj.modelName+'outputData.csv', 'a') as csvfile:
+    csvPath = par_obj.filehandlers[0].path+'/'
+    with open(csvPath+'_'+par_obj.modelName+'outputData.csv', 'a') as csvfile:
         spamwriter = csv.writer(csvfile, dialect='excel')
         spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('Predicted count: ')])
 
-        for fileno in range(par_obj.max_file):
-
+        for fileno, imfile in par_obj.filehandlers.items():
+            filename=imfile.base_name
             for tpt in par_obj.tpt_list:
-                filename = str(par_obj.file_array[fileno])
                 spamwriter.writerow([local_time]+[str(filename)]+[tpt+1]+[par_obj.data_store['pts'][fileno][tpt].__len__()])
 
 
-    for fileno in range(par_obj.max_file):
-        with open(par_obj.csvPath+par_obj.filehandlers[fileno].name+'_'+par_obj.modelName+'_outputPoints.csv', 'a') as csvfile:
+    for fileno, imfile in par_obj.filehandlers.items():
+        with open(csvPath+imfile.name+'_'+par_obj.modelName+'_outputPoints.csv', 'a') as csvfile:
             spamwriter = csv.writer(csvfile)
             spamwriter.writerow([str(par_obj.selectedModel)]+[str('Filename: ')]+[str('Time point: ')]+[str('X: ')]+[str('Y: ')]+[str('Z: ')])
 
@@ -1692,7 +1689,7 @@ def save_output_data_fn(par_obj, int_obj):
                 pts = par_obj.data_store['pts'][fileno][tpt]
                 for i in range(0, par_obj.data_store['pts'][fileno][tpt].__len__()):
                     spamwriter.writerow([local_time]+[str(filename)]+[tpt+1]+[pts[i][0]]+[pts[i][1]]+[pts[i][2]])
-    int_obj.report_progress('Data exported to '+ par_obj.csvPath)
+    int_obj.report_progress('Data exported to '+ csvPath)
 
 def save_user_ROI(par_obj, int_obj):
     #funky ordering TZCYX
