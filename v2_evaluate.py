@@ -807,21 +807,37 @@ class Eval_disp_im_win(QtWidgets.QWidget):
         # Win_fn()
         channel_wid = QtWidgets.QWidget()
         channel_lay = QtWidgets.QHBoxLayout()
-        ChannelGroup = create_channel_objects(self, par_obj, par_obj.numCH)
-        for chbx, contrast, brightness in ChannelGroup:
-            channel_lay.addWidget(chbx)
-            channel_lay.addWidget(contrast)
-            channel_lay.addWidget(brightness)
-            contrast.show()
-            chbx.show()
-            chbx.setChecked(True)
-        channel_lay.addStretch()
         channel_wid.setLayout(channel_lay)
 
-        # self.top_left_grid.setMargin(0)
-        self.top_left_grid.addWidget(channel_wid, 1, 0, 1, 3)
+        evalImWin.top_left_grid.addWidget(channel_wid, 1, 0, 1, 3)
 
-    def goto_img_fn(self, zslice=None, tpt=None, imno=None):
+        # cleanup if reloading image
+        if not hasattr(self, 'ChannelGroup'):
+            # define channel brightness controls
+            self.ChannelGroup = []
+
+        for itemset in self.ChannelGroup:
+            for item in itemset:
+                item.hide()
+                item.deleteLater()
+
+        ChannelGroup = create_channel_objects(self, par_obj, par_obj.numCH)
+        for chbx, clabel, contrast, blabel, brightness in ChannelGroup:
+            channel_lay.addWidget(chbx)
+            channel_lay.addWidget(clabel)
+            channel_lay.addWidget(contrast)
+            channel_lay.addWidget(blabel)
+            channel_lay.addWidget(brightness)
+            #contrast.show()
+            chbx.show()
+            chbx.setChecked(True)
+        self.ChannelGroup = ChannelGroup
+        channel_lay.addStretch()
+
+        win_tab.setCurrentWidget(evalImWin)
+        app.processEvents()
+
+    def goto_img_fn(self, zslice=None, tpt=None, imno=None, keep_roi=False):
         if zslice != None:
             par_obj.curr_z = zslice
         if tpt != None:
@@ -852,7 +868,7 @@ class Eval_disp_im_win(QtWidgets.QWidget):
         # v2.eval_goto_img_fn(im_num,par_obj,self)
         v2.goto_img_fn_new(par_obj, self)
 
-
+'''
 class checkBoxCH(QtWidgets.QCheckBox):
     def __init__(self):
         QtWidgets.QCheckBox.__init__(self)
@@ -864,7 +880,7 @@ class checkBoxCH(QtWidgets.QCheckBox):
         if self.type == 'visual_ch':
             # v2.eval_goto_img_fn(par_obj.curr_z,par_obj,evalImWin)
             Eval_disp_im_win.goto_img_fn(evalImWin)
-
+'''
 
 class File_Dialog(QtWidgets.QMainWindow):
 
@@ -1033,41 +1049,41 @@ if __name__ == '__main__':
     timer = QtCore.QTimer()
     timer.timeout.connect(lambda: None)
     timer.start(200)
-    
+
     # generate layout
     app = QtWidgets.QApplication([])
-    
+
     # Create and display the splash screen
     splash_pix = QtGui .QPixmap('splash_loading.png')
     splash = QtWidgets.QSplashScreen(splash_pix, QtCore.Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
     splash.show()
     app.processEvents()
-    
-    
+
+
     # Creates tab widget.
     win_tab = QtWidgets.QTabWidget()
-    
+
     # Intialises counter object.
     par_obj = ParameterClass()
     # Main widgets.
     evalLoadImWin = Eval_load_im_win(par_obj)
     evalLoadModelWin = Eval_load_model_win(par_obj)
     evalImWin = Eval_disp_im_win(par_obj)
-    
-    
+
+
     # Adds win tab and places button in win.
     win_tab.addTab(evalLoadImWin, "Select Images")
     win_tab.addTab(evalLoadModelWin, "Load Model")
     win_tab.addTab(evalImWin, "Evaluate Images")
-    
+
     # Defines size of the widget.
     win_tab.resize(1200, 800)
-    
+
     time.sleep(2.0)
     splash.finish(win_tab)
-    
-    
+
+
     # Initalises load screen.
     # eval_load_im_win_fn(par_obj,evalLoadImWin)
     # evalLoadModelWinFn(par_obj,evalLoadModelWin)
@@ -1076,6 +1092,3 @@ if __name__ == '__main__':
     import sys
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtWidgets.QApplication.instance().exec_()
-
-
-    
