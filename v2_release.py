@@ -845,7 +845,7 @@ class Win_fn(QtWidgets.QWidget):
         # Initialises the variables for the beginning of the counting.
         par_obj.first_time = True
         par_obj.dots = []
-        par_obj.rects = np.zeros((1, 5))
+        par_obj.rects = None
         par_obj.var = []
         par_obj.saved_dots = []
         par_obj.saved_ROI = []
