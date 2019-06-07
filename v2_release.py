@@ -1336,6 +1336,41 @@ class Win_fn(QtWidgets.QWidget):
 
         # Now we update a density image of the current Image.
         self.update_density_fn()
+    def delete_roi_fn(self,ev=None,update_display=True):
+        win.image_status_text.showMessage(
+            'Status: Highlight new ROI or train. ')
+        par_obj.rects = None
+        par_obj.ori_x = 0
+        par_obj.ori_y = 0
+        par_obj.rect_w = 0
+        par_obj.rect_h = 0
+        # self.draw_saved_dots_and_roi()
+        self.save_ROI_btn.setEnabled(True)
+        self.save_dots_btn.setEnabled(False)
+        self.remove_dots_btn.setEnabled(False)
+        self.sel_ROI_btn.setEnabled(True)
+        self.clear_dots_btn.setEnabled(True)
+        win.delete_ROI_btn.setEnabled(False)
+        par_obj.draw_ROI = True
+        par_obj.draw_dots = False
+        par_obj.remove_dots = False
+        par_obj.dots_past = par_obj.dots
+        par_obj.dots = []
+        self.plt1.lines=[]
+
+        # Now we update a density image of the current Image.
+        if update_display==True:
+            tpt = par_obj.curr_t
+            zslice = par_obj.curr_z
+            fileno = par_obj.curr_file
+            v2.update_com_fn(par_obj, tpt, zslice, fileno)
+            self.draw_saved_dots_and_roi()
+            self.canvas1.draw()
+            '''
+            #self.draw_saved_dots_and_roi()
+            self.goto_img_fn(keep_roi=True)
+            self.canvas1.draw()
+            self.canvas2.draw()'''
 
     def update_density_fn(self):
         # Construct empty array for current image.
