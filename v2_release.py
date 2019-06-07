@@ -61,7 +61,7 @@ class fileDialog(QtWidgets.QMainWindow):
         except Exception: #catch all because pickle can throw loads of Exceptions
             self.parent.filepath = os.path.expanduser('~')+'/'
             try:
-                
+
                 os.makedirs(os.path.expanduser('~')+'/.densitycount/')
             except OSError as exc:
                 if exc.errno != errno.EACCES:
@@ -97,7 +97,10 @@ class fileDialog(QtWidgets.QMainWindow):
         path = None
         for path in QtWidgets.QFileDialog.getOpenFileNames(self, 'Open file', self.parent.filepath, 'Images(*.tif *.tiff);;'):
             if path != '':
-                par_obj.file_array.append(path[0])
+                if type(path) is list:
+                    par_obj.file_array=par_obj.file_array+path
+                else:
+                    par_obj.file_array.append(path)
         if path is None:
             return
 
