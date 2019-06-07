@@ -35,7 +35,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-from common_navigation import navigation_setup, create_channel_objects, btn_fn, on_about
+from common.common_navigation import navigation_setup, create_channel_objects, btn_fn, on_about
 from parameters.parameter_object import ParameterClass
 from ROI.user_ROI import ROI
 import v2_functions as v2
