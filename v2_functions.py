@@ -1514,7 +1514,6 @@ def eval_pred_show_fn(par_obj, int_obj, zslice, tpt):
 def import_data_fn(par_obj, file_array, file_array_offset=0):
     """Function which loads in list of Tiff stacks and checks for consistency"""
     #careful with use of non-zero offset. Intended primarily for use in validation
-
     par_obj.max_file = file_array.__len__()
 
     par_obj.filehandlers = {}
