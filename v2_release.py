@@ -26,7 +26,8 @@ import os.path
 import re
 import pickle
 import sys
-
+from multiprocessing import freeze_support
+freeze_support()
 from PyQt5 import QtGui, QtCore, QtWidgets  # ,QtWebKit
 import numpy as np
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
