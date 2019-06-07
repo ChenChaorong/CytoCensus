@@ -1721,9 +1721,12 @@ if __name__ == '__main__':
 
     time.sleep(0.2)
     splash.finish(win_tab)
-
     win_tab.showMaximized()
     win_tab.activateWindow()
+
+    sys.exit(app.exec_())
+    '''
     # Automates the loading for testing.
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtWidgets.QApplication.instance().exec_()
+    '''
