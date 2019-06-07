@@ -137,7 +137,7 @@ class btn_fn:
         for fileno in range(par_obj.max_file):
             if fileno == par_obj.curr_file:
                 if fileno < par_obj.max_file-1:
-                    par_obj.max_z = par_obj.filehandlers[par_obj.curr_file+1].max_z
+                    par_obj.max_z = min(par_obj.filehandlers[par_obj.curr_file+1].max_z,par_obj.user_max_z)
                     par_obj.max_t = par_obj.filehandlers[par_obj.curr_file+1].max_t
                     if par_obj.curr_z>par_obj.max_z: par_obj.curr_z = par_obj.max_z
                     if par_obj.curr_t>par_obj.max_t: par_obj.curr_t = par_obj.max_t
