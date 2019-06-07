@@ -343,7 +343,7 @@ class Load_win_fn(QtWidgets.QWidget):
         Confirm_im_lo.addWidget(self.selIntButton)
         Confirm_im_lo.addStretch()
         self.image_status_text = QtWidgets.QStatusBar()
-        self.image_status_text.setStyleSheet("QLabel {  color : green }")
+        self.image_status_text.setStyleSheet("QLabel { color : green }")
         self.image_status_text.showMessage(
             'Status: Highlight training images in folder. ')
 
@@ -413,9 +413,9 @@ class Load_win_fn(QtWidgets.QWidget):
         self.plt1.cla()
 
         if par_obj.ex_img.max() != 0:
-            self.plt1.imshow(par_obj.ex_img/par_obj.ex_img.max())
+            self.plt1.imshow(par_obj.ex_img[:,:,:3]/par_obj.ex_img.max())
         else:
-            self.plt1.imshow(par_obj.ex_img)
+            self.plt1.imshow(par_obj.ex_img[:,:,:3])
 
         self.plt1.set_xticklabels([])
         self.plt1.set_yticklabels([])
@@ -480,16 +480,17 @@ class Load_win_fn(QtWidgets.QWidget):
         else:
             par_obj.tpt_list = [0]
 
-        if par_obj.max_z > 0:
+        if par_obj.max_z > 0: #if current file has multiple z
+            #this fails if first file has single z
             fmStr = self.linEdit_Frm.text()
             if fmStr != '':  # catch empty limit
                 par_obj.user_max_z = max(self.hyphen_range(fmStr))
                 par_obj.user_min_z = min(self.hyphen_range(fmStr))
-            else:
-                par_obj.user_max_z = []
+            else: #excessively large default max_z for training
+                par_obj.user_max_z = 1000
                 par_obj.user_min_z = 0
         else:
-            par_obj.user_max_z = []
+            par_obj.user_max_z = 0
             par_obj.user_min_z = 0
 
         self.image_status_text.showMessage(
