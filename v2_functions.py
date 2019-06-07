@@ -42,8 +42,8 @@ from tifffile import imsave #Install with pip install tifffile.
 from matplotlib.path import Path
 import matplotlib.image as pylab
 
-import CytoCensus.features.local_features as lf
-from CytoCensus.fileio.file_handler import File_handler
+import features.local_features as lf
+from fileio.file_handler import File_handler
 import scipy.cluster.hierarchy as hcluster
 
 def peak_local_max(image, min_distance=10, threshold_abs=0, threshold_rel=0.1,
@@ -1425,7 +1425,7 @@ def buffereddraw(int_obj):
     if int_obj.threadpool.activeThreadCount()>1:
         return
     else: 
-        from common_navigation import Worker
+        from common.common_navigation import Worker
         worker = Worker(int_obj.canvas1.draw)
         worker.run()
         return
