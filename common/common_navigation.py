@@ -1,16 +1,28 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Sat Apr  2 18:03:50 2016
+"""Common colour checkboxes and 4D navigation functions
 
-@author: martin
+    CytoCensus Software v0.1
 
-Common colour checkboxes and 4D navigation functions
- Currently must import directly, need to tidy this up later
+    Copyright (C) 2016-2018  Dominic Waithe Martin Hailstone
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 """
-from PyQt5 import QtGui,QtCore,QtWidgets
-from CytoCensus.gnu import return_license
+from PyQt5 import QtGui, QtCore, QtWidgets
+from gnu import return_license
 import numpy as np
-
+from functions.v2_functions import return_rgb_slice
 
 def navigation_setup(self,par_obj):
 
