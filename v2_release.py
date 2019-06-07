@@ -973,7 +973,7 @@ class Win_fn(QtWidgets.QWidget):
             self.count_txt_2.text()), float(self.count_txt_3.text())]
         par_obj.abs_thr = float(self.abs_thr_txt.text())/100
         #par_obj.z_cal =float(self.z_cal_txt.text())
-        v2.count_maxima(par_obj, par_obj.curr_t,
+        count_maxima(par_obj, par_obj.curr_t,
                         par_obj.curr_file, reset_max=True)
         par_obj.show_pts = 1
         self.kernel_btn_fn()
@@ -1155,6 +1155,9 @@ class Win_fn(QtWidgets.QWidget):
 
         # If we are in the dot drawing phase
         elif(par_obj.draw_dots == True and event.button == 1):
+            #catch not initialised
+            if event.xdata == None or event.ydata == None:
+                return
             x = int(np.round(event.xdata, 0))
             y = int(np.round(event.ydata, 0))
 
@@ -1172,9 +1175,9 @@ class Win_fn(QtWidgets.QWidget):
                     i = par_obj.dots[-1]
                     self.plt1.autoscale(False)
                     self.plt1.plot([i[1]-5, i[1]+5],
-                                   [i[2], i[2]], '-', color='r')
+                                   [i[2], i[2]], '-', color='m')
                     self.plt1.plot(
-                        [i[1], i[1]], [i[2]-5, i[2]+5], '-', color='r')
+                        [i[1], i[1]], [i[2]-5, i[2]+5], '-', color='m')
                     self.canvas1.draw()
         elif(par_obj.remove_dots == True and event.button == 1):
             #par_obj.pixMap = QtWidgets.QPixmap(q2r.rgb2qimage(par_obj.imgs[par_obj.curr_z]))
@@ -1295,6 +1298,7 @@ class Win_fn(QtWidgets.QWidget):
             win.save_dots_btn.setEnabled(True)
             win.remove_dots_btn.setEnabled(True)
             win.sel_ROI_btn.setEnabled(False)
+            win.delete_ROI_btn.setEnabled(True)
             par_obj.remove_dots = False
 
     def deleteDotsFn(self, sel_ROI_btn_fn):
@@ -1328,7 +1332,7 @@ class Win_fn(QtWidgets.QWidget):
         par_obj.remove_dots = False
         par_obj.dots_past = par_obj.dots
         par_obj.dots = []
-        par_obj.rects = np.zeros((1, 5))
+        par_obj.rects = None
         par_obj.ori_x = 0
         par_obj.ori_y = 0
         par_obj.rect_w = 0
@@ -1383,15 +1387,15 @@ class Win_fn(QtWidgets.QWidget):
 
         self.canvas2.draw()
 
-    def draw_saved_dots_and_roi(self):
+    def draw_saved_dots_and_roi(self,color='w'):
 
         for i in range(0, par_obj.saved_dots.__len__()):
             if(par_obj.saved_ROI[i][0] == par_obj.curr_z and par_obj.saved_ROI[i][5] == par_obj.curr_t and par_obj.saved_ROI[i][6] == par_obj.curr_file):
                 dots = par_obj.saved_dots[i]
                 rects = par_obj.saved_ROI[i]
-                self.dots_and_square(dots, rects, 'w')
+                self.dots_and_square(dots, rects, color)
 
-    def goto_img_fn(self, zslice=None, tpt=None, imno=None):
+    def goto_img_fn(self, zslice=None, tpt=None, imno=None, keep_roi=False):
         # update current image/slice/timepoint if changed
         if zslice != None:
             par_obj.curr_z = zslice
@@ -1399,27 +1403,35 @@ class Win_fn(QtWidgets.QWidget):
             par_obj.curr_t = tpt
         if imno != None:
             par_obj.curr_file = imno
+
+        # reset drawing tools unless just changing channel
+        if keep_roi == False:
+            self.delete_roi_fn(update_display=False)
+            '''
+            # reset controls and box drawing
+            par_obj.dots = []
+            par_obj.rects = None
+            par_obj.select_ROI = False
+            par_obj.draw_ROI = True
+            par_obj.draw_dots = False
+            par_obj.remove_dots = False
+            self.save_ROI_btn.setEnabled(True)
+            self.save_dots_btn.setEnabled(False)
+            self.remove_dots_btn.setEnabled(False)
+            self.sel_ROI_btn.setEnabled(True)
+            par_obj.ROI_index = []
+            '''
+
         # Goto and evaluate image function.
-        v2.goto_img_fn_new(par_obj, self)
+        v2.goto_img_fn_new(par_obj, self, keep_roi=keep_roi)
         # updates Z-cal
         if par_obj.filehandlers[par_obj.curr_file].z_calibration != 0:
             par_obj.z_cal = par_obj.filehandlers[par_obj.curr_file].z_calibration
         self.z_cal_txt.setText(str(par_obj.z_cal)[0:6])
-        # v2.return_imRGB_slice_new(par_obj,zslice,tpt)
-        # self.draw_saved_dots_and_roi()
-        # reset controls and box drawing
-        par_obj.dots = []
-        par_obj.rects = np.zeros((1, 5))
-        par_obj.select_ROI = False
-        par_obj.draw_ROI = True
-        par_obj.draw_dots = False
-        par_obj.remove_dots = False
-        self.save_ROI_btn.setEnabled(True)
-        self.save_dots_btn.setEnabled(False)
-        self.remove_dots_btn.setEnabled(False)
-        self.sel_ROI_btn.setEnabled(True)
-        par_obj.ROI_index = []
-        # app.processEvents()
+
+
+
+
 
     def sel_ROI_btn_fn(self):
         par_obj.ROI_index = []
@@ -1436,11 +1448,13 @@ class Win_fn(QtWidgets.QWidget):
                 dots = par_obj.saved_dots[par_obj.ROI_index[b]]
                 rects = par_obj.saved_ROI[par_obj.ROI_index[b]]
                 self.dots_and_square(dots, rects, 'y')
+            win.delete_ROI_btn.setEnabled(True)
         else:
             self.save_ROI_btn.setEnabled(True)
             par_obj.select_ROI = False
             par_obj.draw_ROI = True
             self.draw_saved_dots_and_roi()
+
 
     def remove_dots_btn_fn(self):
         if par_obj.remove_dots == False:
