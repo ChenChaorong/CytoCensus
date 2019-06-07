@@ -708,7 +708,7 @@ class Eval_disp_im_win(QtWidgets.QWidget):
         par_obj.min_distance[1] = float(self.count_txt_2.text())
         par_obj.min_distance[2] = float(self.count_txt_3.text())
         par_obj.abs_thr = float(self.abs_thr_txt.text())/100
-        par_obj.rel_thr = float(self.rel_thr_txt.text())
+        #par_obj.rel_thr = float(self.rel_thr_txt.text())
 
         v2.count_maxima(par_obj, par_obj.curr_t, par_obj.curr_file)
         par_obj.show_pts = 1
@@ -773,7 +773,7 @@ class Eval_disp_im_win(QtWidgets.QWidget):
         self.count_txt_2.setText(str(par_obj.min_distance[1]))
         self.count_txt_3.setText(str(par_obj.min_distance[2]))
         self.abs_thr_txt.setText(str(par_obj.abs_thr))
-        self.rel_thr_txt.setText(str(par_obj.rel_thr))
+        #self.rel_thr_txt.setText(str(par_obj.rel_thr))
 
         self.count_maxima_btn.setEnabled(True)
         self.count_all_btn.setEnabled(True)
