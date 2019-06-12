@@ -924,11 +924,14 @@ class File_Dialog(QtWidgets.QMainWindow):
         self.int_obj.selIntButton.setEnabled(False)
         #filepath = QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', '/home')
         par_obj.file_array = []
-
         path = None
-        for path in QtWidgets.QFileDialog.getOpenFileNames(self, 'Open file', self.par_obj.filepath, 'Images(*.tif *.tiff);;'):
-            if path != '':
-                par_obj.file_array.append(path[0])
+        for path in QtWidgets.QFileDialog.getOpenFileNames(self, 'Open files', self.par_obj.filepath, 'Images(*.tif *.tiff);;'):
+            if path != '' and path !='Images(*.tif *.tiff)':
+                if type(path) is not list:
+                    par_obj.file_array.append(path)
+                else:
+                    par_obj.file_array
+                    par_obj.file_array=par_obj.file_array+path
         if path == None:
             return
 

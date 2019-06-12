@@ -143,7 +143,7 @@ class btn_fn:
                     if par_obj.curr_t>par_obj.max_t: par_obj.curr_t = par_obj.max_t
                     self.goto_img_fn(imno=par_obj.curr_file+1)
 
-                    break;
+                    break
 
 def on_about(self):
     self.about_win = QtWidgets.QtWidget()
