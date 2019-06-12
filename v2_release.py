@@ -101,7 +101,7 @@ class fileDialog(QtWidgets.QMainWindow):
                     par_obj.file_array=par_obj.file_array+path
                 else:
                     par_obj.file_array.append(path)
-        if path is None:
+        if par_obj.file_array is []:
             return
 
         self.parent.config['filepath'] = str(
@@ -1692,6 +1692,7 @@ class Win_fn(QtWidgets.QWidget):
 
 # Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
+    freeze_support()
     # generate layout
     app = QtWidgets.QApplication([])
     QtWidgets.QApplication.setQuitOnLastWindowClosed(True)
