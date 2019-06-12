@@ -225,8 +225,9 @@ class checkBoxCH(QtWidgets.QCheckBox):
                 else:
                     newImg = par_obj.filehandlers[0].get_tiff_slice([0], 0, range(par_obj.ex_img.shape[0]), range(par_obj.ex_img.shape[1]), [par_obj.ch_active[:3]])
                 '''
-                Win.plt1.images[0].set_data(newImg/newImg.max())#/par_obj.tiffarraymax)
-                Win.canvas1.draw()
+                if newImg.max()>0:
+                    Win.plt1.images[0].set_data(newImg/newImg.max())#/par_obj.tiffarraymax)
+                    Win.canvas1.draw()
 
         else: #set visible channels
             #if self.ID not in par_obj.ch_display:
