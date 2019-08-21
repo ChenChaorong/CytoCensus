@@ -1049,9 +1049,9 @@ class widgetSP(QtWidgets.QWidget):
 # Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
 
-    timer = QtCore.QTimer()
-    timer.timeout.connect(lambda: None)
-    timer.start(200)
+    #timer = QtCore.QTimer()
+    #timer.timeout.connect(lambda: None)
+    #timer.start(200)
 
     # generate layout
     app = QtWidgets.QApplication([])
