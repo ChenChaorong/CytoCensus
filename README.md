@@ -1,24 +1,23 @@
-# QBrain
+# CytoCensus
 
-Software repository for QBrain, machine learning software for identifying cells in 3-D tissue.
+Software repository for CytoCensus, formerly QBrain, machine learning software for identifying cells in 3-D tissue.
 
 
 ## Corresponding software publication:
 
 MS ID#: BIORXIV/2017/137406
 
-MS TITLE: Brain Development: Machine Learning Analysis Of Individual Stem Cells In Live 3D Tissue
+MS TITLE: CytoCensus: mapping cell identity and division in tissues and organs using machine learning
 
-Authors:
-Martin Hailstone, Lu Yang, Dominic Waithe, Tamsin J Samuels, Yoav Arava, Tomasz Dobrzycki, Richard M Parton and Ilan Davis
+Authors: Martin Hailstone, Dominic Waithe, View ORCID ProfileTamsin J Samuels, Lu Yang, Ita Costello, Yoav Arava, Elizabeth J Robertson, Richard M Parton, View ORCID ProfileIlan Davis
 
-http://biorxiv.org/content/early/2017/05/14/137406
+https://www.biorxiv.org/content/10.1101/137406v4
 
 ## Installation instructions:
 
 ### Run from Source
 
-If you are a capable Python user then  you can clone the above repository and run from source. Clone the repository and run "python v2_release.py" for the training interface to be loaded. Run "python v2_evaluate.py" to load the interface for the bulk running of files.
+If you are a capable Python(3) user then  you can clone the above repository and run from source. Clone the repository and run "python v2_release.py" for the training interface to be loaded. Run "python v2_evaluate.py" to load the interface for the bulk running of files.
 Be aware the repository has a number of dependencies.
 
 ### Compiled software:
