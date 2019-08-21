@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Main script for running QuantiFly training.
-"""QBrain Software v0.1
+"""CytoCensus Software v0.1
 
     Copyright (C) 2017  Dominic Waithe Martin Hailstone
 
@@ -101,7 +101,7 @@ class fileDialog(QtWidgets.QMainWindow):
                     par_obj.file_array.append(path)
                 else:
                     par_obj.file_array=par_obj.file_array+path
-                    
+
         if par_obj.file_array is []:
             return
 
@@ -1693,7 +1693,7 @@ class Win_fn(QtWidgets.QWidget):
 
 # Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
-    freeze_support()
+    #freeze_support()
     # generate layout
     app = QtWidgets.QApplication([])
     QtWidgets.QApplication.setQuitOnLastWindowClosed(True)
