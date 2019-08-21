@@ -77,7 +77,7 @@ class ParameterClass(object):
         self.curr_z = 0
         self.curr_t = 0
 
-        self.user_max_z = []
+        self.user_max_z = 10000 #fallback limits to 10000 Zs, which should be plenty
 
 
         self.height = 0
