@@ -9,7 +9,7 @@ MS ID#: BIORXIV/2017/137406
 
 MS TITLE: CytoCensus: mapping cell identity and division in tissues and organs using machine learning
 
-Authors: Martin Hailstone, Dominic Waithe, View ORCID ProfileTamsin J Samuels, Lu Yang, Ita Costello, Yoav Arava, Elizabeth J Robertson, Richard M Parton, View ORCID ProfileIlan Davis
+Authors: Martin Hailstone, Dominic Waithe, Tamsin J Samuels, Lu Yang, Ita Costello, Yoav Arava, Elizabeth J Robertson, Richard M Parton, Ilan Davis
 
 https://www.biorxiv.org/content/10.1101/137406v4
 
@@ -30,7 +30,9 @@ Simply download the version for your operating system and run the software direc
 
 ## FAQ
 * Q: The software is slow to load
+
   A: It should only be slow the first time you run it on a particular computer. Subsequent usuage should be much faster.
 
 * Q: Which executable should I run first? 
+
   A: The train software should be run first as this software allows you to train the software and produce models which can than be applied in bulk. The bulk software allows you to apply your previously trained model to one or more datasets.
