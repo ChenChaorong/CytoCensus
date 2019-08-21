@@ -31,7 +31,7 @@ Simply download the version for your operating system and run the software direc
 ## FAQ
 * Q: The software is slow to load
 
-  A: It should only be slow the first time you run it on a particular computer. Subsequent usuage should be much faster.
+  A: It should only be slow the first time you run it on a particular computer. Subsequent usage should be much faster.
 
 * Q: Which executable should I run first? 
 
