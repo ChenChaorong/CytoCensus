@@ -1,5 +1,6 @@
 from features import local_features
 from common import common_navigation
-from functions import v2_functions
+from functions import v2_functions, maxima
 from parameters import parameter_object
-from io import File_handler 
+from fileio import File_handler
+from ROI import user_ROI

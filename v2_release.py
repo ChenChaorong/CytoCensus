@@ -117,8 +117,8 @@ class fileDialog(QtWidgets.QMainWindow):
         self.parent.image_status_text.showMessage(updateText)
         if success is True:
             self.parent.updateAfterImport()
-            self.parent.resize_factor_text.hide()
-            self.parent.resize_factor_input.hide()
+            #self.parent.resize_factor_text.hide()
+            #self.parent.resize_factor_input.hide()
         else:
             self.parent.image_status_text.showMessage(
                 'Image import unsuccesful. Use TIF files')
@@ -1704,9 +1704,9 @@ if __name__ == '__main__':
     splash.setMask(splash_pix.mask())
     splash.show()
     #app.processEvents()
-    timer = QtCore.QTimer()
-    timer.timeout.connect(lambda: time.sleep(0.001))
-    timer.start(100)
+    #timer = QtCore.QTimer()
+    #timer.timeout.connect(lambda: time.sleep(0.001))
+    #timer.start(100)
     # Creates tab widget.
     win_tab = QtWidgets.QTabWidget()
     # Creates win, an instance of QWidget

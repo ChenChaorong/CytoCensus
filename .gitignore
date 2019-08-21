@@ -14,3 +14,6 @@ v2_functions.pyc
 .ipynb_checkpoints/validation_scripts-checkpoint.ipynb
 
 .ipynb_checkpoints/*
+.vscode/.ropeproject/config.py
+.vscode/.ropeproject/objectdb
+.vscode/settings.json

@@ -780,16 +780,16 @@ def import_data_fn(par_obj, file_array, file_array_offset=0):
         elif par_obj.numCH == max(par_obj.filehandlers[imno].numCH,1):
             pass
         else:
-            status_text = 'Different number of image channels in the selected images'
-            raise Exception(status_text)# if this isn't true then something is wrong
+            status_text = 'Images not loaded: Different number of image channels in the selected images'
+            return False, status_text # if this isn't true then something is wrong
         #check height and width match
         if imno == 0:
             par_obj.ori_height = par_obj.filehandlers[imno].height
         elif par_obj.ori_height == par_obj.filehandlers[imno].height:
             pass
         else:
-            status_text = 'Different image size in the selected images'
-            raise Exception(status_text)# if this isn't true then something is wrong
+            status_text = 'Images not loaded: Different image size in the selected images'
+            return False, status_text# if this isn't true then something is wrong
 
         if imno == 0:
             par_obj.ori_width = par_obj.filehandlers[imno].width
@@ -821,8 +821,8 @@ def import_data_fn(par_obj, file_array, file_array_offset=0):
     par_obj.ch_display = list(range(0, min(par_obj.numCH, 3)))
     par_obj.ex_img = return_rgb_slice(par_obj, 0, 0, 0)
     
-    statusText = str(file_array.__len__())+' Files Loaded.'
-    return True, statusText
+    status_text = str(file_array.__len__())+' Files Loaded.'
+    return True, status_text
 
 def filter_prediction_fn(par_obj, int_obj):
     for fileno, imfile in par_obj.filehandlers.items():
