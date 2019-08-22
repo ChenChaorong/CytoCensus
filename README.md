@@ -25,10 +25,18 @@ Be aware the repository has a number of dependencies.
 ### Compiled software:
 
 The latest compiled releases can be found here:
-https://github.com/dwaithe/QBrain/releases/
+https://github.com/hailstonem/CytoCensus/releases/
 Simply download the version for your operating system and run the software directly.
 
 ## FAQ
+* Q: Where do I download CytoCensus from?
+
+  A: https://github.com/hailstonem/CytoCensus/releases/
+  
+* Q: How do I use CytoCensus?
+
+  A: A manual is included in the download
+  
 * Q: The software is slow to load
 
   A: It should only be slow the first time you run it on a particular computer. Subsequent usage should be much faster.
