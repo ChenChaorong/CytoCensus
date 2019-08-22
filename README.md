@@ -34,7 +34,7 @@ or create a new environment with conda:
 Run "python v2_release.py" for the training interface to be loaded. Run "python v2_evaluate.py" to load the interface for the bulk running of files.
 
 
-### Compiled software:
+## Download compiled software:
 
 The latest compiled releases can be found here:
 https://github.com/hailstonem/CytoCensus/releases/
