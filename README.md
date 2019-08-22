@@ -17,10 +17,22 @@ https://www.biorxiv.org/content/10.1101/137406v4
 
 ### Run from Source
 
-If you are a capable Python(3) user then you can clone the above repository and run from source. Using git
+If you are a capable Python(3) user then you can clone the above repository and run from source. Using git:
 
-Clone the repository, install requirements using  and run "python v2_release.py" for the training interface to be loaded. Run "python v2_evaluate.py" to load the interface for the bulk running of files.
-Be aware the repository has a number of dependencies.
+`git clone https://github.com/hailstonem/CytoCensus.git`
+
+Clone the repository, install requirements using pip:
+
+`pip install -r requirements.txt`
+
+or create a new environment with conda:
+
+`conda env create --file environment.yml`
+
+`conda activate cytocensus`
+
+Run "python v2_release.py" for the training interface to be loaded. Run "python v2_evaluate.py" to load the interface for the bulk running of files.
+
 
 ### Compiled software:
 
