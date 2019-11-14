@@ -86,7 +86,7 @@ class File_handler(object):
                 alist.append(tpt)
                 blist.append(n)
         for n, axis in enumerate(self.order):
-            if axis == "Z":
+            if axis == "Z" or axis == "Q":
                 alist.append(zslice)
                 blist.append(n)
         for n, axis in enumerate(self.order):
