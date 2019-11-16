@@ -78,7 +78,7 @@ class File_handler(object):
             zslice = [zslice]
         if isinstance(zslice[0], list):
             zslice = zslice[0]
-
+        
         alist = []
         blist = []
         for n, axis in enumerate(self.order):
@@ -86,7 +86,7 @@ class File_handler(object):
                 alist.append(tpt)
                 blist.append(n)
         for n, axis in enumerate(self.order):
-            if axis == "Z":
+            if axis in ["Z", "Q", "I"]:
                 alist.append(zslice)
                 blist.append(n)
         for n, axis in enumerate(self.order):
@@ -102,7 +102,9 @@ class File_handler(object):
             if axis == "C" or axis == "S":
                 alist.append(c)
                 blist.append(n)
-
+        print (self.order)
+        #print (blist)
+        #print (alist)
         tiff2 = self.array.transpose(blist)
 
         if self.order.__len__() == 5:
@@ -173,7 +175,7 @@ class File_handler(object):
         for n, axis in enumerate(self.order):
             if axis == "T":
                 self.max_t = meta.shape[n] - 1
-            if axis == "Z":
+            if axis in ["Z", "Q", "I"]:
                 self.max_z = meta.shape[n] - 1
             if axis == "Y":
                 self.height = meta.shape[n]
