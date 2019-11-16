@@ -768,7 +768,7 @@ def import_data_fn(par_obj, file_array, file_array_offset=0):
     par_obj.filehandlers = {}
 
     for im_n, imfile in enumerate(file_array):
-        imno=im_n+file_array_offset
+        imno = im_n + file_array_offset
 
         par_obj.filehandlers[imno] = File_handler(str(imfile))
         #currently doesn't check if multiple filetypes, on the basis only loads tiffs
