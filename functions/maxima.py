@@ -47,8 +47,11 @@ def maxima_hessian_3D(par_obj, time_pt, fileno, reset_max = False):
     radius = [par_obj.min_distance[0], par_obj.min_distance[1], par_obj.resize_factor*par_obj.min_distance[2]/imfile.z_calibration]
 
     predMtx = np.zeros((par_obj.height, par_obj.width, imfile.max_z+1))
+
     for i in range(imfile.max_z+1):
-        predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
+        if time_pt in par_obj.data_store['pred_arr'][fileno]:
+            if i in par_obj.data_store['pred_arr'][fileno][time_pt]:
+                predMtx[:, :, i] = par_obj.data_store['pred_arr'][fileno][time_pt][i]
     """
     with par_obj.data.predictions[fileno].reader() as predictions:
         
