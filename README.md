@@ -15,6 +15,12 @@ https://www.biorxiv.org/content/10.1101/137406v4
 
 ## Installation instructions:
 
+### Download compiled software:
+
+The latest compiled releases can be found here:
+https://github.com/hailstonem/CytoCensus/releases/
+Simply download the version for your operating system and run the software directly.
+
 ### Run from Source
 
 If you are a capable Python(3) user then you can clone the above repository and run from source. Using git:
@@ -32,13 +38,6 @@ or create a new environment with conda:
 `conda activate cytocensus`
 
 Run "python v2_release.py" for the training interface to be loaded. Run "python v2_evaluate.py" to load the interface for the bulk running of files.
-
-
-### Compiled software:
-
-The latest compiled releases can be found here:
-https://github.com/hailstonem/CytoCensus/releases/
-Simply download the version for your operating system and run the software directly.
 
 ## FAQ
 * Q: Where do I download CytoCensus from?
