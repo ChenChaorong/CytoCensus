@@ -498,7 +498,7 @@ def evaluate_forest_new(par_obj, int_obj, withGT, model_num, zsliceList, tptList
                 if par_obj.p_size==1:
                     mimg_lin = np.reshape(par_obj.data_store[arr][imno][tpt][zslice], (par_obj.height * par_obj.width, par_obj.data_store[arr][imno][tpt][zslice].shape[2]))
                 if par_obj.p_size==2:
-                    mimg_lin= par_obj.data_store[arr][imno][tpt][zslice]
+                    mimg_lin = par_obj.data_store[arr][imno][tpt][zslice]
                 t2 = time.time()
                 linPred = par_obj.RF[model_num].predict(mimg_lin).astype('uint16')
                 #linPred=linPred[:,1]-linPred[:,0]
