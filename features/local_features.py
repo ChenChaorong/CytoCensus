@@ -75,9 +75,9 @@ def feature_create_threadable(par_obj, imRGB):
     int(par_obj.crop_x1)), feat_length * (par_obj.ch_active.__len__())))'''
     feat = np.zeros((par_obj.height, par_obj.width, feat_length * (par_obj.ch_active.__len__())))
 
-    if par_obj.numCH == 1:
+    if par_obj.numCH in [1, 0]:
         imG = imRGB[:, :].astype(np.float32)/par_obj.tiffarray_typemax
-
+        
         feat = feat_func(imG, par_obj.feature_scale)
     else:
         for b in range(0, par_obj.ch_active.__len__()):
@@ -210,8 +210,8 @@ def frst2d(image, radii, alpha, stdFactor, mode,discard=0):
     gx =  scipy.ndimage.filters.sobel(image, axis=0)
     gy = scipy.ndimage.filters.sobel(image, axis=1)
 
-    dark = False;
-    bright = False;
+    dark = False
+    bright = False
 
     if (mode == 'bright'):
         bright = True
@@ -221,9 +221,9 @@ def frst2d(image, radii, alpha, stdFactor, mode,discard=0):
         bright = True
         dark = True
     else:
-        raise Exception("invalid mode!");
+        raise Exception("invalid mode!")
 
-    maxRadius = int(np.ceil(max(radii)));
+    maxRadius = int(np.ceil(max(radii)))
 
     filtered = np.zeros((sizex + 2 * maxRadius, sizey + 2 * maxRadius))
     S_n = np.zeros((sizex + 2 * maxRadius, sizey + 2 * maxRadius))
