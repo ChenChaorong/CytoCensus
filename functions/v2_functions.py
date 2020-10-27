@@ -393,9 +393,7 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
                         # imRGB/=par_obj.tiffarraymax
                         width = range(0, par_obj.ori_width, int(par_obj.resize_factor))
                         height = range(0, par_obj.ori_height, int(par_obj.resize_factor))
-                        imRGB = par_obj.filehandlers[imno].get_tiff_slice(
-                            [tpt], [zslice], width, height, par_obj.ch_active
-                        )
+                        imRGB = par_obj.filehandlers[imno].get_slice([tpt], [zslice], width, height, par_obj.ch_active)
 
                         # imRGBlist.append(imRGB)
                         imRGB = imRGB.astype("float32") / par_obj.tiffarray_typemax
@@ -460,9 +458,7 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
 
                         width = range(0, par_obj.ori_width, int(par_obj.resize_factor))
                         height = range(0, par_obj.ori_height, int(par_obj.resize_factor))
-                        imRGB = par_obj.filehandlers[imno].get_tiff_slice(
-                            [tpt], [zslice], width, height, par_obj.ch_active
-                        )
+                        imRGB = par_obj.filehandlers[imno].get_slice([tpt], [zslice], width, height, par_obj.ch_active)
                         imRGBlist.append(imRGB.astype("float32") / par_obj.tiffarray_typemax)
                 # initiate pool and start caclulating features
                 int_obj.report_progress(
@@ -496,53 +492,53 @@ def im_pred_inline_fn_new(par_obj, int_obj, zsliceList, tptList, imnoList, threa
                             featwithzt[:, :, 8:] = feat
                             if zslice > 1:
                                 featwithzt[:, :, 0:2] = (
-                                    par_obj.filehandlers[imno].get_tiff_slice(
+                                    par_obj.filehandlers[imno].get_slice(
                                         [tpt], [zslice - 2], width, height, par_obj.ch_active
                                     )
-                                    + par_obj.filehandlers[imno].get_tiff_slice(
+                                    + par_obj.filehandlers[imno].get_slice(
                                         [tpt], [zslice - 1], width, height, par_obj.ch_active
                                     )
                                     - 2
-                                    * par_obj.filehandlers[imno].get_tiff_slice(
+                                    * par_obj.filehandlers[imno].get_slice(
                                         [tpt], [zslice], width, height, par_obj.ch_active
                                     )
                                 )
                             if zslice < (par_obj.max_z - 1):
                                 featwithzt[:, :, 2:4] = (
-                                    par_obj.filehandlers[imno].get_tiff_slice(
+                                    par_obj.filehandlers[imno].get_slice(
                                         [tpt], [zslice + 2], width, height, par_obj.ch_active
                                     )
-                                    + par_obj.filehandlers[imno].get_tiff_slice(
+                                    + par_obj.filehandlers[imno].get_slice(
                                         [tpt], [zslice + 1], width, height, par_obj.ch_active
                                     )
                                     - 2
-                                    * par_obj.filehandlers[imno].get_tiff_slice(
+                                    * par_obj.filehandlers[imno].get_slice(
                                         [tpt], [zslice], width, height, par_obj.ch_active
                                     )
                                 )
                             if tpt > 5:
                                 featwithzt[:, :, 4:6] = (
-                                    par_obj.filehandlers[imno].get_tiff_slice(
+                                    par_obj.filehandlers[imno].get_slice(
                                         [tpt - 5], [zslice], width, height, par_obj.ch_active
                                     )
-                                    + par_obj.filehandlers[imno].get_tiff_slice(
+                                    + par_obj.filehandlers[imno].get_slice(
                                         [tpt - 4], [zslice], width, height, par_obj.ch_active
                                     )
                                     - 2
-                                    * par_obj.filehandlers[imno].get_tiff_slice(
+                                    * par_obj.filehandlers[imno].get_slice(
                                         [tpt], [zslice], width, height, par_obj.ch_active
                                     )
                                 )
                             if tpt < (par_obj.max_t - 5):
                                 featwithzt[:, :, 6:8] = (
-                                    par_obj.filehandlers[imno].get_tiff_slice(
+                                    par_obj.filehandlers[imno].get_slice(
                                         [tpt + 5], [zslice], width, height, par_obj.ch_active
                                     )
-                                    + par_obj.filehandlers[imno].get_tiff_slice(
+                                    + par_obj.filehandlers[imno].get_slice(
                                         [tpt + 4], [zslice], width, height, par_obj.ch_active
                                     )
                                     - 2
-                                    * par_obj.filehandlers[imno].get_tiff_slice(
+                                    * par_obj.filehandlers[imno].get_slice(
                                         [tpt], [zslice], width, height, par_obj.ch_active
                                     )
                                 )
@@ -570,20 +566,20 @@ def return_rgb_slice(par_obj, zslice, tpt, imno):
                 if i == 3:
                     break  # can only display 3 channels
 
-                input_im = imfile.get_tiff_slice([tpt], [zslice], width, height, [ch])
+                input_im = imfile.get_slice([tpt], [zslice], width, height, [ch])
                 imRGB[:, :, i] = (input_im.astype("float32") / par_obj.filehandlers[imno].tiffarraymax) * clim[ch][
                     1
                 ] - clim[ch][0]
         else:
             for i, ch in enumerate(par_obj.ch_display):
 
-                input_im = imfile.get_tiff_slice([tpt], [zslice], width, height, [ch])
+                input_im = imfile.get_slice([tpt], [zslice], width, height, [ch])
                 imRGB[:, :, ch] = (input_im.astype("float32") / par_obj.filehandlers[imno].tiffarraymax) * clim[ch][
                     1
                 ] - clim[ch][0]
 
     elif par_obj.numCH == 1 and len(par_obj.ch_display) == 1:
-        input_im = imfile.get_tiff_slice([tpt], [zslice], width, height)
+        input_im = imfile.get_slice([tpt], [zslice], width, height)
 
         im = (input_im.astype("float32") / par_obj.filehandlers[imno].tiffarraymax) * clim[0][1] - clim[0][0]
         imRGB[:, :, 0] = im
