@@ -3,20 +3,14 @@
 import os
 import numpy as np
 from tifffile import TiffFile, imsave, TiffWriter  # Install with pip install tifffile.
+from fileio.datadoc import DataDoc
 
 """
 Created on Fri Feb 17 19:48:58 2017
 @author: martin
 Since it's clear that we want to handle files with all their own data in a
 coherent way
-And at the moment we rely on 'Parameter Object' effectively global parameters
-Which contain lists or dictionaries of the relevant parameters
-This means that it is possible to have some global file-related parameters
-Along with some non-global ones
-This is potentially neccessary for things such as the Z-calibration, which
-really shouldn't differ between images.
-But is not a particularly good way to handle the images along with their associated data
-Because it requires specialised parameters and logic for each.
+
 A more coherent way to do this would be to have a class that holds all the file specific
 information, and then is simply accessed when needed
 The parameter object then need only hold relevant parameters to the
@@ -78,7 +72,7 @@ class File_handler(object):
             zslice = [zslice]
         if isinstance(zslice[0], list):
             zslice = zslice[0]
-        
+
         alist = []
         blist = []
         for n, axis in enumerate(self.order):
@@ -86,7 +80,7 @@ class File_handler(object):
                 alist.append(tpt)
                 blist.append(n)
         for n, axis in enumerate(self.order):
-            if axis in ["Z", "Q", "I"]:
+            if axis in ["Z", "Q", "I", "W"]:
                 alist.append(zslice)
                 blist.append(n)
         for n, axis in enumerate(self.order):
@@ -102,9 +96,9 @@ class File_handler(object):
             if axis == "C" or axis == "S":
                 alist.append(c)
                 blist.append(n)
-        print (self.order)
-        #print (blist)
-        #print (alist)
+        print(self.order)
+        # print (blist)
+        # print (alist)
         tiff2 = self.array.transpose(blist)
 
         if self.order.__len__() == 5:
@@ -132,10 +126,47 @@ class File_handler(object):
 
         if self.ext == "tif" or self.ext == "tiff":
             self.import_tiff()
-            return True, "Image loaded"
+            return True, "TIFF Image loaded"
+        elif self.ext in ["dv", "mrc"]:
+            self.import_mrc()
+            return True, "MRC Image loaded"
         else:
-            status_text = "Status: Image format not-recognised. Please choose TIF/TIFF files."
+            status_text = "Status: Image format not-recognised. Please choose MRC or TIF/TIFF files."
             return False, status_text
+
+    def import_mrc(self):
+        self.mrc = DataDoc(self.full_name)
+        try:
+            x_pixel_size = self.mrc.imageHeader.d[0]
+            z_pixel_size = self.mrc.imageHeader.d[2]
+            self.z_calibration = z_pixel_size / x_pixel_size
+        except (AttributeError, KeyError) as ex:
+            print("resolution not recognised")
+        pixeltype_to_dtypemax = [255, 32768, 0, 0, 0, 0, 65535, 0]
+
+        self.array = self.mrc.getImageArray()
+        self.tiffarray_typemax = pixeltype_to_dtypemax[self.mrc.imageHeader.PixelType]
+        self.tiffarraymax = self.array.max()
+        if self.tiffarray_typemax == 0:
+            self.tiffarray_typemax = self.tiffarraymax
+        elif self.tiffarraymax == 65535 and self.tiffarraymax < 4096:  #'14 bit'
+            self.tiffarraymax = 4095
+        shape = self.array.shape
+        self.order = "CTZYX"
+        for n, axis in enumerate(self.order):
+            if axis == "T":
+                self.max_t = shape[n] - 1
+            if axis in ["Z", "Q", "I"]:
+                self.max_z = shape[n] - 1
+            if axis == "Y":
+                self.height = shape[n]
+            if axis == "X":
+                self.width = shape[n]
+            if axis == "S":  # RGB image colour channel
+                self.numCH = shape[n]
+                # par_obj.tiff_reorder=False
+            if axis == "C":
+                self.numCH = shape[n]
 
     def import_tiff(self):
         tiff = TiffFile(self.full_name)
@@ -200,6 +231,7 @@ class File_handler(object):
                 self.tiffarray_typemax = 4095
         else:
             self.tiffarray_typemax = np.finfo(self.bitDepth).max
+        print(self.array.shape)
 
 
 class Intermediate_handler:
