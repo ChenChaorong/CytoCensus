@@ -71,7 +71,7 @@ class File_handler(object):
         self.bitDepth = 0
         self.import_file()
 
-    def get_tiff_slice(self, tpt=[0], zslice=[0], x=[0], y=[0], c=[0]):
+    def get_slice(self, tpt=[0], zslice=[0], x=[0], y=[0], c=[0]):
         """Get image cube using numpy views, dealing with different TXYZC orderings. Always return TZYXC"""
         # handles lists and ints nicely
         if not isinstance(zslice, list):  # type(zslice) is not list:
