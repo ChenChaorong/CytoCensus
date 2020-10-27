@@ -95,8 +95,8 @@ class fileDialog(QtWidgets.QMainWindow):
 
         par_obj.file_array = []
         path = None
-        for path in QtWidgets.QFileDialog.getOpenFileNames(self, 'Open file', self.parent.filepath, 'Images(*.tif *.tiff);;'):
-            if path != '' and path !='Images(*.tif *.tiff)':
+        for path in QtWidgets.QFileDialog.getOpenFileNames(self, 'Open file', self.parent.filepath, 'Images(*.tif *.tiff *.mrc *.dv);;'):
+            if path != '' and path !='Images(*.tif *.tiff *.mrc *.dv)':
                 if type(path) is not list:
                     par_obj.file_array.append(path)
                 else:
